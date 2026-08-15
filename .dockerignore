@@ -1,0 +1,10 @@
+# 后端构建上下文排除项
+.git
+.idea
+target
+data
+frontend
+*.log
+*.md
+HELP.md
+.env

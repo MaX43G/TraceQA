@@ -1,0 +1,75 @@
+package edu.zjut.traceqa.controller;
+
+import edu.zjut.traceqa.common.api.ApiResponse;
+import edu.zjut.traceqa.common.api.PageResult;
+import edu.zjut.traceqa.dto.kb.KnowledgeBaseDTO;
+import edu.zjut.traceqa.service.KnowledgeBaseService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 知识库接口。
+ */
+@Tag(name = "知识库", description = "知识库的增删改查")
+@RestController
+@RequestMapping("/api/kbs")
+public class KnowledgeBaseController {
+
+    private final KnowledgeBaseService knowledgeBaseService;
+
+    public KnowledgeBaseController(KnowledgeBaseService knowledgeBaseService) {
+        this.knowledgeBaseService = knowledgeBaseService;
+    }
+
+    @Operation(summary = "查询启用知识库列表")
+    @GetMapping
+    public ApiResponse<List<KnowledgeBaseDTO>> list() {
+        return ApiResponse.ok(knowledgeBaseService.list());
+    }
+
+    @Operation(summary = "分页查询知识库")
+    @GetMapping("/page")
+    public ApiResponse<PageResult<KnowledgeBaseDTO>> page(
+            @RequestParam(defaultValue = "1") long page,
+            @RequestParam(defaultValue = "10") long size) {
+        return ApiResponse.ok(knowledgeBaseService.page(page, size));
+    }
+
+    @Operation(summary = "统计知识库文档数量")
+    @GetMapping("/{id}/doc-count")
+    public ApiResponse<Map<String, Long>> docCount(@PathVariable Long id) {
+        return ApiResponse.ok(Map.of("count", knowledgeBaseService.countDocuments(id)));
+    }
+
+    @Operation(summary = "创建知识库")
+    @PostMapping
+    public ApiResponse<KnowledgeBaseDTO> create(@Valid @RequestBody KnowledgeBaseDTO dto) {
+        return ApiResponse.ok(knowledgeBaseService.create(dto));
+    }
+
+    @Operation(summary = "更新知识库")
+    @PutMapping("/{id}")
+    public ApiResponse<KnowledgeBaseDTO> update(@PathVariable Long id, @Valid @RequestBody KnowledgeBaseDTO dto) {
+        return ApiResponse.ok(knowledgeBaseService.update(id, dto));
+    }
+
+    @Operation(summary = "删除知识库")
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        knowledgeBaseService.delete(id);
+        return ApiResponse.ok();
+    }
+}

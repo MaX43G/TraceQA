@@ -1,0 +1,98 @@
+package edu.zjut.traceqa.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import edu.zjut.traceqa.common.api.PageResult;
+import edu.zjut.traceqa.common.enums.ErrorCode;
+import edu.zjut.traceqa.common.exception.BizException;
+import edu.zjut.traceqa.dto.kb.KnowledgeBaseDTO;
+import edu.zjut.traceqa.entity.Document;
+import edu.zjut.traceqa.entity.KnowledgeBase;
+import edu.zjut.traceqa.mapper.DocumentMapper;
+import edu.zjut.traceqa.mapper.KnowledgeBaseMapper;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+/**
+ * 知识库服务。
+ *
+ * <p>提供知识库的增删改查与文档计数，支撑管理员后台与聊天时的知识库选择。</p>
+ */
+@Slf4j
+@Service
+public class KnowledgeBaseService {
+
+    private final KnowledgeBaseMapper knowledgeBaseMapper;
+    private final DocumentMapper documentMapper;
+
+    public KnowledgeBaseService(KnowledgeBaseMapper knowledgeBaseMapper, DocumentMapper documentMapper) {
+        this.knowledgeBaseMapper = knowledgeBaseMapper;
+        this.documentMapper = documentMapper;
+    }
+
+    /** 查询全部启用的知识库 */
+    public List<KnowledgeBaseDTO> list() {
+        return knowledgeBaseMapper.selectList(
+                        new LambdaQueryWrapper<KnowledgeBase>().orderByAsc(KnowledgeBase::getId))
+                .stream().map(KnowledgeBaseDTO::of).toList();
+    }
+
+    /** 分页查询知识库 */
+    public PageResult<KnowledgeBaseDTO> page(long page, long size) {
+        IPage<KnowledgeBase> result = knowledgeBaseMapper.selectPage(
+                new Page<>(page, size),
+                new LambdaQueryWrapper<KnowledgeBase>().orderByDesc(KnowledgeBase::getId));
+        return PageResult.of(result, KnowledgeBaseDTO::of);
+    }
+
+    /** 创建知识库 */
+    public KnowledgeBaseDTO create(KnowledgeBaseDTO dto) {
+        KnowledgeBase kb = new KnowledgeBase();
+        kb.setName(dto.name());
+        kb.setDescription(dto.description());
+        kb.setCourse(dto.course());
+        kb.setStatus(dto.status() == null ? 1 : dto.status());
+        knowledgeBaseMapper.insert(kb);
+        log.info("创建知识库：{}", kb.getName());
+        return KnowledgeBaseDTO.of(kb);
+    }
+
+    /** 更新知识库 */
+    public KnowledgeBaseDTO update(Long id, KnowledgeBaseDTO dto) {
+        KnowledgeBase kb = requireById(id);
+        kb.setName(dto.name());
+        kb.setDescription(dto.description());
+        kb.setCourse(dto.course());
+        kb.setStatus(dto.status());
+        knowledgeBaseMapper.updateById(kb);
+        return KnowledgeBaseDTO.of(kb);
+    }
+
+    /** 删除知识库（同时逻辑删除其下文档） */
+    public void delete(Long id) {
+        requireById(id);
+        // 逻辑删除文档
+        documentMapper.delete(new LambdaQueryWrapper<Document>()
+                .eq(Document::getKnowledgeBaseId, id));
+        knowledgeBaseMapper.deleteById(id);
+        log.info("删除知识库：{}", id);
+    }
+
+    /** 统计知识库下文档数量 */
+    public long countDocuments(Long knowledgeBaseId) {
+        return documentMapper.selectCount(new LambdaQueryWrapper<Document>()
+                .eq(Document::getKnowledgeBaseId, knowledgeBaseId));
+    }
+
+    /** 校验知识库存在 */
+    public KnowledgeBase requireById(Long id) {
+        KnowledgeBase kb = knowledgeBaseMapper.selectById(id);
+        if (kb == null) {
+            throw new BizException(ErrorCode.NOT_FOUND, "知识库不存在");
+        }
+        return kb;
+    }
+}

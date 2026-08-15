@@ -1,0 +1,117 @@
+# ============================================================
+# 溯知 / TraceQA 一键部署编排
+# 服务：mysql + lightrag(知识图谱引擎) + backend(Spring Boot) + frontend(Nuxt SSR)
+# 使用：cp .env.example .env && docker compose up -d --build
+# ============================================================
+name: traceqa
+
+services:
+  # 数据库（单库，极简架构）
+  mysql:
+    image: mysql:8.4
+    container_name: traceqa-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-traceqa}
+      MYSQL_USER: ${MYSQL_USER:-traceqa}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traceqa123}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      # 首次启动自动建表
+      - ./src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - traceqa-mysql-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root123456}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # LightRAG 官方 Server（知识图谱 + 向量引擎）
+  lightrag:
+    image: ghcr.io/hkuds/lightrag:latest
+    container_name: traceqa-lightrag
+    restart: unless-stopped
+    environment:
+      # LLM（OpenAI 兼容，硅基流动）
+      LLM_BINDING: openai
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-THUDM/GLM-Z1-9B-0414}
+      # Embedding（同 OpenAI 兼容端点）
+      EMBEDDING_BINDING: openai
+      EMBEDDING_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn/v1}
+      EMBEDDING_API_KEY: ${LLM_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}
+      EMBEDDING_MAX_TOKEN_SIZE: ${EMBEDDING_MAX_TOKEN_SIZE:-8192}
+      # 服务
+      PORT: 9621
+      WORKING_DIR: /app/data/rag_storage
+      MAX_ASYNC: 4
+    volumes:
+      - traceqa-lightrag-data:/app/data
+    ports:
+      - "9621:9621"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:9621/docs', timeout=5)"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 30s
+
+  # Spring Boot 后端
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: traceqa-backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-traceqa}
+      MYSQL_USER: ${MYSQL_USER:-traceqa}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traceqa123}
+      LIGHTRAG_BASE_URL: http://lightrag:9621
+      LIGHTRAG_API_KEY: ${LIGHTRAG_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-THUDM/GLM-Z1-9B-0414}
+      APP_JWT_SECRET: ${APP_JWT_SECRET:-traceqa-prod-secret-change-me-please-2026}
+      APP_STORAGE_ROOT: /app/data/files
+      TZ: Asia/Shanghai
+    volumes:
+      - traceqa-backend-data:/app/data
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      lightrag:
+        condition: service_healthy
+
+  # Nuxt SSR 前端
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        API_PROXY_TARGET: http://backend:8080
+    container_name: traceqa-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  traceqa-mysql-data:
+  traceqa-lightrag-data:
+  traceqa-backend-data:

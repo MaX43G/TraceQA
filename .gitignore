@@ -37,3 +37,12 @@ build/
 # 前端项目
 frontend/node_modules/**
 frontend/.nuxt/**
+frontend/.output/**
+frontend/.data/**
+frontend/dist/**
+frontend/scripts/openapi.json
+
+# 本地数据与密钥
+data/**
+.env
+*.log
