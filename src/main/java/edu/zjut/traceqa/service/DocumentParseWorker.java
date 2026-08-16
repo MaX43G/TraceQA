@@ -210,7 +210,7 @@ public class DocumentParseWorker {
             poll++;
             updateStatus(doc, DocumentStatus.PROCESSING,
                     uploadProgress(total, doc.getPartDone()),
-                    "第 " + partIndex + "/" + total + " 块解析中");
+                    "第 " + partIndex + "/" + total + " 块图谱构建中（向量检索已可用）");
             sleepQuietly(POLL_INTERVAL_MS);
         }
         throw new BizException(ErrorCode.FILE_ERROR, "解析超时，请稍后重试");

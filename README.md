@@ -39,20 +39,24 @@
                        │    后端（Spring Boot 4.1）        │
                        │  统一响应/全局异常/RBAC/熔断降级    │
                        │  MyBatis-Plus(MySQL) · SSE        │
-                       │  多 Agent 编排 · 检索增强          │
+                       │  多 Agent 编排 · 三路混合检索      │
                        └──────┬─────────────┬─────────────┘
                               │ 多Agent     │ 文档/检索
                     ┌─────────▼──────┐  ┌────▼─────────────┐
                     │ LLM（硅基流动）  │  │ LightRAG 官方     │
-                    │ OpenAI 兼容     │  │ Server（图+向量）  │
-                    └────────────────┘  └────────┬─────────┘
-                                                │ 本地文件系统/图谱
+                    │ OpenAI 兼容     │  │ Server（图+向量+  │
+                    └────────────────┘  │  关键词）          │
+                                       └────────┬─────────┘
+                                               │ 本地文件系统/图谱
+                       ┌──────────────────────────────────┐
+                       │ Redis（查询/决策缓存 · 文档任务队列） │
+                       └──────────────────────────────────┘
 ```
 
 **多 Agent 工作流（SSE 实时推送，前端状态图可视化）：**
 
 ```
-意图识别 → 检索策略调度 → 查询重写与HyDE → 图谱检索(local+global) → 向量检索(多查询) → 融合与补全(RRF+ReRead) → 总结生成
+意图识别 → 检索策略调度 → 查询重写与HyDE → 图谱检索(local+global) → 向量检索(多查询) → 关键词检索 → 融合与补全(RRF+ReRead+LLM精排) → 总结生成
 ```
 
 调度节点按问题复杂度分流：**简单问题仅向量检索（更快）**，**复杂问题走完整聚合链路**。
@@ -61,13 +65,15 @@
 
 - **统一响应** `{code,msg,data,traceId}` + 全局错误码 + 全局异常处理（绝不外泄堆栈）
 - **熔断降级**：LLM 失败自动熔断，逐级降级（Agent → ChatClient → 纯检索 → 友好提示）
-- **检索增强**：查询重写、HyDE、图谱(local+global)+向量(多查询)双路、RRF 融合、ReRead 补全
+- **三路混合检索**：查询重写、HyDE、图谱(local+global)+向量(多查询)+关键词(hl_keywords)、RRF 融合、ReRead 补全、LLM 精排
+- **查询分解**：对比/比较类问题自动拆分为子问题多路检索，召回更完整
+- **Redis 缓存**：查询结果、Agent 决策（意图/复杂度/重写）短 TTL 缓存，显著降低 LLM 调用与响应延迟
 - **LLM 复杂度调度**：简单/复杂问题智能分流，兼顾速度与准确率
 - **多轮对话**：历史上下文注入意图识别、查询重写与总结
-- **SSE 流式**：思考状态图实时可视化 + 打字机输出 + 随时中断
+- **SSE 流式**：思考状态图实时可视化（三路检索节点）+ 打字机输出 + 随时中断
 - **引用溯源**：只显示实际引用的文献，点击查看全文
 - **模型自由切换**：平台内置 6 个模型 + 自定义 OpenAI 兼容模型（本地存储）
-- **异步文档解析**：上传即返 202，后台构建图谱，进度实时追踪
+- **异步文档解析**：支持 .md/.txt 上传与 zip 批量导入，内容指纹去重，大文档切块限速入库（Redis Stream 任务队列），进度实时追踪
 - **RBAC 管理后台**：用户/角色/知识库/文档/系统提示词
 - **移动端适配** + SSR/SEO 首页
 
@@ -95,7 +101,7 @@
 cp .env.example .env
 #    填入 LLM_API_KEY（硅基流动）；可调整 LLM_MODEL 等
 
-# 2. 一键拉起（mysql + lightrag + backend + frontend）
+# 2. 一键拉起（mysql + redis + lightrag + backend + frontend）
 docker compose up -d --build
 ```
 
@@ -108,8 +114,12 @@ docker compose up -d --build
 | OpenAPI 规范 | http://localhost:8080/v3/api-docs |
 | LightRAG Server | http://localhost:9621/docs |
 | MySQL | localhost:3306 |
+| Redis | localhost:6379 |
 
 **默认账号**：`admin/admin123456`（管理员）、`user/user123456`（生产环境务必修改）。
+
+> **文档格式说明**：仅支持上传 **`.md` / `.txt`** 文本文件（支持 zip 批量导入，自动内容去重）。
+> PDF / PPT / Word / 图片等格式请先用 MinerU 等工具转换为 Markdown 后再上传（LightRAG 内置 pypdf 无法解析扫描版 PDF 的文本层）。
 
 > **LightRAG 说明**：Docker 部署中 LightRAG 使用 `Qwen/Qwen3.5-4B` + `BAAI/bge-m3`（硅基流动），并已开启**低并发 + 重试退避**以缓解免费额度限流。若遇限流，可在 `.env` 调整 `LLM_MODEL`，或改用本地 Ollama 模型实现无限流。
 

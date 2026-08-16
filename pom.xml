@@ -127,6 +127,11 @@
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-model-openai</artifactId>
         </dependency>
+        <!-- Redis：查询/决策缓存 + 文档异步任务队列 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
         <!-- 大文档切块：PDF 按页拆分（上传超大 PDF 时用） -->
         <dependency>
             <groupId>org.apache.pdfbox</groupId>

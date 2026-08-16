@@ -15,6 +15,7 @@ import edu.zjut.traceqa.retrieval.RetrievalResult;
 import edu.zjut.traceqa.retrieval.RetrievalService;
 import edu.zjut.traceqa.service.ChatService;
 import edu.zjut.traceqa.service.LlmService;
+import edu.zjut.traceqa.service.RedisCacheService;
 import edu.zjut.traceqa.sse.SsePublisher;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,9 +23,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -60,6 +65,9 @@ public class RagAgentOrchestrator {
 
     @Resource
     private SsePublisher ssePublisher;
+
+    @Resource
+    private RedisCacheService redisCacheService;
 
     /** Spring AI 默认 Base URL 与 API Key（服务端模型切换时使用） */
     @Value("${spring.ai.openai.base-url:https://api.siliconflow.cn}")
@@ -148,14 +156,24 @@ public class RagAgentOrchestrator {
     }
 
     /**
-     * 意图识别节点，返回意图类型
+     * 意图识别节点，返回意图类型（结果缓存 30 分钟）
      */
     private IntentType recognizeIntent(SseEmitter emitter, List<ThinkingNodeVO> thinking, String content,
                                        String history, LlmConfig config) {
         ThinkingNodeVO node = startThinking(thinking, "意图识别", "intent-agent", "正在分析用户意图");
         ssePublisher.send(emitter, "thinking", node);
-        IntentType intent = intentAgent.identify(content, history, config);
-        finishThinking(thinking, emitter, "意图识别", "识别结果：" + intent.getLabel());
+        // 意图缓存按问题内容命中（历史敏感场景较少，短 TTL 兜底）
+        String cacheKey = "intent:" + sha256(content);
+        Optional<IntentType> cached = redisCacheService.get(cacheKey, IntentType.class);
+        IntentType intent;
+        if (cached.isPresent()) {
+            intent = cached.get();
+            finishThinking(thinking, emitter, "意图识别", "识别结果：" + intent.getLabel() + "（缓存命中）");
+        } else {
+            intent = intentAgent.identify(content, history, config);
+            redisCacheService.put(cacheKey, intent, Duration.ofMinutes(30));
+            finishThinking(thinking, emitter, "意图识别", "识别结果：" + intent.getLabel());
+        }
         return intent;
     }
 
@@ -210,12 +228,20 @@ public class RagAgentOrchestrator {
                 progress -> pushProgress(emitter, vectorNode, cancelled, progress));
         finishThinking(thinking, emitter, "向量检索", "向量命中 " + vectorChunks.size() + " 条");
 
-        // 步骤 4：融合与 ReRead 补全
+        // 步骤 4：关键词检索（术语/编号类问题召回更准）
+        ThinkingNodeVO kwNode = startThinking(thinking, "关键词检索", "keyword-agent",
+                "正在执行关键词检索");
+        ssePublisher.send(emitter, "thinking", kwNode);
+        List<RetrievedChunk> keywordChunks = retrievalService.queryKeyword(content, enhanced, config,
+                progress -> pushProgress(emitter, kwNode, cancelled, progress));
+        finishThinking(thinking, emitter, "关键词检索", "关键词命中 " + keywordChunks.size() + " 条");
+
+        // 步骤 5：三路融合 + ReRead 补全 + LLM 精排
         ThinkingNodeVO fuseNode = startThinking(thinking, "融合与补全", "fusion-agent",
-                "正在融合双路结果并二次检索补全");
+                "正在融合三路结果并二次检索补全、精排");
         ssePublisher.send(emitter, "thinking", fuseNode);
         RetrievalResult result = retrievalService.fuseAndSupplement(content, graphChunks, vectorChunks,
-                enhanced, config);
+                keywordChunks, enhanced, config);
         String fuseDetail = String.format("融合后共 %d 条%s", result.chunks().size(),
                 result.degraded() ? "（查询增强已降级）" : "");
         finishThinking(thinking, emitter, "融合与补全", fuseDetail);
@@ -449,6 +475,21 @@ public class RagAgentOrchestrator {
                         node.message(), "执行失败，已降级"));
                 break;
             }
+        }
+    }
+
+    /** SHA-256 摘要（缓存 key 用） */
+    private String sha256(String text) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(text.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return String.valueOf(text.hashCode());
         }
     }
 }

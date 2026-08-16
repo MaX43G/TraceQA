@@ -45,7 +45,8 @@
         <span>策略调度</span><i>→</i>
         <span>图谱检索</span><i>→</i>
         <span>向量检索</span><i>→</i>
-        <span>融合补全</span><i>→</i>
+        <span>关键词检索</span><i>→</i>
+        <span>融合精排</span><i>→</i>
         <span>总结生成</span>
       </div>
     </section>
@@ -88,8 +89,8 @@ const features = [
     color: '#1677ff'
   },
   {
-    title: '图谱 + 向量双路检索',
-    desc: 'LightRAG 知识图谱与语义向量并行检索，RRF 融合 + ReRead 二次补全，召回更准',
+    title: '图谱 + 向量 + 关键词三路检索',
+    desc: 'LightRAG 图谱、语义向量与关键词三路并行检索，RRF 融合 + ReRead 补全 + LLM 精排，召回更准',
     icon: ApartmentOutlined,
     color: '#722ed1'
   },
@@ -113,7 +114,7 @@ const features = [
   },
   {
     title: '异步文档解析',
-    desc: '教材/PPT 上传后后台异步构建知识图谱，进度实时追踪',
+    desc: '支持 .md/.txt 上传与 zip 批量导入，内容指纹去重，后台切块限速入库，进度实时追踪',
     icon: SafetyCertificateOutlined,
     color: '#eb2f96'
   }

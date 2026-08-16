@@ -8,6 +8,7 @@ import edu.zjut.traceqa.common.enums.DocumentStatus;
 import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.exception.BizException;
 import edu.zjut.traceqa.config.AppProperties;
+import edu.zjut.traceqa.dto.document.BatchUploadVO;
 import edu.zjut.traceqa.dto.document.DocumentProgressVO;
 import edu.zjut.traceqa.dto.document.DocumentUploadVO;
 import edu.zjut.traceqa.dto.document.DocumentVO;
@@ -19,17 +20,23 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 /**
  * 文档服务。
  *
- * <p>负责文档上传、本地文件存储、查询与逻辑删除。
+ * <p>负责文档上传（单文件 / zip 批量）、本地文件存储、内容指纹去重、查询与逻辑删除。
  * LightRAG 异步解析委托给 {@link DocumentParseWorker}（独立 Bean，保证 @Async 生效），
  * 上传接口立即返回 202，不阻塞请求线程。</p>
  */
@@ -47,7 +54,7 @@ public class DocumentService {
     @Resource
     private DocumentProgressStore progressStore;
     @Resource
-    private DocumentParseWorker parseWorker;
+    private DocumentQueueWorker documentQueueWorker;
     @Resource
     private KnowledgeBaseService knowledgeBaseService;
 
@@ -55,34 +62,76 @@ public class DocumentService {
      * 上传文档并提交异步解析，立即返回。
      */
     public DocumentUploadVO upload(MultipartFile file, Long knowledgeBaseId) {
-        knowledgeBaseService.requireById(knowledgeBaseId);
-        String fileType = resolveFileType(file.getOriginalFilename());
-        if (!ALLOWED_TYPES.contains(fileType)) {
-            throw new BizException(ErrorCode.PARAM_ERROR,
-                    "不支持的文件类型：" + fileType + "。PDF/PPT/Word/图片等格式请先用 MinerU 等工具转换为 Markdown（.md）后再上传");
-        }
-        // 同步读取文件字节（transferTo 会移动 Tomcat 临时文件，异步线程中再读将失败）
-        byte[] content;
         try {
-            content = file.getBytes();
+            byte[] content = file.getBytes();
+            return uploadContent(file.getOriginalFilename(), content, knowledgeBaseId);
         } catch (IOException e) {
             log.error("文件读取失败：{}", e.getMessage());
             throw new BizException(ErrorCode.FILE_ERROR, "文件读取失败");
         }
-        Path storedPath = storeFile(file, knowledgeBaseId);
+    }
+
+    /** 批量导入：解压 zip 内所有 .md/.txt，逐个入库解析 */
+    public BatchUploadVO batchUpload(MultipartFile zipFile, Long knowledgeBaseId) {
+        knowledgeBaseService.requireById(knowledgeBaseId);
+        int success = 0;
+        int failed = 0;
+        List<String> errors = new ArrayList<>();
+        try (ZipInputStream zis = new ZipInputStream(zipFile.getInputStream())) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                if (entry.isDirectory()) {
+                    continue;
+                }
+                String name = entry.getName();
+                try {
+                    byte[] content = zis.readAllBytes();
+                    uploadContent(name, content, knowledgeBaseId);
+                    success++;
+                } catch (BizException e) {
+                    failed++;
+                    errors.add(name + "：" + e.getMessage());
+                } catch (Exception e) {
+                    failed++;
+                    errors.add(name + "：解析失败");
+                }
+            }
+        } catch (IOException e) {
+            log.error("批量导入压缩包解析失败：{}", e.getMessage());
+            throw new BizException(ErrorCode.FILE_ERROR, "压缩包解析失败");
+        }
+        log.info("批量导入完成：成功 {}，失败 {}", success, failed);
+        return new BatchUploadVO(success, failed, errors);
+    }
+
+    /** 核心上传逻辑（单文件/批量共用）：校验 -> 指纹去重 -> 落盘 -> 入库 -> 异步解析 */
+    private DocumentUploadVO uploadContent(String originalName, byte[] content, Long knowledgeBaseId) {
+        knowledgeBaseService.requireById(knowledgeBaseId);
+        String fileType = resolveFileType(originalName);
+        if (!ALLOWED_TYPES.contains(fileType)) {
+            throw new BizException(ErrorCode.PARAM_ERROR,
+                    "不支持的文件类型：" + fileType + "。PDF/PPT/Word/图片等格式请先用 MinerU 等工具转换为 Markdown（.md）后再上传");
+        }
+        // 内容指纹去重（相同内容视为重复）
+        String contentHash = sha256(content);
+        if (existsContentHash(contentHash)) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "该文档内容已存在，请勿重复上传：" + originalName);
+        }
+        Path storedPath = storeFile(content, originalName, knowledgeBaseId);
 
         Document doc = new Document();
         doc.setKnowledgeBaseId(knowledgeBaseId);
-        doc.setOriginalName(file.getOriginalFilename());
+        doc.setOriginalName(originalName);
         doc.setStoredPath(storedPath.toString());
         doc.setFileType(fileType);
-        doc.setFileSize(file.getSize());
+        doc.setContentHash(contentHash);
+        doc.setFileSize((long) content.length);
         doc.setStatus(DocumentStatus.PENDING.name());
         documentMapper.insert(doc);
 
-        // 异步解析（跨 Bean 调用，@Async 代理生效，不阻塞本方法）
-        parseWorker.parse(doc, content, file.getOriginalFilename());
-        log.info("文档上传成功：{}，kbId={}", doc.getOriginalName(), knowledgeBaseId);
+        // 异步解析：任务入 Redis Stream 队列，由队列消费者在 docExecutor 中执行
+        documentQueueWorker.enqueue(doc.getId());
+        log.info("文档上传成功：{}，kbId={}", originalName, knowledgeBaseId);
         return new DocumentUploadVO(doc.getId());
     }
 
@@ -121,15 +170,24 @@ public class DocumentService {
         return progressStore.get(documentId);
     }
 
+    /** 判断内容指纹是否已存在（去重） */
+    private boolean existsContentHash(String hash) {
+        if (hash == null || hash.isBlank()) {
+            return false;
+        }
+        return documentMapper.selectCount(
+                new LambdaQueryWrapper<Document>().eq(Document::getContentHash, hash)) > 0;
+    }
+
     /** 存储文件到本地文件系统 */
-    private Path storeFile(MultipartFile file, Long knowledgeBaseId) {
+    private Path storeFile(byte[] content, String originalName, Long knowledgeBaseId) {
         try {
             Path dir = Paths.get(properties.getStorage().getRoot()).resolve(String.valueOf(knowledgeBaseId));
             Files.createDirectories(dir);
             String filename = UUID.randomUUID().toString().replace("-", "")
-                    + "_" + sanitizeFilename(file.getOriginalFilename());
+                    + "_" + sanitizeFilename(originalName);
             Path target = dir.resolve(filename);
-            file.transferTo(target.toAbsolutePath());
+            Files.write(target, content);
             return target;
         } catch (IOException e) {
             log.error("文件存储失败：{}", e.getMessage());
@@ -158,5 +216,20 @@ public class DocumentService {
     private String sanitizeFilename(String name) {
         String safe = name == null ? "file" : name.replaceAll("[/\\\\]", "_");
         return safe.isBlank() ? "file" : safe;
+    }
+
+    /** 内容 SHA-256 指纹 */
+    private String sha256(byte[] content) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(content);
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return String.valueOf(Arrays.hashCode(content));
+        }
     }
 }

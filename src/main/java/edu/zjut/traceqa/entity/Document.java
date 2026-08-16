@@ -37,6 +37,9 @@ public class Document extends BaseEntity {
     /** LightRAG 返回的任务追踪 ID（track_id） */
     private String trackId;
 
+    /** 内容指纹（SHA-256，用于去重） */
+    private String contentHash;
+
     /** 切分后的子文件总数（>=1，未切分为 1） */
     private Integer partTotal;
 

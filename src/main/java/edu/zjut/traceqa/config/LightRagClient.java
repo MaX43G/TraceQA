@@ -21,6 +21,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -148,12 +149,14 @@ public class LightRagClient {
     /**
      * 流式检索查询（调用 /query/stream，实时回调检索进度并收集引用）。
      *
-     * @param query    检索文本
-     * @param mode     查询模式（naive/local/hybrid/mix）
-     * @param progress 检索进度回调（LightRAG 流水线步骤，可空）
+     * @param query       检索文本
+     * @param mode        查询模式（naive/local/hybrid/mix）
+     * @param hlKeywords  关键词检索（高优先级关键词，可空）——用于「关键词路」三路混合检索
+     * @param progress    检索进度回调（LightRAG 流水线步骤，可空）
      * @return 引用的原始列表（每个元素为 {reference_id,file_path,content:[...]}）
      */
-    public List<Map<String, Object>> queryStream(String query, String mode, Consumer<String> progress) {
+    public List<Map<String, Object>> queryStream(String query, String mode, List<String> hlKeywords,
+                                                 Consumer<String> progress) {
         List<Map<String, Object>> references = new ArrayList<>();
         // LightRAG 要求查询最短 3 字符，过短直接返回空，避免 422
         if (query == null || query.trim().length() < 3) {
@@ -161,19 +164,23 @@ public class LightRagClient {
             return references;
         }
         try {
+            Map<String, Object> body = new HashMap<>();
+            body.put("query", query);
+            body.put("mode", mode);
+            body.put("only_need_context", true);
+            body.put("stream", true);
+            body.put("include_progress", true);
+            body.put("include_references", true);
+            body.put("include_chunk_content", true);
+            body.put("top_k", properties.getLightrag().getTopK());
+            if (hlKeywords != null && !hlKeywords.isEmpty()) {
+                body.put("hl_keywords", hlKeywords);
+            }
             webClient.post()
                     .uri("/query/stream")
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.parseMediaType("application/x-ndjson"))
-                    .bodyValue(Map.of(
-                            "query", query,
-                            "mode", mode,
-                            "only_need_context", true,
-                            "stream", true,
-                            "include_progress", true,
-                            "include_references", true,
-                            "include_chunk_content", true,
-                            "top_k", properties.getLightrag().getTopK()))
+                    .bodyValue(body)
                     .retrieve()
                     .bodyToFlux(String.class)
                     .doOnNext(line -> handleStreamLine(line, progress, references))

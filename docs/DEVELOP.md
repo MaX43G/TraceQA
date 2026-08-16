@@ -11,8 +11,9 @@
 | 后端 | Spring Boot 4.1、Java 25、Spring AI Alibaba Agent、springdoc-openapi |
 | ORM | MyBatis-Plus |
 | 数据库 | MySQL 8（单库），本地文件系统存储文件 |
-| 检索 | LightRAG（图谱 + 向量），查询重写 / HyDE / 双路检索 / RRF 融合 / ReRead |
-| 部署 | Docker Compose（mysql + lightrag + backend + frontend） |
+| 缓存/队列 | Redis（查询与 Agent 决策缓存、文档解析任务队列 Redis Stream） |
+| 检索 | LightRAG（图谱 + 向量 + 关键词），查询重写 / HyDE / 查询分解 / 三路检索 / RRF 融合 / ReRead / LLM 精排 |
+| 部署 | Docker Compose（mysql + redis + lightrag + backend + frontend） |
 
 ## 2. 目录结构
 
@@ -46,7 +47,7 @@ TraceQA/
 
 ## 3. 本地开发
 
-前置：JDK 25、Node 20+、pnpm、MySQL 8（本地建 `traceqa` 库）。
+前置：JDK 25、Node 20+、pnpm、MySQL 8（本地建 `traceqa` 库）、Redis（默认 localhost:6379，可环境变量 `REDIS_HOST` 覆盖）。
 
 ```bash
 # 1. 后端（默认 dev profile 连本地 MySQL root/123456，可环境变量覆盖）
@@ -65,6 +66,8 @@ docker run -d --name lightrag -p 9621:9621 \
   ghcr.io/hkuds/lightrag:latest
 ```
 
+> Redis 不可用时系统自动降级（无缓存、文档任务改为直接解析），不影响核心功能。
+
 默认账号：`admin/admin123456`（管理员）、`user/user123456`。
 
 ### 3.1 重新生成前端 API（后端接口变更后）
@@ -76,23 +79,28 @@ cd frontend && pnpm gen:api   # 依据 http://localhost:8080/v3/api-docs 生成 
 ## 4. 多 Agent 工作流
 
 ```
-意图识别 → 检索策略调度 → 查询重写与HyDE → 图谱检索(local+global) → 向量检索(多查询) → 融合与补全(RRF+ReRead) → 总结生成
+意图识别 → 检索策略调度 → 查询重写与HyDE → 图谱检索(local+global) → 向量检索(多查询+分解子问题) → 关键词检索 → 融合与补全(RRF+ReRead+LLM精排) → 总结生成
      ↳ 简单问题（LLM 判定）：仅 向量检索 → 总结生成
 ```
 
 - 调度节点用 **LLM 判定**问题复杂度（跨文档聚合/关系推理/主题归纳 → 复杂；单点事实/小文档集/叙事文本 → 简单），LLM 失败时规则兜底。
-- 全程 SSE 推送 `thinking` 节点状态，前端状态图实时可视化。
+- 全程 SSE 推送 `thinking` 节点状态，前端状态图实时可视化（含「关键词检索」节点）。
 
 ## 5. 检索增强链路（RetrievalService）
 
 | 步骤 | 说明 |
 | --- | --- |
-| 复杂度判定 | LLM（scenario=complexity）+ 快速预检 + 规则兜底 |
-| 查询重写 / HyDE | 结合多轮历史消解指代，并行生成 |
-| 图谱检索 | `local`（实体局部图）+ `global`（关系全局图）并行 |
-| 向量检索 | 原问题 + 重写 + HyDE 多查询并行，`naive` 模式 |
-| RRF 融合 | 双路结果按倒数排名融合去重 |
+| 复杂度判定 | LLM（scenario=complexity）+ 快速预检 + 规则兜底，结果缓存 |
+| 查询重写 / HyDE | 结合多轮历史消解指代，并行生成；结果缓存 |
+| 查询分解 | 对比/比较类问题按连接词拆分子问题，并入向量多查询 |
+| 图谱检索 | `local`（实体局部图）+ `global`（关系全局图）并行，结果缓存 |
+| 向量检索 | 原问题 + 重写 + HyDE + 子问题多查询并行，`naive` 模式，结果缓存 |
+| 关键词检索 | scenario=keyword 提取术语，`hl_keywords` 检索（术语/编号类问题更准） |
+| RRF 融合 | 三路结果按倒数排名融合去重 |
 | ReRead | 从片段提取关键术语二次检索补全 |
+| LLM 精排 | scenario=rerank 筛除无关片段并按相关度重排 |
+
+> 查询/决策结果经 `RedisCacheService` 短 TTL 缓存；Redis 不可用时自动降级。
 
 ## 6. 模型体系
 

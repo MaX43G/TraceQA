@@ -1,6 +1,6 @@
 # ============================================================
 # 溯知 / TraceQA 一键部署编排
-# 服务：mysql + lightrag(知识图谱引擎) + backend(Spring Boot) + frontend(Nuxt SSR)
+# 服务：mysql + redis + lightrag(知识图谱引擎) + backend(Spring Boot) + frontend(Nuxt SSR)
 # 使用：cp .env.example .env && docker compose up -d --build
 # ============================================================
 name: traceqa
@@ -31,6 +31,21 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  # Redis：查询/Agent 决策缓存 + 文档处理异步队列
+  # 轻量配置：内存上限 256MB、不落盘（缓存可重建），适配小内存服务器
+  redis:
+    image: redis:7-alpine
+    container_name: traceqa-redis
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--appendonly", "no", "--save", ""]
+    volumes:
+      - traceqa-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # LightRAG 官方 Server（知识图谱 + 向量引擎）
   lightrag:
@@ -84,6 +99,7 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      REDIS_HOST: redis
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
       MYSQL_DATABASE: ${MYSQL_DATABASE:-traceqa}
@@ -104,6 +120,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       lightrag:
         condition: service_healthy
 
@@ -123,5 +141,6 @@ services:
 
 volumes:
   traceqa-mysql-data:
+  traceqa-redis-data:
   traceqa-lightrag-data:
   traceqa-backend-data:

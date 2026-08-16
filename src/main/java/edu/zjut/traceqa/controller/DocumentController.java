@@ -3,6 +3,7 @@ package edu.zjut.traceqa.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.zjut.traceqa.common.api.ApiResponse;
 import edu.zjut.traceqa.common.api.PageResult;
+import edu.zjut.traceqa.dto.document.BatchUploadVO;
 import edu.zjut.traceqa.dto.document.DocumentProgressVO;
 import edu.zjut.traceqa.dto.document.DocumentUploadVO;
 import edu.zjut.traceqa.dto.document.DocumentVO;
@@ -60,6 +61,14 @@ public class DocumentController {
             @RequestParam("knowledgeBaseId") Long knowledgeBaseId) {
         DocumentUploadVO vo = documentService.upload(file, knowledgeBaseId);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(vo));
+    }
+
+    @Operation(summary = "批量导入文档（zip 压缩包，内含 .md/.txt）")
+    @PostMapping(value = "/batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<BatchUploadVO> batchUpload(
+            @RequestPart("file") MultipartFile file,
+            @RequestParam("knowledgeBaseId") Long knowledgeBaseId) {
+        return ApiResponse.ok(documentService.batchUpload(file, knowledgeBaseId));
     }
 
     @Operation(summary = "分页查询文档列表")

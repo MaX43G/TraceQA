@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS t_document (
     file_size         BIGINT       DEFAULT 0,
     status            VARCHAR(16)  DEFAULT 'PENDING',
     track_id          VARCHAR(128) DEFAULT '',
+    content_hash      VARCHAR(64)  DEFAULT '',
     part_total        INT          DEFAULT 1,
     part_done         INT          DEFAULT 0,
     chunk_count       INT          DEFAULT 0,

@@ -18,6 +18,19 @@
           </a-button>
         </a-tooltip>
       </a-upload>
+      <a-upload
+        :show-upload-list="false"
+        :disabled="!selectedKbId"
+        accept=".zip"
+        :custom-request="handleBatchUpload"
+      >
+        <a-tooltip title="批量导入：上传 zip 压缩包，自动解压其中的全部 .md/.txt 文档">
+          <a-button :disabled="!selectedKbId" :loading="uploading">
+            <template #icon><FileZipOutlined /></template>
+            批量导入
+          </a-button>
+        </a-tooltip>
+      </a-upload>
     </div>
 
     <a-table :data-source="docs" :columns="columns" row-key="id" :loading="loading" :pagination="false">
@@ -59,7 +72,7 @@
  * 文档管理（管理员）：上传后异步解析（202 Accepted），
  * 通过 SSE 轮询解析进度并展示进度面板。
  */
-import { UploadOutlined } from '@ant-design/icons-vue'
+import { UploadOutlined, FileZipOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import { list1 as apiListKbs } from '@/api/traceqa/zhishiku'
 import { upload, delete2 as apiDeleteDoc, listByKb } from '@/api/traceqa/wendang'
@@ -188,6 +201,43 @@ async function trackProgress(documentId: number): Promise<void> {
     }
   } catch {
     // SSE 中断：忽略，下次刷新列表可见最终状态
+  }
+}
+
+/** 批量导入：zip 压缩包，自动解压其中的 .md/.txt 文档 */
+async function handleBatchUpload(options: Record<string, unknown>): Promise<void> {
+  const file = options.file as File
+  const kbId = selectedKbId.value
+  if (!kbId || !file) {
+    return
+  }
+  uploading.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch(`/api/documents/batch?knowledgeBaseId=${kbId}`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: fd
+    })
+    const json = (await res.json()) as {
+      code?: number
+      msg?: string
+      data?: { successCount?: number; failedCount?: number; errors?: string[] }
+    }
+    if (json.code === 200 && json.data) {
+      message.success(`批量导入完成：成功 ${json.data.successCount ?? 0}，失败 ${json.data.failedCount ?? 0}`)
+      if (json.data.errors?.length) {
+        message.warning(json.data.errors.slice(0, 5).join('；'))
+      }
+    } else {
+      message.error(json.msg || '批量导入失败')
+    }
+    await loadDocs()
+  } catch {
+    message.error('批量导入失败，请确认上传的是 zip 压缩包')
+  } finally {
+    uploading.value = false
   }
 }
 
