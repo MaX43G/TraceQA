@@ -72,7 +72,7 @@ app:
   models:
     - name: GLM-4-32B
       model: ${LLM_MODEL:THUDM/GLM-4-32B-0414}
-      baseUrl: ${LLM_BASE_URL:https://api.siliconflow.cn}
+      baseUrl: https://api.siliconflow.cn/v1
     - name: GLM-4-9B
       model: THUDM/GLM-4-9B-0414
       baseUrl: https://api.siliconflow.cn/v1

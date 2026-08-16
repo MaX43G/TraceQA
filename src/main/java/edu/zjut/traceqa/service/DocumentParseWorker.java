@@ -14,7 +14,6 @@ import edu.zjut.traceqa.mapper.DocumentMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -47,11 +46,11 @@ public class DocumentParseWorker {
 
     /** 异步执行 LightRAG 解析（线程池执行，上传后立即返回） */
     @Async("docExecutor")
-    public void parse(Document doc, MultipartFile file) {
+    public void parse(Document doc, byte[] content, String filename) {
         try {
             updateStatus(doc, DocumentStatus.PROCESSING, 15, "正在提交至知识图谱引擎");
-            // 1. 提交 LightRAG 上传
-            String trackId = lightRagClient.uploadDocument(file);
+            // 1. 提交 LightRAG 上传（内容已在请求线程中读出，避免临时文件被清理）
+            String trackId = lightRagClient.uploadDocument(content, filename);
             doc.setTrackId(trackId);
             documentMapper.updateById(doc);
             updateStatus(doc, DocumentStatus.PROCESSING, 30, "正在抽取文本与知识图谱");

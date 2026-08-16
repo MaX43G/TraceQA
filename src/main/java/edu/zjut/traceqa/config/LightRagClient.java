@@ -17,10 +17,8 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -67,12 +65,12 @@ public class LightRagClient {
     }
 
     /** 上传文件至 LightRAG 异步解析，返回 track_id */
-    public String uploadDocument(MultipartFile file) {
+    public String uploadDocument(byte[] content, String filename) {
         try {
             String body = restClient.post()
                     .uri("/documents/upload")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
-                    .body(buildUploadBody(file))
+                    .body(buildUploadBody(content, filename))
                     .retrieve()
                     .body(String.class);
             Map<String, Object> json = parseJson(body);
@@ -120,6 +118,10 @@ public class LightRagClient {
      * @return 响应体 JSON
      */
     public Map<String, Object> query(String query, String mode, boolean onlyContext) {
+        // LightRAG 要求查询最短 3 字符，过短直接返回空，避免 422
+        if (query == null || query.trim().length() < 3) {
+            return Map.of();
+        }
         try {
             String body = restClient.post()
                     .uri("/query")
@@ -153,6 +155,11 @@ public class LightRagClient {
      */
     public List<Map<String, Object>> queryStream(String query, String mode, Consumer<String> progress) {
         List<Map<String, Object>> references = new ArrayList<>();
+        // LightRAG 要求查询最短 3 字符，过短直接返回空，避免 422
+        if (query == null || query.trim().length() < 3) {
+            log.debug("查询过短，跳过 LightRAG 检索：query={}", query);
+            return references;
+        }
         try {
             webClient.post()
                     .uri("/query/stream")
@@ -203,12 +210,12 @@ public class LightRagClient {
     }
 
     /** 组装 multipart 上传体 */
-    private MultiValueMap<String, Object> buildUploadBody(MultipartFile file) throws IOException {
+    private MultiValueMap<String, Object> buildUploadBody(byte[] content, String filename) {
         MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
-        ByteArrayResource resource = new ByteArrayResource(file.getBytes()) {
+        ByteArrayResource resource = new ByteArrayResource(content) {
             @Override
             public String getFilename() {
-                return file.getOriginalFilename();
+                return filename;
             }
         };
         form.add("file", resource);

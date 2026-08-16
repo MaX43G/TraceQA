@@ -8,7 +8,7 @@ FROM node:26-alpine AS build
 WORKDIR /app
 
 # 启用 corepack 以使用 pnpm
-RUN corepack enable
+RUN npm install -g corepack && corepack enable
 
 # 先安装依赖（利用层缓存）
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./

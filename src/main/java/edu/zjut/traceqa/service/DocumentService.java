@@ -60,6 +60,14 @@ public class DocumentService {
         if (!ALLOWED_TYPES.contains(fileType)) {
             throw new BizException(ErrorCode.PARAM_ERROR, "不支持的文件类型：" + fileType);
         }
+        // 同步读取文件字节（transferTo 会移动 Tomcat 临时文件，异步线程中再读将失败）
+        byte[] content;
+        try {
+            content = file.getBytes();
+        } catch (IOException e) {
+            log.error("文件读取失败：{}", e.getMessage());
+            throw new BizException(ErrorCode.FILE_ERROR, "文件读取失败");
+        }
         Path storedPath = storeFile(file, knowledgeBaseId);
 
         Document doc = new Document();
@@ -72,7 +80,7 @@ public class DocumentService {
         documentMapper.insert(doc);
 
         // 异步解析（跨 Bean 调用，@Async 代理生效，不阻塞本方法）
-        parseWorker.parse(doc, file);
+        parseWorker.parse(doc, content, file.getOriginalFilename());
         log.info("文档上传成功：{}，kbId={}", doc.getOriginalName(), knowledgeBaseId);
         return new DocumentUploadVO(doc.getId());
     }

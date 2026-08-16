@@ -8,7 +8,7 @@ name: traceqa
 services:
   # 数据库（单库，极简架构）
   mysql:
-    image: mysql:8.4
+    image: mysql:latest
     container_name: traceqa-mysql
     restart: unless-stopped
     environment:
@@ -38,18 +38,24 @@ services:
     container_name: traceqa-lightrag
     restart: unless-stopped
     environment:
-      # LLM（OpenAI 兼容，硅基流动）
+      # LLM（OpenAI 兼容，硅基流动；LightRAG 需带 /v1，与后端 Spring AI 的 base-url 分离）
       LLM_BINDING: openai
-      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn/v1}
+      LLM_BINDING_HOST: ${LIGHTRAG_LLM_BASE_URL:-https://api.siliconflow.cn/v1}
+      LLM_BASE_URL: ${LIGHTRAG_LLM_BASE_URL:-https://api.siliconflow.cn/v1}
       LLM_API_KEY: ${LLM_API_KEY:-}
+      # LightRAG openai binding 同时读取 OPENAI_API_KEY / OPENAI_BASE_URL
+      OPENAI_API_KEY: ${LLM_API_KEY:-}
+      OPENAI_BASE_URL: ${LIGHTRAG_LLM_BASE_URL:-https://api.siliconflow.cn/v1}
       LLM_MODEL: ${LIGHTRAG_LLM_MODEL:-Qwen/Qwen3.5-4B}
       # 抽取限流优化：低并发 + 重试退避，避免免费额度被瞬时打爆
       MAX_ASYNC_LLM: 1
+      MAX_ASYNC_EMBEDDING: 1
       LLM_MAX_RETRIES: 5
       MAX_TOKENS: 2000
       # Embedding（同 OpenAI 兼容端点）
       EMBEDDING_BINDING: openai
-      EMBEDDING_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn/v1}
+      EMBEDDING_BINDING_HOST: ${LIGHTRAG_LLM_BASE_URL:-https://api.siliconflow.cn/v1}
+      EMBEDDING_BASE_URL: ${LIGHTRAG_LLM_BASE_URL:-https://api.siliconflow.cn/v1}
       EMBEDDING_API_KEY: ${LLM_API_KEY:-}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
       EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}
@@ -84,7 +90,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traceqa123}
       LIGHTRAG_BASE_URL: http://lightrag:9621
       LIGHTRAG_API_KEY: ${LIGHTRAG_API_KEY:-}
-      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn/v1}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-THUDM/GLM-4-32B-0414}
       APP_JWT_SECRET: ${APP_JWT_SECRET:-traceqa-prod-secret-change-me-please-2026}
@@ -110,7 +116,7 @@ services:
     container_name: traceqa-frontend
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "80:3000"
     depends_on:
       - backend
 

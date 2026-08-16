@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS t_chat_message (
     role           VARCHAR(16) NOT NULL,
     content        TEXT,
     thinking_trace TEXT,
-    references     TEXT,
+    `references`     TEXT,
     latency_ms     BIGINT   DEFAULT 0,
     status         TINYINT  DEFAULT 1,
     create_time    DATETIME DEFAULT CURRENT_TIMESTAMP,
