@@ -22,7 +22,7 @@
           <div class="flow-node__label">{{ stage }}</div>
           <div v-if="detailOf(stage)" class="flow-node__detail">{{ detailOf(stage) }}</div>
         </div>
-        <div v-if="i < flowStages.length - 1" class="flow-arrow">→</div>
+        <div v-if="i < FLOW_STAGES.length - 1" class="flow-arrow">→</div>
       </template>
     </div>
   </div>

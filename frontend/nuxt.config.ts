@@ -83,7 +83,13 @@ export default defineNuxtConfig({
   routeRules: {
     '/api/**': {
       proxy: `${process.env.API_PROXY_TARGET || 'http://localhost:8080'}/api/**`
-    }
+    },
+    // 页面 HTML 不缓存，避免浏览器加载旧版 JS（新版部署后状态图等失效）
+    '/': { headers: { 'Cache-Control': 'no-store' } },
+    '/chat': { headers: { 'Cache-Control': 'no-store' } },
+    '/login': { headers: { 'Cache-Control': 'no-store' } },
+    '/admin': { headers: { 'Cache-Control': 'no-store' } },
+    '/admin/**': { headers: { 'Cache-Control': 'no-store' } }
   },
 
   typescript: {
