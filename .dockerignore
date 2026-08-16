@@ -8,3 +8,6 @@ frontend
 *.md
 HELP.md
 .env
+
+# 敏感配置不进镜像
+src/main/resources/application-dev.yaml

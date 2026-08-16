@@ -1,0 +1,90 @@
+spring:
+  application:
+    name: TraceQA
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 55MB
+  # 表结构由 DBA/初始化脚本预先建立（本地已建表），应用启动不再执行 SQL 脚本
+  sql:
+    init:
+      mode: never
+  # OpenAI 兼容接口配置（接入任意 OpenAI 兼容的 LLM 服务）
+  # 注意：api-key 属敏感信息，由各 profile 配置文件提供（dev/prod），禁止在本文件写入密钥
+  ai:
+    openai:
+      base-url: ${LLM_BASE_URL:https://api.siliconflow.cn}
+      api-key: ${LLM_API_KEY:}
+      # 快速失败：超时 15s、不重试，保证熔断降级链路及时生效
+      timeout: 30s
+      max-retries: 1
+      chat:
+        timeout: 30s
+        max-retries: 1
+        options:
+          model: ${LLM_MODEL:THUDM/GLM-4-32B-0414}
+          temperature: 0.3
+
+# OpenAPI 规范（前端依据 /v3/api-docs 自动生成 API 客户端）
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  global-config:
+    banner: false
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+# 应用自定义配置
+app:
+  # 本地文件存储根目录（初期不引入对象存储/Redis 等中间件）
+  storage:
+    root: ${APP_STORAGE_ROOT:./data/files}
+  jwt:
+    secret: ${APP_JWT_SECRET:traceqa-secret-key-please-change-in-prod-2026}
+    expiration: ${APP_JWT_EXPIRATION:7200000}
+  # LightRAG 官方 Server（核心图谱/向量引擎）
+  lightrag:
+    base-url: ${LIGHTRAG_BASE_URL:http://localhost:9621}
+    api-key: ${LIGHTRAG_API_KEY:}
+    top-k: ${LIGHTRAG_TOP_K:20}
+    # 请求超时（毫秒）
+    connect-timeout: 5000
+    read-timeout: 120000
+  # 熔断降级参数
+  circuit-breaker:
+    failure-threshold: 3
+    open-millis: 30000
+    half-open-max-calls: 1
+  # 可用模型列表（模型选择功能；默认模型名称取自 spring.ai.openai 配置）
+  # 服务端模型共享硅基流动的 API Key / Base URL，可在前端一键切换
+  models:
+    - name: GLM-4-32B
+      model: ${LLM_MODEL:THUDM/GLM-4-32B-0414}
+      baseUrl: ${LLM_BASE_URL:https://api.siliconflow.cn}
+    - name: GLM-4-9B
+      model: THUDM/GLM-4-9B-0414
+      baseUrl: https://api.siliconflow.cn/v1
+    - name: DeepSeek-R1-0528
+      model: deepseek-ai/DeepSeek-R1-0528-Qwen3-8B
+      baseUrl: https://api.siliconflow.cn/v1
+    - name: Qwen3-8B
+      model: Qwen/Qwen3-8B
+      baseUrl: https://api.siliconflow.cn/v1
+    - name: Qwen3.5-4B
+      model: Qwen/Qwen3.5-4B
+      baseUrl: https://api.siliconflow.cn/v1
+    - name: Qwen2.5-7B
+      model: Qwen/Qwen2.5-7B-Instruct
+      baseUrl: https://api.siliconflow.cn/v1
