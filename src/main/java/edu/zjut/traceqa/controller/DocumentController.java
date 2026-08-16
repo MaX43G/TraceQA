@@ -28,6 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 
 /**
@@ -84,6 +85,12 @@ public class DocumentController {
     @GetMapping("/by-kb")
     public ApiResponse<List<DocumentVO>> listByKb(@RequestParam Long knowledgeBaseId) {
         return ApiResponse.ok(documentService.listByKnowledgeBase(knowledgeBaseId));
+    }
+
+    @Operation(summary = "解析队列统计（待处理/处理中/死信）")
+    @GetMapping("/queue/stats")
+    public ApiResponse<Map<String, Object>> queueStats() {
+        return ApiResponse.ok(documentService.queueStats());
     }
 
     @Operation(summary = "文档解析进度 SSE（先补发快照，再轮询推送）")

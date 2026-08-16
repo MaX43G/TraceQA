@@ -11,7 +11,6 @@ import edu.zjut.traceqa.mapper.DocumentMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
@@ -22,10 +21,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 文档解析服务（独立 Bean，确保 {@code @Async} 代理生效）。
+ * 文档解析服务。
  *
- * <p>由 {@link DocumentService#upload} 跨 Bean 调用，在 {@code docExecutor} 线程池中
- * 异步执行 LightRAG 文档解析与进度追踪，上传接口立即返回 202 不阻塞。</p>
+ * <p>由 {@link DocumentQueueWorker}（Redis Stream 队列消费者）同步调用，执行
+ * LightRAG 文档解析与进度追踪。超大文件切块、限速提交、进度聚合均在此完成。</p>
  *
  * <p>超大文件（PDF / 文本）自动切分为多个子块，逐块以限速间隔提交 LightRAG，
  * 每块独立 track_id 轮询，进度按「已完成块数 / 总块数」聚合展示，
@@ -46,8 +45,8 @@ public class DocumentParseWorker {
 
     /** 解析轮询间隔（毫秒） */
     private static final long POLL_INTERVAL_MS = 2000L;
-    /** 解析轮询最大次数（约 10 分钟/块） */
-    private static final int MAX_POLL_TIMES = 300;
+    /** 解析轮询最大次数（约 30 分钟/块，避免解析超时误报） */
+    private static final int MAX_POLL_TIMES = 900;
     /** 切分阈值：PDF 超过该字节数才切分 */
     private static final long SPLIT_THRESHOLD_BYTES = 2L * 1024 * 1024;
     /** PDF 每块目标字节数（约 4MB） */
@@ -65,9 +64,13 @@ public class DocumentParseWorker {
     private record PartChunk(byte[] bytes, String name) {
     }
 
-    /** 异步执行 LightRAG 解析（线程池执行，上传后立即返回） */
-    @Async("docExecutor")
-    public void parse(Document doc, byte[] content, String filename) {
+    /**
+     * 同步执行 LightRAG 解析（由队列消费者调用），返回是否成功。
+     *
+     * <p>超大文件自动切块逐块限速提交；失败时清理 LightRAG 中残留的失败记录
+     * （供队列重试时重新上传，避免内容去重拦截）。</p>
+     */
+    public boolean parse(Document doc, byte[] content, String filename) {
         try {
             // 1. 切分大文件为多块（PDF 按页、文本按大小），小文件为单块
             List<PartChunk> parts = splitParts(content, filename);
@@ -98,11 +101,35 @@ public class DocumentParseWorker {
                 }
             }
             updateStatus(doc, DocumentStatus.DONE, 100, "解析完成");
+            return true;
         } catch (BizException e) {
             failDocument(doc, e.getMessage());
+            cleanupFailedLightRag(doc);
+            return false;
         } catch (Exception e) {
             log.error("文档解析异常：{}", doc.getOriginalName(), e);
             failDocument(doc, "解析失败，请稍后重试");
+            cleanupFailedLightRag(doc);
+            return false;
+        }
+    }
+
+    /** 清理 LightRAG 中该文档的失败记录（重试前删除，避免内容去重拦截） */
+    private void cleanupFailedLightRag(Document doc) {
+        if (doc.getTrackId() == null || doc.getTrackId().isBlank()) {
+            return;
+        }
+        try {
+            Map<String, Object> status = lightRagClient.queryTrackStatus(doc.getTrackId());
+            Object docs = status.get("documents");
+            if (docs instanceof List<?> documentList && !documentList.isEmpty()) {
+                Object first = documentList.get(0);
+                if (first instanceof Map<?, ?> docMap && docMap.get("id") != null) {
+                    lightRagClient.deleteDocument(String.valueOf(docMap.get("id")));
+                }
+            }
+        } catch (Exception e) {
+            log.debug("清理 LightRAG 失败记录异常：{}", e.getMessage());
         }
     }
 

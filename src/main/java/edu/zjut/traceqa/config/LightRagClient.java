@@ -92,6 +92,17 @@ public class LightRagClient {
         }
     }
 
+    /** 健康探测：LightRAG /health 是否可达 */
+    public boolean ping() {
+        try {
+            restClient.get().uri("/health").retrieve().toBodilessEntity();
+            return true;
+        } catch (Exception e) {
+            log.debug("LightRAG 健康探测失败：{}", e.getMessage());
+            return false;
+        }
+    }
+
     /** 查询文档解析状态（LightRAG 该版本路径为 /documents/track_status/{trackId}） */
     public Map<String, Object> queryTrackStatus(String trackId) {
         try {
@@ -107,6 +118,16 @@ public class LightRagClient {
         } catch (Exception e) {
             log.warn("LightRAG 状态查询异常：trackId={}, err={}", trackId, e.getMessage());
             throw new BizException(ErrorCode.LLM_UNAVAILABLE, "知识图谱服务暂时不可用，请稍后再试");
+        }
+    }
+
+    /** 删除 LightRAG 中的文档记录（解析失败重试前清理，避免内容去重拦截） */
+    public void deleteDocument(String docId) {
+        try {
+            restClient.delete().uri("/documents/{docId}", docId).retrieve();
+            log.info("已清理 LightRAG 失败记录：docId={}", docId);
+        } catch (Exception e) {
+            log.warn("LightRAG 文档删除失败：docId={}, err={}", docId, e.getMessage());
         }
     }
 

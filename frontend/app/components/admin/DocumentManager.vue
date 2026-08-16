@@ -32,6 +32,13 @@
         </a-tooltip>
       </a-upload>
     </div>
+    <div v-if="queueStats" class="queue-stats">
+      <span class="queue-stats__label">解析队列：</span>
+      <a-tag color="blue">待处理 {{ queueStats.pending }}</a-tag>
+      <a-tag color="processing">处理中 {{ queueStats.processing }}</a-tag>
+      <a-tag v-if="(queueStats.dead ?? 0) > 0" color="red">死信 {{ queueStats.dead }}</a-tag>
+      <a-tag v-else color="default">死信 0</a-tag>
+    </div>
 
     <a-table :data-source="docs" :columns="columns" row-key="id" :loading="loading" :pagination="false">
       <template #bodyCell="{ column, record }">
@@ -97,6 +104,20 @@ const uploading = ref(false)
 const progressMap = reactive<Record<number, number>>({})
 /** 分块进度（SSE 推送） */
 const partInfo = reactive<Record<number, { total: number; done: number }>>({})
+/** 解析队列统计 */
+const queueStats = ref<{ pending?: number; processing?: number; dead?: number } | null>(null)
+
+async function loadQueueStats(): Promise<void> {
+  try {
+    const res = await fetch('/api/documents/queue/stats', { headers: getAuthHeaders() })
+    const json = (await res.json()) as { code?: number; data?: { pending?: number; processing?: number; dead?: number } }
+    if (json.code === 200 && json.data) {
+      queueStats.value = json.data
+    }
+  } catch {
+    // 忽略：队列统计不可用时静默
+  }
+}
 
 async function load(): Promise<void> {
   const res = await apiListKbs()
@@ -277,14 +298,30 @@ function statusLabel(status?: string): string {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadQueueStats()
+})
 </script>
 
 <style scoped>
 .toolbar {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
+}
+
+.queue-stats {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.queue-stats__label {
+  font-size: 13px;
+  color: #4e5969;
 }
 
 .stats {

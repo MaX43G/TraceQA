@@ -28,6 +28,7 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
@@ -168,6 +169,11 @@ public class DocumentService {
     /** 获取文档进度快照（供 SSE 重连补发） */
     public DocumentProgressVO getProgress(Long documentId) {
         return progressStore.get(documentId);
+    }
+
+    /** 解析队列统计（待处理/处理中/死信），供管理后台可视化 */
+    public Map<String, Object> queueStats() {
+        return documentQueueWorker.queueStats();
     }
 
     /** 判断内容指纹是否已存在（去重） */

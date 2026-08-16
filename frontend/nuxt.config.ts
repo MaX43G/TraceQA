@@ -1,5 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import type { Plugin } from 'vite'
+import Components from 'unplugin-vue-components/vite'
+import { AntDesignVueResolver } from 'unplugin-vue-components/resolvers'
 
 /**
  * 开发模式下的 dayjs ESM 解析插件。
@@ -104,6 +106,13 @@ export default defineNuxtConfig({
   // （浏览器端会报 "does not provide an export named 'default'"，导致前端 JS 全部失效）
   // 方案：仅开发模式将 dayjs 及其插件解析到 ESM 构建；生产构建交由打包器原生处理。
   vite: {
-    plugins: [fixDayjsEsmDev()]
+    plugins: [
+      fixDayjsEsmDev(),
+      // ant-design-vue 按需引入，显著减小打包体积
+      Components({
+        resolvers: [AntDesignVueResolver({ importStyle: false })],
+        dts: false
+      })
+    ]
   }
 })
