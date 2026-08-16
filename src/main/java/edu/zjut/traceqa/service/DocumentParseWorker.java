@@ -76,7 +76,7 @@ public class DocumentParseWorker {
             // 2. 逐块提交 + 轮询 + 限速
             for (int i = 0; i < total; i++) {
                 PartChunk part = parts.get(i);
-                String partName = total > 1 ? part.name() + " [part " + (i + 1) + "/" + total + "]" : part.name();
+                String partName = total > 1 ? safePartName(part.name(), i + 1, total) : part.name();
                 updateStatus(doc, DocumentStatus.PROCESSING, partProgress(total, i), "正在提交第 " + (i + 1) + "/" + total + " 块");
                 String trackId = lightRagClient.uploadDocument(part.bytes(), partName);
                 doc.setTrackId(trackId);
@@ -178,6 +178,14 @@ public class DocumentParseWorker {
             return "";
         }
         return filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
+    }
+
+    /** 生成安全的子块文件名（不含空格/方括号，避免触发 LightRAG 安全校验） */
+    private String safePartName(String filename, int index, int total) {
+        int dot = filename == null ? -1 : filename.lastIndexOf('.');
+        String base = dot > 0 ? filename.substring(0, dot) : (filename == null ? "file" : filename);
+        String ext = dot > 0 ? filename.substring(dot) : "";
+        return base + "_part" + index + "of" + total + ext;
     }
 
     /** 轮询单块解析状态直至完成 */
