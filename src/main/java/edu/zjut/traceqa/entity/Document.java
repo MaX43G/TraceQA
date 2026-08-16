@@ -37,6 +37,12 @@ public class Document extends BaseEntity {
     /** LightRAG 返回的任务追踪 ID（track_id） */
     private String trackId;
 
+    /** 切分后的子文件总数（>=1，未切分为 1） */
+    private Integer partTotal;
+
+    /** 已完成解析的子文件数 */
+    private Integer partDone;
+
     /** 抽取出的分块数量 */
     private Integer chunkCount;
 

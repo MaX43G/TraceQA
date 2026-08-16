@@ -37,7 +37,7 @@
   </div>
 
   <!-- 文献全文查看弹窗 -->
-  <a-modal v-model:open="viewerOpen" :title="viewerRef ? `文献${viewerRef.index}：${viewerRef.title || viewerRef.filePath}` : '文献全文'" :footer="null" width="640px">
+  <a-modal v-model:open="viewerOpen" :title="viewerRef ? `文献${viewerRef.index}：${viewerRef.title || viewerRef.filePath}` : '文献全文'" :footer="null" width="72vw" :body-style="{ padding: '14px 20px 20px' }">
     <div v-if="viewerRef" class="viewer-body">
       <a-tag color="blue">{{ viewerRef.filePath }}</a-tag>
       <pre class="viewer-text">{{ viewerRef.content }}</pre>
@@ -203,5 +203,29 @@ async function copyContent(): Promise<void> {
 
 .chat-msg:hover .chat-msg__actions {
   opacity: 1;
+}
+
+/* 文献全文弹窗：窗口放大 + 内容纵向滚动（自动换行，无需横向拖动） */
+.viewer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.viewer-text {
+  flex: 1;
+  max-height: 62vh;
+  min-height: 240px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #1f2329;
+  background: #f7f8fa;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin: 0;
 }
 </style>

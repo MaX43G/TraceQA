@@ -204,6 +204,8 @@ declare namespace API {
     fileType?: string;
     fileSize?: number;
     status?: string;
+    partTotal?: number;
+    partDone?: number;
     chunkCount?: number;
     entityCount?: number;
     relationCount?: number;

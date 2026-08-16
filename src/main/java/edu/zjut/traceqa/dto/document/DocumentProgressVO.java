@@ -7,6 +7,8 @@ package edu.zjut.traceqa.dto.document;
  * @param trackId    解析任务 ID
  * @param status     当前状态（PENDING/PROCESSING/DONE/FAILED）
  * @param progress   进度百分比（0-100）
+ * @param partTotal  切分后的子文件总数
+ * @param partDone   已完成解析的子文件数
  * @param chunkCount 已解析分块数
  * @param entityCount 已解析实体数
  * @param relationCount 已解析关系数
@@ -17,6 +19,8 @@ public record DocumentProgressVO(
         String trackId,
         String status,
         int progress,
+        Integer partTotal,
+        Integer partDone,
         Integer chunkCount,
         Integer entityCount,
         Integer relationCount,

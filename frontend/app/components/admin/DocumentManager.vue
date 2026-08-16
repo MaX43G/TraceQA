@@ -28,6 +28,9 @@
               size="small"
               status="active"
             />
+            <span v-if="partInfo[record.id]" class="part-progress">
+              已解析 {{ partInfo[record.id].done }} / {{ partInfo[record.id].total }} 块
+            </span>
           </a-space>
         </template>
         <template v-else-if="column.key === 'stats'">
@@ -76,6 +79,8 @@ const docs = ref<DocumentVO[]>([])
 const loading = ref(false)
 const uploading = ref(false)
 const progressMap = reactive<Record<number, number>>({})
+/** 分块进度（SSE 推送） */
+const partInfo = reactive<Record<number, { total: number; done: number }>>({})
 
 async function load(): Promise<void> {
   const res = await apiListKbs()
