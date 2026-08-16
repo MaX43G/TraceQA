@@ -3,11 +3,12 @@ package edu.zjut.traceqa.controller;
 import jakarta.annotation.Resource;
 import edu.zjut.traceqa.common.api.ApiResponse;
 import edu.zjut.traceqa.common.auth.UserContext;
-import edu.zjut.traceqa.dto.auth.LoginRequest;
-import edu.zjut.traceqa.dto.auth.LoginResponse;
-import edu.zjut.traceqa.dto.auth.PasswordChangeRequest;
-import edu.zjut.traceqa.dto.auth.RegisterRequest;
-import edu.zjut.traceqa.dto.auth.UserInfo;
+import edu.zjut.traceqa.model.dto.LoginRequest;
+import edu.zjut.traceqa.model.vo.LoginResponse;
+import edu.zjut.traceqa.model.dto.NicknameRequest;
+import edu.zjut.traceqa.model.dto.PasswordChangeRequest;
+import edu.zjut.traceqa.model.dto.RegisterRequest;
+import edu.zjut.traceqa.model.vo.UserInfo;
 import edu.zjut.traceqa.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,16 +45,30 @@ public class AuthController {
         return ApiResponse.ok(authService.login(request));
     }
 
+    @Operation(summary = "用户登出")
+    @PostMapping("/logout")
+    public ApiResponse<Void> logout() {
+        authService.logout();
+        return ApiResponse.ok();
+    }
+
     @Operation(summary = "查询当前登录用户")
     @GetMapping("/me")
     public ApiResponse<UserInfo> me() {
         return ApiResponse.ok(authService.currentUser());
     }
 
+    @Operation(summary = "修改当前用户昵称")
+    @PutMapping("/nickname")
+    public ApiResponse<Void> updateNickname(@Valid @RequestBody NicknameRequest request) {
+        authService.updateNickname(request.getNickname());
+        return ApiResponse.ok();
+    }
+
     @Operation(summary = "修改当前用户密码")
     @PutMapping("/password")
     public ApiResponse<Void> changePassword(@Valid @RequestBody PasswordChangeRequest request) {
-        authService.changePassword(UserContext.getUserId(), request.oldPassword(), request.newPassword());
+        authService.changePassword(UserContext.getUserId(), request.getOldPassword(), request.getNewPassword());
         return ApiResponse.ok();
     }
 }

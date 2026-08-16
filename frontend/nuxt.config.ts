@@ -1,5 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import type { Plugin } from 'vite'
+import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { AntDesignVueResolver } from 'unplugin-vue-components/resolvers'
 
@@ -108,6 +109,11 @@ export default defineNuxtConfig({
   vite: {
     plugins: [
       fixDayjsEsmDev(),
+      // 自动导入 Vue/Pinia/@vueuse API，减少每个组件的手写 import
+      AutoImport({
+        imports: ['vue', 'vue-router', 'pinia', '@vueuse/core'],
+        dts: false
+      }),
       // ant-design-vue 按需引入，显著减小打包体积
       Components({
         resolvers: [AntDesignVueResolver({ importStyle: false })],

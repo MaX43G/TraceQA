@@ -67,9 +67,7 @@
       <div v-if="modelStore.customModels.length === 0" class="model-empty">暂无自定义模型</div>
       <div v-for="cm in modelStore.customModels" :key="cm.id" class="model-item">
         <span class="model-item__name">{{ cm.name }}（{{ cm.model }}）</span>
-        <a-popconfirm title="确定删除该自定义模型？" @confirm="handleRemove(cm.id)">
-          <a-button type="text" size="small" danger>删除</a-button>
-        </a-popconfirm>
+        <ConfirmDelete title="确定删除该自定义模型？" @confirm="handleRemove(cm.id)" />
       </div>
     </a-modal>
   </div>
@@ -81,6 +79,7 @@
  */
 import { RobotOutlined, ApiOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
+import ConfirmDelete from '@/components/common/ConfirmDelete.vue'
 import { useModelStore } from '@/stores/model'
 
 const modelStore = useModelStore()

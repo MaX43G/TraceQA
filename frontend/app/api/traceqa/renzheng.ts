@@ -54,3 +54,18 @@ export async function register(
     ...(options || {}),
   });
 }
+
+/** 修改当前用户昵称 PUT /api/auth/nickname */
+export async function updateNickname(
+  body: API.NicknameRequest,
+  options?: { [key: string]: any }
+) {
+  return request<API.ApiResponseVoid>("/api/auth/nickname", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    data: body,
+    ...(options || {}),
+  });
+}

@@ -3,10 +3,10 @@ package edu.zjut.traceqa.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.zjut.traceqa.common.api.ApiResponse;
 import edu.zjut.traceqa.common.api.PageResult;
-import edu.zjut.traceqa.dto.document.BatchUploadVO;
-import edu.zjut.traceqa.dto.document.DocumentProgressVO;
-import edu.zjut.traceqa.dto.document.DocumentUploadVO;
-import edu.zjut.traceqa.dto.document.DocumentVO;
+import edu.zjut.traceqa.model.vo.BatchUploadVO;
+import edu.zjut.traceqa.model.vo.DocumentProgressVO;
+import edu.zjut.traceqa.model.vo.DocumentUploadVO;
+import edu.zjut.traceqa.model.vo.DocumentVO;
 import edu.zjut.traceqa.service.DocumentProgressStore;
 import edu.zjut.traceqa.service.DocumentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -114,7 +114,7 @@ public class DocumentController {
                     lastSent = current;
                 }
                 // 解析结束则退出；连接关闭时 send 会抛异常由外层捕获
-                if (current != null && isTerminal(current.status())) {
+                if (current != null && isTerminal(current.getStatus())) {
                     return;
                 }
                 Thread.sleep(POLL_INTERVAL_MS);

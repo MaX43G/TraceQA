@@ -7,12 +7,12 @@ import edu.zjut.traceqa.common.enums.ChatRole;
 import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.exception.BizException;
 import edu.zjut.traceqa.common.util.JsonUtils;
-import edu.zjut.traceqa.dto.chat.ChatMessageVO;
-import edu.zjut.traceqa.dto.chat.ReferenceVO;
-import edu.zjut.traceqa.dto.chat.SessionVO;
-import edu.zjut.traceqa.dto.chat.ThinkingNodeVO;
-import edu.zjut.traceqa.entity.ChatMessage;
-import edu.zjut.traceqa.entity.ChatSession;
+import edu.zjut.traceqa.model.vo.ChatMessageVO;
+import edu.zjut.traceqa.model.vo.ReferenceVO;
+import edu.zjut.traceqa.model.vo.SessionVO;
+import edu.zjut.traceqa.model.vo.ThinkingNodeVO;
+import edu.zjut.traceqa.model.po.ChatMessage;
+import edu.zjut.traceqa.model.po.ChatSession;
 import edu.zjut.traceqa.mapper.ChatMessageMapper;
 import edu.zjut.traceqa.mapper.ChatSessionMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -203,8 +203,8 @@ public class ChatService {
             if (!refs.isEmpty()) {
                 sb.append("> 参考来源：\n");
                 for (ReferenceVO ref : refs) {
-                    sb.append("> [").append(ref.index()).append("] ")
-                            .append(ref.title()).append("\n");
+                    sb.append("> [").append(ref.getIndex()).append("] ")
+                            .append(ref.getTitle()).append("\n");
                 }
                 sb.append("\n");
             }
@@ -252,7 +252,7 @@ public class ChatService {
     private ChatMessageVO toVO(ChatMessage message) {
         List<ThinkingNodeVO> thinking = jsonUtils.parseList(message.getThinkingTrace(), ThinkingNodeVO.class);
         List<ReferenceVO> references = jsonUtils.parseList(message.getReferences(), ReferenceVO.class);
-        return ChatMessageVO.of(message, thinking, references);
+            return ChatMessageVO.of(message, thinking, references);
     }
 
     /** 由首条消息生成会话标题 */

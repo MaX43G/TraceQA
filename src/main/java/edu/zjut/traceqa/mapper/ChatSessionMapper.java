@@ -1,7 +1,7 @@
 package edu.zjut.traceqa.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import edu.zjut.traceqa.entity.ChatSession;
+import edu.zjut.traceqa.model.po.ChatSession;
 import org.apache.ibatis.annotations.Mapper;
 
 /**

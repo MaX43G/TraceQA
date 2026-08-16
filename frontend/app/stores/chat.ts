@@ -1,10 +1,9 @@
-﻿/**
+/**
  * 对话状态（Pinia Store）。
  *
  * <p>管理会话列表、当前会话消息与流式生成的临时消息。
  * 流式回答基于 {@link useChatStream} 消费 SSE，逐增量追加渲染。</p>
  */
-import { defineStore } from 'pinia'
 import {
   listSessions,
   listMessages,

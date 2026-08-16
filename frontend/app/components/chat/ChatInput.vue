@@ -8,12 +8,8 @@
       @keydown="handleKeydown"
     />
     <div class="chat-input__footer">
-      <span class="chat-input__tip">{{ generating ? 'AI 正在回答，可随时停止' : 'Enter 发送，Shift + Enter 换行' }}</span>
-      <a-button v-if="generating" danger @click="emit('stop')">
-        <template #icon><StopOutlined /></template>
-        停止
-      </a-button>
-      <a-button v-else type="primary" :disabled="!text.trim() || disabled" @click="submit">
+      <span class="chat-input__tip">{{ generating ? 'AI 正在回答，请稍候…' : 'Enter 发送，Shift + Enter 换行' }}</span>
+      <a-button type="primary" :disabled="!text.trim() || disabled || generating" @click="submit">
         <template #icon><SendOutlined /></template>
         发送
       </a-button>
@@ -23,20 +19,19 @@
 
 <script setup lang="ts">
 /**
- * 聊天输入组件：Enter 快捷发送、发送中可随时「停止」。
+ * 聊天输入组件：Enter 快捷发送；AI 回答期间禁用发送（不提供中途停止）。
  */
-import { SendOutlined, StopOutlined } from '@ant-design/icons-vue'
+import { SendOutlined } from '@ant-design/icons-vue'
 
 const props = defineProps<{
   /** 是否禁止输入（生成中） */
   disabled?: boolean
-  /** 是否正在生成（显示停止按钮） */
+  /** 是否正在生成（禁用发送） */
   generating?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'send', content: string): void
-  (e: 'stop'): void
 }>()
 
 const text = ref('')

@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.common.auth;
 
+import cn.dev33.satoken.stp.StpUtil;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -8,30 +9,41 @@ import java.util.List;
 /**
  * 当前登录用户的线程上下文。
  *
- * <p>由 {@link AuthInterceptor} 在 JWT 校验通过后写入，供各 Service/Controller
- * 通过 {@link #get()} 读取当前用户，避免在方法签名中层层透传用户参数。</p>
+ * <p>基于 sa-token 会话：登录时把 {@link LoginUser} 写入会话，
+ * 各 Service/Controller 通过 {@link #get()} 读取当前用户，
+ * 避免在方法签名中层层透传用户参数。</p>
  */
 public final class UserContext {
 
-    private static final ThreadLocal<LoginUser> CURRENT = new ThreadLocal<>();
+    /** 会话中存储登录用户信息的 key */
+    public static final String SESSION_KEY = "loginUser";
 
     private UserContext() {
     }
 
-    /** 写入当前登录用户 */
-    public static void set(LoginUser user) {
-        CURRENT.set(user);
-    }
-
-    /** 获取当前登录用户，未登录返回 null */
+    /** 读取当前登录用户（未登录返回 null） */
     public static LoginUser get() {
-        return CURRENT.get();
+        try {
+            if (!StpUtil.isLogin()) {
+                return null;
+            }
+            Object user = StpUtil.getSession().get(SESSION_KEY);
+            return user instanceof LoginUser lu ? lu : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /** 获取当前用户 ID，未登录返回 null */
     public static Long getUserId() {
-        LoginUser user = CURRENT.get();
-        return user == null ? null : user.getUserId();
+        try {
+            if (!StpUtil.isLogin()) {
+                return null;
+            }
+            return StpUtil.getLoginIdAsLong();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**
@@ -39,7 +51,7 @@ public final class UserContext {
      * 角色为 ADMIN 或含 "all" 通配权限时视为拥有全部权限。
      */
     public static boolean hasPermission(String permission) {
-        LoginUser user = CURRENT.get();
+        LoginUser user = get();
         if (user == null || user.getPermissions() == null) {
             return false;
         }
@@ -50,13 +62,8 @@ public final class UserContext {
         return user.getPermissions().contains("all") || user.getPermissions().contains(permission);
     }
 
-    /** 清理当前线程上下文（请求结束必须调用） */
-    public static void clear() {
-        CURRENT.remove();
-    }
-
     /**
-     * 登录用户信息快照（写入 JWT 与线程上下文的轻量对象）。
+     * 登录用户信息快照（写入 sa-token 会话的轻量对象）。
      */
     @Data
     @AllArgsConstructor

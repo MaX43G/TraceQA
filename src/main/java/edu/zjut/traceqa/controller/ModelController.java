@@ -2,7 +2,7 @@ package edu.zjut.traceqa.controller;
 
 import edu.zjut.traceqa.common.api.ApiResponse;
 import edu.zjut.traceqa.config.AppProperties;
-import edu.zjut.traceqa.dto.model.ModelVO;
+import edu.zjut.traceqa.model.vo.ModelVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;

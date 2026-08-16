@@ -2,7 +2,7 @@ package edu.zjut.traceqa.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import edu.zjut.traceqa.config.LlmConfig;
+import edu.zjut.traceqa.model.dto.LlmConfig;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -41,7 +41,7 @@ public class OpenAiCompatClient {
         try {
             String body = webClient.post()
                     .uri(resolveUri(config) + "/chat/completions")
-                    .header("Authorization", "Bearer " + config.apiKey())
+                    .header("Authorization", "Bearer " + config.getApiKey())
                     .header("Content-Type", "application/json")
                     .bodyValue(buildRequest(config, systemPrompt, userContent, false))
                     .retrieve()
@@ -49,7 +49,7 @@ public class OpenAiCompatClient {
                     .block();
             return extractContent(body);
         } catch (Exception e) {
-            log.warn("OpenAI 兼容调用失败：model={}, err={}", config.model(), e.getMessage());
+            log.warn("OpenAI 兼容调用失败：model={}, err={}", config.getModel(), e.getMessage());
             return null;
         }
     }
@@ -58,7 +58,7 @@ public class OpenAiCompatClient {
     public Flux<String> stream(LlmConfig config, String systemPrompt, String userContent) {
         return webClient.post()
                 .uri(resolveUri(config) + "/chat/completions")
-                .header("Authorization", "Bearer " + config.apiKey())
+                .header("Authorization", "Bearer " + config.getApiKey())
                 .header("Content-Type", "application/json")
                 .header("Accept", "text/event-stream")
                 .bodyValue(buildRequest(config, systemPrompt, userContent, true))
@@ -67,7 +67,7 @@ public class OpenAiCompatClient {
                 // StringDecoder 会去除行分隔符与 "data: " 前缀，每个数据块即一条完整的 SSE 数据行
                 .concatMap(chunk -> Flux.fromIterable(parseSse(chunk)))
                 .onErrorResume(e -> {
-                    log.warn("OpenAI 兼容流式调用失败：model={}, err={}", config.model(), e.getMessage());
+                    log.warn("OpenAI 兼容流式调用失败：model={}, err={}", config.getModel(), e.getMessage());
                     return Flux.empty();
                 });
     }
@@ -80,7 +80,7 @@ public class OpenAiCompatClient {
         }
         messages.add(Map.of("role", "user", "content", userContent));
         return Map.of(
-                "model", config.model(),
+                "model", config.getModel(),
                 "messages", messages,
                 "stream", stream
         );
@@ -88,7 +88,7 @@ public class OpenAiCompatClient {
 
     /** 拼接 /chat/completions 完整地址 */
     private String resolveUri(LlmConfig config) {
-        String base = config.baseUrl().trim();
+        String base = config.getBaseUrl().trim();
         if (base.endsWith("/")) {
             base = base.substring(0, base.length() - 1);
         }

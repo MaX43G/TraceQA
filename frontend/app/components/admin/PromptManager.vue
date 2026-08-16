@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div>
     <a-alert
       type="info"
@@ -24,9 +24,6 @@
               启用
             </a-button>
             <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
-            <a-popconfirm title="确定删除该提示词？" @confirm="handleDelete(record)">
-              <a-button type="link" size="small" danger>删除</a-button>
-            </a-popconfirm>
           </a-space>
         </template>
       </template>
@@ -63,7 +60,7 @@
  * 提示词场景由平台预置，不支持新增。
  */
 import { message } from 'ant-design-vue'
-import { list as fetchPrompts, update, enable, deleteUsingDelete } from '@/api/traceqa/xitongtishici'
+import { list as fetchPrompts, update, enable } from '@/api/traceqa/xitongtishici'
 import type { SystemPromptDTO } from '@/utils/api-types'
 
 const columns = [
@@ -139,16 +136,6 @@ async function handleEnable(record: SystemPromptDTO): Promise<void> {
     await load()
   } catch (err) {
     message.error((err as Error).message || '操作失败')
-  }
-}
-
-async function handleDelete(record: SystemPromptDTO): Promise<void> {
-  try {
-    await deleteUsingDelete({ id: record.id })
-    message.success('已删除（重启后自动恢复预置提示词）')
-    await load()
-  } catch (err) {
-    message.error((err as Error).message || '删除失败')
   }
 }
 

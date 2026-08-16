@@ -25,6 +25,10 @@
             </a-space>
             <template #overlay>
               <a-menu>
+                <a-menu-item key="nickname" @click="showNicknameModal = true">
+                  <EditOutlined />
+                  修改昵称
+                </a-menu-item>
                 <a-menu-item key="password" @click="showPasswordModal = true">
                   <KeyOutlined />
                   修改密码
@@ -46,19 +50,22 @@
     </a-layout-content>
 
     <ChangePasswordModal v-model:open="showPasswordModal" />
+    <NicknameModal v-model:open="showNicknameModal" />
   </a-layout>
 </template>
 
 <script setup lang="ts">
 /**
- * 默认布局：顶栏（品牌 + 导航 + 用户菜单）+ 内容区 + 修改密码弹窗。
+ * 默认布局：顶栏（品牌 + 导航 + 用户菜单）+ 内容区 + 修改密码/昵称弹窗。
  */
-import { KeyOutlined, LogoutOutlined } from '@ant-design/icons-vue'
+import { EditOutlined, KeyOutlined, LogoutOutlined } from '@ant-design/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import ChangePasswordModal from '@/components/auth/ChangePasswordModal.vue'
+import NicknameModal from '@/components/auth/NicknameModal.vue'
 
 const auth = useAuthStore()
 const showPasswordModal = ref(false)
+const showNicknameModal = ref(false)
 
 async function handleLogout(): Promise<void> {
   auth.logout()

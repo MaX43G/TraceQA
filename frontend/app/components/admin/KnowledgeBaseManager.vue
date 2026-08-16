@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div>
     <div class="toolbar">
       <a-button type="primary" @click="openCreate">
@@ -22,9 +22,7 @@
         <template v-else-if="column.key === 'action'">
           <a-space>
             <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
-            <a-popconfirm title="删除后其下文档将一并移除，确定？" @confirm="handleDelete(record)">
-              <a-button type="link" size="small" danger>删除</a-button>
-            </a-popconfirm>
+            <ConfirmDelete title="删除后其下文档将一并移除，确定？" @confirm="handleDelete(record)" />
           </a-space>
         </template>
       </template>
@@ -55,6 +53,7 @@
  */
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
+import ConfirmDelete from '@/components/common/ConfirmDelete.vue'
 import { list1 as apiList, create1 as apiCreate, update1 as apiUpdate, delete1 as apiDelete } from '@/api/traceqa/zhishiku'
 import type { KnowledgeBaseDTO } from '@/utils/api-types'
 

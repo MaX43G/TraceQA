@@ -6,7 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.exception.BizException;
 import edu.zjut.traceqa.config.PromptDefaults;
-import edu.zjut.traceqa.entity.SystemPrompt;
+import edu.zjut.traceqa.model.po.SystemPrompt;
 import edu.zjut.traceqa.mapper.SystemPromptMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -81,12 +81,6 @@ public class SystemPromptService {
                         .set(SystemPrompt::getEnabled, 0));
         prompt.setEnabled(1);
         systemPromptMapper.updateById(prompt);
-    }
-
-    /** 删除提示词 */
-    public void delete(Long id) {
-        requireById(id);
-        systemPromptMapper.deleteById(id);
     }
 
     /** 查询指定提示词，不存在抛业务异常 */

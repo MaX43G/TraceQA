@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SSE 流式对话消费工具（fetch 流解析）。
  *
  * <p>后端以 {@code event: xxx \n data: {...}} 格式推送：

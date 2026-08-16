@@ -2,16 +2,16 @@ package edu.zjut.traceqa.service;
 
 import jakarta.annotation.Resource;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import edu.zjut.traceqa.common.auth.JwtService;
+import cn.dev33.satoken.stp.StpUtil;
 import edu.zjut.traceqa.common.auth.UserContext;
 import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.exception.BizException;
-import edu.zjut.traceqa.dto.auth.LoginRequest;
-import edu.zjut.traceqa.dto.auth.LoginResponse;
-import edu.zjut.traceqa.dto.auth.RegisterRequest;
-import edu.zjut.traceqa.dto.auth.UserInfo;
-import edu.zjut.traceqa.entity.Role;
-import edu.zjut.traceqa.entity.User;
+import edu.zjut.traceqa.model.dto.LoginRequest;
+import edu.zjut.traceqa.model.vo.LoginResponse;
+import edu.zjut.traceqa.model.dto.RegisterRequest;
+import edu.zjut.traceqa.model.vo.UserInfo;
+import edu.zjut.traceqa.model.po.Role;
+import edu.zjut.traceqa.model.po.User;
 import edu.zjut.traceqa.mapper.RoleMapper;
 import edu.zjut.traceqa.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -20,17 +20,26 @@ import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.List;
+import edu.zjut.traceqa.common.convert.DtoMapper;
 
 /**
  * 认证服务。
  *
- * <p>负责注册、登录与当前用户信息查询。密码统一 BCrypt 加密存储，
- * 登录成功后签发 JWT 令牌。用户名与密码校验失败均返回「用户名或密码错误」，
- * 避免账号枚举攻击。</p>
+ * <p>负责注册、登录、登出、当前用户信息与昵称修改。密码统一 BCrypt 加密存储。
+ * 登录态由 sa-token 管理（Redis 持久化 + 单端登录：同一账号同时只允许一个用户在线）。
+ * 用户名与密码校验失败均返回「用户名或密码错误」，避免账号枚举攻击。</p>
  */
 @Slf4j
 @Service
 public class AuthService {
+
+    /** 系统全部权限码（管理员角色持有，DB 层展开存储） */
+    public static final List<String> ALL_PERMISSIONS = List.of(
+            "user:manage", "role:manage", "kb:manage", "prompt:manage",
+            "kb:view", "doc:view", "chat:manage"
+    );
+    /** 管理员权限码的逗号拼接串（写入角色表） */
+    public static final String ALL_PERMISSIONS_STR = String.join(",", ALL_PERMISSIONS);
 
     @Resource
     private UserMapper userMapper;
@@ -41,33 +50,32 @@ public class AuthService {
     @Resource
     private PasswordEncoder passwordEncoder;
 
-    @Resource
-    private JwtService jwtService;
-
-    
-
-    /** 用户注册（默认角色 USER） */
+    /** 用户注册（默认角色 USER；账号需英文数字且唯一，注册后不可修改） */
     public UserInfo register(RegisterRequest request) {
-        User exist = findByUsername(request.username());
-        if (exist != null) {
-            throw new BizException(ErrorCode.PARAM_ERROR, "用户名已被占用");
+        if (!request.getPassword().equals(request.getConfirmPassword())) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "两次输入的密码不一致");
         }
-        User user = new User();
-        user.setUsername(request.username());
-        user.setPassword(passwordEncoder.encode(request.password()));
-        user.setNickname(request.nickname() == null ? request.username() : request.nickname());
-        user.setRoleCode("USER");
-        user.setStatus(1);
+        User exist = findByUsername(request.getUsername());
+        if (exist != null) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "账号已被占用");
+        }
+        User user = User.builder()
+                .username(request.getUsername())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .nickname(request.getNickname())
+                .roleCode("USER")
+                .status(1)
+                .build();
         userMapper.insert(user);
-        log.info("用户注册成功：{}", request.username());
-        return UserInfo.of(user, resolvePermissions(user.getRoleCode()));
+        log.info("用户注册成功：{}", request.getUsername());
+        return DtoMapper.INSTANCE.toUserInfo(user, resolvePermissions(user.getRoleCode()));
     }
 
-    /** 用户登录，签发令牌 */
+    /** 用户登录（sa-token 单端登录：同一账号新登录会顶掉旧会话） */
     public LoginResponse login(LoginRequest request) {
-        User user = findByUsername(request.username());
+        User user = findByUsername(request.getUsername());
         // 统一错误提示，防账号枚举
-        if (user == null || !passwordEncoder.matches(request.password(), user.getPassword())) {
+        if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new BizException(ErrorCode.PARAM_ERROR, "用户名或密码错误");
         }
         if (user.getStatus() == null || user.getStatus() != 1) {
@@ -76,9 +84,16 @@ public class AuthService {
         List<String> permissions = resolvePermissions(user.getRoleCode());
         UserContext.LoginUser loginUser = new UserContext.LoginUser(
                 user.getId(), user.getUsername(), user.getNickname(), user.getRoleCode(), permissions);
-        String token = jwtService.generateToken(loginUser);
-        log.info("用户登录成功：{}", request.username());
+        StpUtil.login(user.getId());
+        StpUtil.getSession().set(UserContext.SESSION_KEY, loginUser);
+        String token = StpUtil.getTokenValue();
+        log.info("用户登录成功：{}", request.getUsername());
         return LoginResponse.of(user, permissions, token);
+    }
+
+    /** 当前用户登出 */
+    public void logout() {
+        StpUtil.logout();
     }
 
     /** 查询当前登录用户信息 */
@@ -88,7 +103,28 @@ public class AuthService {
         if (user == null) {
             throw new BizException(ErrorCode.UNAUTHORIZED);
         }
-        return UserInfo.of(user, resolvePermissions(user.getRoleCode()));
+        return DtoMapper.INSTANCE.toUserInfo(user, resolvePermissions(user.getRoleCode()));
+    }
+
+    /** 修改当前用户昵称 */
+    public void updateNickname(String nickname) {
+        Long userId = UserContext.getUserId();
+        if (userId == null) {
+            throw new BizException(ErrorCode.UNAUTHORIZED);
+        }
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BizException(ErrorCode.UNAUTHORIZED);
+        }
+        user.setNickname(nickname);
+        userMapper.updateById(user);
+        // 同步刷新会话中的用户信息
+        UserContext.LoginUser lu = UserContext.get();
+        if (lu != null) {
+            lu.setNickname(nickname);
+            StpUtil.getSession().set(UserContext.SESSION_KEY, lu);
+        }
+        log.info("用户修改昵称成功：{} → {}", user.getUsername(), nickname);
     }
 
     /** 修改当前用户密码（校验原密码，BCrypt 加密新密码） */

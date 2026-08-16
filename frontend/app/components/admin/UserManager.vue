@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div>
     <a-tabs>
       <a-tab-pane key="users" tab="用户管理">

@@ -23,7 +23,7 @@
           </a-input-password>
         </a-form-item>
         <a-form-item>
-          <a-button type="primary" html-type="submit" block size="large" :loading="loading">登 录</a-button>
+          <a-button type="primary" html-type="submit" block size="large" :loading="loading">登录</a-button>
         </a-form-item>
       </a-form>
 
@@ -32,11 +32,12 @@
         <a-form-item
           name="username"
           :rules="[
-            { required: true, message: '请输入用户名' },
-            { min: 3, max: 32, message: '用户名长度需在 3-32 之间' }
+            { required: true, message: '请输入账号' },
+            { pattern: /^[a-zA-Z0-9]+$/, message: '账号只能由英文字母和数字组成' },
+            { min: 3, max: 32, message: '账号长度需在 3-32 之间' }
           ]"
         >
-          <a-input v-model:value="registerForm.username" placeholder="用户名（3-32 位）" size="large">
+          <a-input v-model:value="registerForm.username" placeholder="账号（仅英文数字，注册后不可修改）" size="large">
             <template #prefix><UserOutlined /></template>
           </a-input>
         </a-form-item>
@@ -62,8 +63,19 @@
             <template #prefix><SafetyOutlined /></template>
           </a-input-password>
         </a-form-item>
+        <a-form-item
+          name="nickname"
+          :rules="[
+            { required: true, message: '请输入昵称' },
+            { max: 32, message: '昵称长度不能超过 32' }
+          ]"
+        >
+          <a-input v-model:value="registerForm.nickname" placeholder="昵称" size="large">
+            <template #prefix><SmileOutlined /></template>
+          </a-input>
+        </a-form-item>
         <a-form-item>
-          <a-button type="primary" html-type="submit" block size="large" :loading="loading">注 册</a-button>
+          <a-button type="primary" html-type="submit" block size="large" :loading="loading">注册</a-button>
         </a-form-item>
       </a-form>
     </a-card>
@@ -74,15 +86,18 @@
 /**
  * 登录 / 注册页。
  *
- * <p>支持账号登录与自助注册。注册成功后自动登录并进入问答页。</p>
+ * <p>支持账号登录与自助注册。注册成功后自动登录并进入问答页。
+ * 表单基于 antd Form 原生 rules 校验（简单可靠）。</p>
  */
-import { UserOutlined, LockOutlined, SafetyOutlined } from '@ant-design/icons-vue'
+import { UserOutlined, LockOutlined, SafetyOutlined, SmileOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 useSeoMeta({ title: '登录 - 溯知 · TraceQA' })
 
 const auth = useAuthStore()
+const route = useRoute()
 const loading = ref(false)
 const mode = ref<'login' | 'register'>('login')
 const modeOptions = [
@@ -91,7 +106,7 @@ const modeOptions = [
 ]
 
 const loginForm = reactive({ username: '', password: '' })
-const registerForm = reactive({ username: '', password: '', confirm: '' })
+const registerForm = reactive({ username: '', password: '', confirm: '', nickname: '' })
 
 async function handleLogin(): Promise<void> {
   loading.value = true
@@ -109,7 +124,7 @@ async function handleLogin(): Promise<void> {
 async function handleRegister(): Promise<void> {
   loading.value = true
   try {
-    await auth.register(registerForm.username, registerForm.password)
+    await auth.register(registerForm.username, registerForm.password, registerForm.confirm, registerForm.nickname)
     // 注册成功后自动登录
     await auth.login(registerForm.username, registerForm.password)
     message.success('注册成功，已自动登录')
@@ -123,7 +138,6 @@ async function handleRegister(): Promise<void> {
 
 /** 登录/注册成功后跳转：优先回退到来源页，否则进入问答页 */
 async function goHome(): Promise<void> {
-  const route = useRoute()
   const redirect = route.query.redirect as string | undefined
   await navigateTo(redirect && redirect.startsWith('/') ? redirect : '/chat')
 }
@@ -146,18 +160,14 @@ function validateConfirm(_rule: unknown, value: string, callback: (error?: Error
   min-height: 100vh;
   background: linear-gradient(135deg, #e8f0fe 0%, #f6f7fb 100%);
 }
-
 .login-card {
-  width: 380px;
-  border-radius: 12px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  width: 420px;
+  max-width: 92vw;
 }
-
 .login-card__header {
   text-align: center;
   margin-bottom: 20px;
 }
-
 .login-card__logo {
   display: inline-flex;
   align-items: center;
@@ -167,22 +177,20 @@ function validateConfirm(_rule: unknown, value: string, callback: (error?: Error
   border-radius: 12px;
   background: linear-gradient(135deg, #1677ff, #06b6d4);
   color: #fff;
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
+  margin-bottom: 8px;
 }
-
 .login-card__title {
-  margin: 12px 0 4px;
+  margin: 0;
   font-size: 20px;
   color: #1f2329;
 }
-
 .login-card__subtitle {
-  margin: 0;
+  margin: 4px 0 0;
   color: #86909c;
   font-size: 13px;
 }
-
 .login-card__seg {
   margin-bottom: 20px;
 }

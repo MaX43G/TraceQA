@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="session-list">
     <a-button type="primary" block class="session-list__new" @click="emit('new')">
       <template #icon><PlusOutlined /></template>

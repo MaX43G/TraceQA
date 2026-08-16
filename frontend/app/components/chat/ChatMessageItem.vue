@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="chat-msg" :class="isUser ? 'chat-msg--user' : 'chat-msg--assistant'">
     <div class="chat-msg__avatar">
       <a-avatar :style="avatarStyle">{{ avatarText }}</a-avatar>

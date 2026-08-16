@@ -77,7 +77,7 @@
       </div>
 
       <div class="chat-page__input">
-        <ChatInput :disabled="chat.generating" :generating="chat.generating" @send="handleSend" @stop="stopGenerating" />
+        <ChatInput :disabled="chat.generating" :generating="chat.generating" @send="handleSend" />
       </div>
     </main>
   </div>
@@ -257,9 +257,6 @@ async function handleSend(content: string): Promise<void> {
   // 携带模型选择：优先服务端模型（平台默认 Key/URL），其次自定义模型
   const serverModel = modelStore.activeServerModel
   const modelConfig = modelStore.activeCustomConfig
-  // 中止控制器：页面卸载时中断未完成的流式请求
-  const abortController = new AbortController()
-  activeStreamAbort = abortController
   await streamChat(
     {
       sessionId,
@@ -289,20 +286,13 @@ async function handleSend(content: string): Promise<void> {
       },
       onEnd: async () => {
         chat.generating = false
-        activeStreamAbort = null
-        // 用户主动停止：保留本地已生成内容，不重新加载后端（可能尚未保存）
-        if (userStopped) {
-          userStopped = false
-          return
-        }
         // 刷新会话与消息（获取真实 ID）
         await chat.loadSessions()
         if (chat.currentSessionId) {
           await chat.openSession(chat.currentSessionId)
         }
       }
-    },
-    abortController.signal
+    }
   )
 }
 
@@ -317,36 +307,6 @@ function mergeThinkingNode(streamMsg: StreamMessage, node: ThinkingNodeVO): void
   }
   streamMsg.thinkingTrace = [...nodes]
 }
-
-/** 当前进行中的流式请求 AbortController */
-let activeStreamAbort: AbortController | null = null
-/** 是否由用户主动停止当前回答 */
-let userStopped = false
-
-/** 用户主动中断回答：保留已生成内容并结束本次流 */
-function stopGenerating(): void {
-  if (!chat.generating) {
-    return
-  }
-  userStopped = true
-  const last = chat.messages[chat.messages.length - 1]
-  if (last && isStreamingMsg(last)) {
-    if (!last.buffer) {
-      // 尚未生成任何内容（思考/检索阶段停止）：移除空占位，与后端「不保存空消息」保持一致
-      chat.messages.pop()
-    } else {
-      last.streaming = false
-      last.content = last.buffer || last.content
-    }
-  }
-  chat.generating = false
-  activeStreamAbort?.abort()
-  activeStreamAbort = null
-}
-
-onBeforeUnmount(() => {
-  activeStreamAbort?.abort()
-})
 
 /** 消息或流式缓冲变化时自动滚动到底部 */
 watch(

@@ -3,7 +3,7 @@
  *
  * <p>职责：</p>
  * <ul>
- *   <li>自动附加 JWT 认证头（Bearer Token，存于 localStorage）；</li>
+ *   <li>自动附加登录令牌头（Authorization: Bearer，存于 localStorage）；</li>
  *   <li>统一解析后端 {@code {code,msg,data,traceId}} 响应结构，仅返回 data；</li>
  *   <li>非 200 业务码抛出 {@link ApiError}，前端仅依据 {@code code} 判断；</li>
  *   <li>兼容 Markdown 文本导出等非 JSON 响应。</li>

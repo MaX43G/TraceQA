@@ -3,16 +3,17 @@ package edu.zjut.traceqa.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import cn.hutool.crypto.SecureUtil;
 import edu.zjut.traceqa.common.api.PageResult;
 import edu.zjut.traceqa.common.enums.DocumentStatus;
 import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.exception.BizException;
 import edu.zjut.traceqa.config.AppProperties;
-import edu.zjut.traceqa.dto.document.BatchUploadVO;
-import edu.zjut.traceqa.dto.document.DocumentProgressVO;
-import edu.zjut.traceqa.dto.document.DocumentUploadVO;
-import edu.zjut.traceqa.dto.document.DocumentVO;
-import edu.zjut.traceqa.entity.Document;
+import edu.zjut.traceqa.model.vo.BatchUploadVO;
+import edu.zjut.traceqa.model.vo.DocumentProgressVO;
+import edu.zjut.traceqa.model.vo.DocumentUploadVO;
+import edu.zjut.traceqa.model.vo.DocumentVO;
+import edu.zjut.traceqa.model.po.Document;
 import edu.zjut.traceqa.mapper.DocumentMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -24,15 +25,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.MessageDigest;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import edu.zjut.traceqa.common.convert.DtoMapper;
 
 /**
  * 文档服务。
@@ -120,14 +120,15 @@ public class DocumentService {
         }
         Path storedPath = storeFile(content, originalName, knowledgeBaseId);
 
-        Document doc = new Document();
-        doc.setKnowledgeBaseId(knowledgeBaseId);
-        doc.setOriginalName(originalName);
-        doc.setStoredPath(storedPath.toString());
-        doc.setFileType(fileType);
-        doc.setContentHash(contentHash);
-        doc.setFileSize((long) content.length);
-        doc.setStatus(DocumentStatus.PENDING.name());
+        Document doc = Document.builder()
+                .knowledgeBaseId(knowledgeBaseId)
+                .originalName(originalName)
+                .storedPath(storedPath.toString())
+                .fileType(fileType)
+                .contentHash(contentHash)
+                .fileSize((long) content.length)
+                .status(DocumentStatus.PENDING.name())
+                .build();
         documentMapper.insert(doc);
 
         // 异步解析：任务入 Redis Stream 队列，由队列消费者在 docExecutor 中执行
@@ -142,7 +143,7 @@ public class DocumentService {
                 .eq(knowledgeBaseId != null, Document::getKnowledgeBaseId, knowledgeBaseId)
                 .orderByDesc(Document::getId);
         IPage<Document> result = documentMapper.selectPage(new Page<>(page, size), wrapper);
-        return PageResult.of(result, DocumentVO::of);
+        return PageResult.of(result, DtoMapper.INSTANCE::toDocumentVO);
     }
 
     /** 查询某知识库下的全部文档 */
@@ -151,7 +152,7 @@ public class DocumentService {
                         new LambdaQueryWrapper<Document>()
                                 .eq(Document::getKnowledgeBaseId, knowledgeBaseId)
                                 .orderByDesc(Document::getId))
-                .stream().map(DocumentVO::of).toList();
+                .stream().map(DtoMapper.INSTANCE::toDocumentVO).toList();
     }
 
     /** 逻辑删除文档并清理本地文件 */
@@ -224,18 +225,8 @@ public class DocumentService {
         return safe.isBlank() ? "file" : safe;
     }
 
-    /** 内容 SHA-256 指纹 */
+    /** 内容 SHA-256 指纹（Hutool） */
     private String sha256(byte[] content) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(content);
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hash) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
-        } catch (Exception e) {
-            return String.valueOf(Arrays.hashCode(content));
-        }
+        return SecureUtil.sha256(new String(content, StandardCharsets.UTF_8));
     }
 }

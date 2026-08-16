@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="home">
     <!-- Hero 区 -->
     <section class="home__hero">

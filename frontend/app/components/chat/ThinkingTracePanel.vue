@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="thinking-panel">
     <div class="thinking-panel__header">
       <a-space size="small">

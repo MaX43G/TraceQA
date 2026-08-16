@@ -2,7 +2,7 @@ package edu.zjut.traceqa.agent;
 
 import jakarta.annotation.Resource;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
-import edu.zjut.traceqa.config.LlmConfig;
+import edu.zjut.traceqa.model.dto.LlmConfig;
 import edu.zjut.traceqa.service.LlmService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.Message;

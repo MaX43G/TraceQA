@@ -3,14 +3,17 @@ package edu.zjut.traceqa.retrieval;
 import jakarta.annotation.Resource;
 import com.fasterxml.jackson.core.type.TypeReference;
 import edu.zjut.traceqa.config.LightRagClient;
-import edu.zjut.traceqa.config.LlmConfig;
+import edu.zjut.traceqa.model.dto.EnhancedQuery;
+import edu.zjut.traceqa.model.dto.LlmConfig;
+import edu.zjut.traceqa.model.dto.RetrievalResult;
+import edu.zjut.traceqa.model.dto.RetrievedChunk;
 import edu.zjut.traceqa.service.LlmService;
 import edu.zjut.traceqa.service.RedisCacheService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import cn.hutool.crypto.SecureUtil;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -116,7 +119,7 @@ public class RetrievalService {
     public List<RetrievedChunk> queryGraph(String question, EnhancedQuery enhanced, LlmConfig config,
                                            Consumer<String> progress) {
         notify(progress, "正在执行图谱检索（local + global）");
-        String graphQuery = enhanced.rewritten() != null ? enhanced.rewritten() : question;
+        String graphQuery = enhanced.getRewritten() != null ? enhanced.getRewritten() : question;
         String cacheKey = "graph:" + sha256(graphQuery);
         Optional<List<RetrievedChunk>> cached = redisCacheService.get(cacheKey, new TypeReference<>() {
         });
@@ -144,14 +147,14 @@ public class RetrievalService {
         notify(progress, "正在执行向量检索（多查询扩展）");
         List<String> queries = new ArrayList<>();
         queries.add(question);
-        if (enhanced.rewritten() != null && !enhanced.rewritten().isBlank()) {
-            queries.add(enhanced.rewritten());
+        if (enhanced.getRewritten() != null && !enhanced.getRewritten().isBlank()) {
+            queries.add(enhanced.getRewritten());
         }
-        if (enhanced.hyde() != null && !enhanced.hyde().isBlank()) {
-            queries.add(enhanced.hyde());
+        if (enhanced.getHyde() != null && !enhanced.getHyde().isBlank()) {
+            queries.add(enhanced.getHyde());
         }
-        if (enhanced.subqueries() != null) {
-            queries.addAll(enhanced.subqueries());
+        if (enhanced.getSubqueries() != null) {
+            queries.addAll(enhanced.getSubqueries());
         }
         String cacheKey = "vec:" + sha256(String.join("|", queries));
         Optional<List<RetrievedChunk>> cached = redisCacheService.get(cacheKey, new TypeReference<>() {
@@ -237,7 +240,7 @@ public class RetrievalService {
         List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
         List<RetrievedChunk> supplemented = reread(question, fused, config);
         List<RetrievedChunk> reranked = rerank(question, supplemented, config);
-        boolean degraded = enhanced.rewritten() == null && enhanced.hyde() == null;
+        boolean degraded = enhanced.getRewritten() == null && enhanced.getHyde() == null;
         return new RetrievalResult(reranked, degraded);
     }
 
@@ -246,7 +249,7 @@ public class RetrievalService {
         Map<String, RetrievedChunk> merged = new LinkedHashMap<>();
         for (List<RetrievedChunk> source : sources) {
             for (RetrievedChunk chunk : source) {
-                String key = chunk.referenceId() == null ? chunk.content() : chunk.referenceId();
+                String key = chunk.getReferenceId() == null ? chunk.getContent() : chunk.getReferenceId();
                 merged.putIfAbsent(key, chunk);
             }
         }
@@ -410,7 +413,7 @@ public class RetrievalService {
         }
         // 按融合得分降序
         return merged.values().stream()
-                .sorted((a, b) -> Double.compare(b.score(), a.score()))
+                .sorted((a, b) -> Double.compare(b.getScore(), a.getScore()))
                 .limit(MAX_PER_PATH)
                 .toList();
     }
@@ -420,14 +423,14 @@ public class RetrievalService {
         int rank = 1;
         for (RetrievedChunk chunk : chunks) {
             double addScore = 1.0 / (RRF_K + rank);
-            String key = chunk.referenceId() == null ? chunk.content() : chunk.referenceId();
+            String key = chunk.getReferenceId() == null ? chunk.getContent() : chunk.getReferenceId();
             if (merged.containsKey(key)) {
                 RetrievedChunk exist = merged.get(key);
-                merged.put(key, new RetrievedChunk(exist.referenceId(), exist.filePath(),
-                        exist.content(), exist.score() + addScore, exist.source() + "+" + chunk.source()));
+                merged.put(key, new RetrievedChunk(exist.getReferenceId(), exist.getFilePath(),
+                        exist.getContent(), exist.getScore() + addScore, exist.getSource() + "+" + chunk.getSource()));
             } else {
-                merged.put(key, new RetrievedChunk(chunk.referenceId(), chunk.filePath(),
-                        chunk.content(), addScore, chunk.source()));
+                merged.put(key, new RetrievedChunk(chunk.getReferenceId(), chunk.getFilePath(),
+                        chunk.getContent(), addScore, chunk.getSource()));
             }
             rank++;
         }
@@ -442,7 +445,7 @@ public class RetrievalService {
             return fused;
         }
         // 抽取关键术语
-        String summary = fused.stream().map(RetrievedChunk::content).reduce("", (a, b) -> a + "\n" + b);
+        String summary = fused.stream().map(RetrievedChunk::getContent).reduce("", (a, b) -> a + "\n" + b);
         String terms = llmService.call("reread", summary, config);
         String termQuery = extractTerms(terms);
         if (termQuery == null) {
@@ -452,10 +455,10 @@ public class RetrievalService {
             Map<String, Object> response = lightRagClient.query(termQuery, "mix", true);
             List<RetrievedChunk> extra = parseReferences(response, "reread");
             Map<String, RetrievedChunk> merged = new LinkedHashMap<>();
-            fused.forEach(c -> merged.put(c.referenceId(), c));
-            extra.forEach(c -> merged.putIfAbsent(c.referenceId(), c));
+            fused.forEach(c -> merged.put(c.getReferenceId(), c));
+            extra.forEach(c -> merged.putIfAbsent(c.getReferenceId(), c));
             return merged.values().stream()
-                    .sorted((a, b) -> Double.compare(b.score(), a.score()))
+                    .sorted((a, b) -> Double.compare(b.getScore(), a.getScore()))
                     .limit(MAX_PER_PATH)
                     .toList();
         } catch (Exception e) {
@@ -474,7 +477,7 @@ public class RetrievalService {
         try {
             StringBuilder sb = new StringBuilder("问题：").append(question).append("\n\n片段列表：\n");
             for (int i = 0; i < chunks.size(); i++) {
-                sb.append("[").append(i + 1).append("] ").append(shorten(chunks.get(i).content())).append("\n\n");
+                sb.append("[").append(i + 1).append("] ").append(shorten(chunks.get(i).getContent())).append("\n\n");
             }
             String result = llmService.call("rerank", sb.toString(), config);
             if (result == null || result.isBlank()) {
@@ -518,19 +521,9 @@ public class RetrievalService {
         return joined.isBlank() ? null : joined;
     }
 
-    /** SHA-256 摘要（缓存 key 用） */
+    /** SHA-256 摘要（缓存 key 用，Hutool） */
     private String sha256(String text) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(text.getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hash) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
-        } catch (Exception e) {
-            return String.valueOf(text.hashCode());
-        }
+        return SecureUtil.sha256(text);
     }
 
     /** 安全转字符串 */

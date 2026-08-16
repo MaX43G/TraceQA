@@ -3,6 +3,10 @@ package edu.zjut.traceqa.common.exception;
 import edu.zjut.traceqa.common.api.ApiResponse;
 import edu.zjut.traceqa.common.api.TraceIdHolder;
 import edu.zjut.traceqa.common.enums.ErrorCode;
+import cn.dev33.satoken.exception.NotLoginException;
+import cn.dev33.satoken.exception.NotPermissionException;
+import edu.zjut.traceqa.service.MonitorService;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.BindException;
@@ -26,12 +30,30 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @Resource
+    private MonitorService monitorService;
+
     /** 业务异常：按自身错误码返回 */
     @ExceptionHandler(BizException.class)
     public ApiResponse<Void> handleBiz(BizException e) {
         log.warn("业务异常，traceId={}, code={}, msg={}",
                 TraceIdHolder.get(), e.getErrorCode().getCode(), e.getMessage());
         return ApiResponse.fail(e.getErrorCode(), e.getMessage());
+    }
+
+    /** sa-token 未登录/登录失效：统一返回 40100 */
+    @ExceptionHandler(NotLoginException.class)
+    public ApiResponse<Void> handleNotLogin(NotLoginException e) {
+        log.warn("未登录或登录已失效，traceId={}, type={}",
+                TraceIdHolder.get(), e.getType());
+        return ApiResponse.fail(ErrorCode.UNAUTHORIZED);
+    }
+
+    /** sa-token 权限不足（@SaCheckPermission）：统一返回 40300 */
+    @ExceptionHandler(NotPermissionException.class)
+    public ApiResponse<Void> handleNotPermission(NotPermissionException e) {
+        log.warn("权限不足，traceId={}, need={}", TraceIdHolder.get(), e.getPermission());
+        return ApiResponse.fail(ErrorCode.FORBIDDEN);
     }
 
     /** 方法参数校验异常（@RequestBody + @Valid） */
@@ -83,6 +105,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ApiResponse<Void> handleUnexpected(Exception e) {
         log.error("未预期异常，traceId={}", TraceIdHolder.get(), e);
+        monitorService.recordError(e.getClass().getSimpleName() + ": " + e.getMessage());
         return ApiResponse.fail(ErrorCode.INTERNAL_ERROR);
     }
 

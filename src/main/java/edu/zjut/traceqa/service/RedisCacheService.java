@@ -40,8 +40,10 @@ public class RedisCacheService {
         try {
             String json = stringRedisTemplate.opsForValue().get(key);
             if (json == null) {
+                MonitorService.recordCacheMiss();
                 return Optional.empty();
             }
+            MonitorService.recordCacheHit();
             return Optional.ofNullable(objectMapper.readValue(json, type));
         } catch (Exception e) {
             log.debug("Redis 读取失败：key={}, err={}", key, e.getMessage());
@@ -54,8 +56,10 @@ public class RedisCacheService {
         try {
             String json = stringRedisTemplate.opsForValue().get(key);
             if (json == null) {
+                MonitorService.recordCacheMiss();
                 return Optional.empty();
             }
+            MonitorService.recordCacheHit();
             return Optional.ofNullable(objectMapper.readValue(json, typeRef));
         } catch (Exception e) {
             log.debug("Redis 读取失败：key={}, err={}", key, e.getMessage());

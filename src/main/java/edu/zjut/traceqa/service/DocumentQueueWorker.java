@@ -1,7 +1,7 @@
 package edu.zjut.traceqa.service;
 
 import edu.zjut.traceqa.common.enums.DocumentStatus;
-import edu.zjut.traceqa.entity.Document;
+import edu.zjut.traceqa.model.po.Document;
 import edu.zjut.traceqa.mapper.DocumentMapper;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
@@ -39,7 +39,6 @@ public class DocumentQueueWorker {
     /** 最大重试次数 */
     private static final int MAX_RETRY = 3;
     /** 重试退避基础（秒）：retry 1 → 5s，2 → 10s，3 → 15s */
-
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 

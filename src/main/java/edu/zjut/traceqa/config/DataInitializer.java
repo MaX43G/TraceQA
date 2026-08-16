@@ -2,22 +2,21 @@ package edu.zjut.traceqa.config;
 
 import jakarta.annotation.Resource;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import edu.zjut.traceqa.entity.KnowledgeBase;
-import edu.zjut.traceqa.entity.Role;
-import edu.zjut.traceqa.entity.SystemPrompt;
-import edu.zjut.traceqa.entity.User;
+import edu.zjut.traceqa.model.po.KnowledgeBase;
+import edu.zjut.traceqa.model.po.Role;
+import edu.zjut.traceqa.model.po.SystemPrompt;
+import edu.zjut.traceqa.model.po.User;
 import edu.zjut.traceqa.mapper.KnowledgeBaseMapper;
 import edu.zjut.traceqa.mapper.RoleMapper;
 import edu.zjut.traceqa.mapper.SystemPromptMapper;
 import edu.zjut.traceqa.mapper.UserMapper;
+import edu.zjut.traceqa.service.AuthService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 /**
  * 系统初始化数据装载器。
@@ -56,7 +55,7 @@ public class DataInitializer implements ApplicationRunner {
 
     /** 初始化角色 */
     private void initRoles() {
-        saveRoleIfAbsent("ADMIN", "管理员", "all",
+        saveRoleIfAbsent("ADMIN", "管理员", AuthService.ALL_PERMISSIONS_STR,
                 "拥有系统全部权限");
         saveRoleIfAbsent("USER", "普通用户",
                 "kb:view,doc:view,chat:manage", "课程问答与知识库查看权限");

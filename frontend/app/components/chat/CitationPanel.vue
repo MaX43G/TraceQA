@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="citation-panel">
     <div class="citation-panel__header">
       <a-space size="small">

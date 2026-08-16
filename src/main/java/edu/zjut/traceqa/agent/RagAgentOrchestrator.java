@@ -3,15 +3,15 @@ package edu.zjut.traceqa.agent;
 import jakarta.annotation.Resource;
 import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.enums.IntentType;
-import edu.zjut.traceqa.config.LlmConfig;
-import edu.zjut.traceqa.dto.chat.ChatStreamRequest;
-import edu.zjut.traceqa.dto.chat.ReferenceVO;
-import edu.zjut.traceqa.dto.chat.ThinkingNodeVO;
-import edu.zjut.traceqa.entity.ChatMessage;
-import edu.zjut.traceqa.entity.ChatSession;
-import edu.zjut.traceqa.retrieval.EnhancedQuery;
-import edu.zjut.traceqa.retrieval.RetrievedChunk;
-import edu.zjut.traceqa.retrieval.RetrievalResult;
+import edu.zjut.traceqa.model.dto.LlmConfig;
+import edu.zjut.traceqa.model.dto.ChatStreamRequest;
+import edu.zjut.traceqa.model.vo.ReferenceVO;
+import edu.zjut.traceqa.model.vo.ThinkingNodeVO;
+import edu.zjut.traceqa.model.po.ChatMessage;
+import edu.zjut.traceqa.model.po.ChatSession;
+import edu.zjut.traceqa.model.dto.EnhancedQuery;
+import edu.zjut.traceqa.model.dto.RetrievedChunk;
+import edu.zjut.traceqa.model.dto.RetrievalResult;
 import edu.zjut.traceqa.retrieval.RetrievalService;
 import edu.zjut.traceqa.service.ChatService;
 import edu.zjut.traceqa.service.LlmService;
@@ -23,8 +23,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 
+import cn.hutool.crypto.SecureUtil;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -91,23 +91,23 @@ public class RagAgentOrchestrator {
         LlmConfig modelConfig = toLlmConfig(request);
         try {
             // 1. 获取/创建会话；先取历史（不含当前消息），再保存当前用户消息
-            ChatSession session = chatService.getOrCreateSession(userId, request.sessionId(),
-                    request.knowledgeBaseId(), request.content());
+            ChatSession session = chatService.getOrCreateSession(userId, request.getSessionId(),
+                    request.getKnowledgeBaseId(), request.getContent());
             String history = chatService.buildHistoryText(session.getId(), 6);
-            chatService.saveUserMessage(session.getId(), request.content());
+            chatService.saveUserMessage(session.getId(), request.getContent());
 
             // 2. 意图识别（带多轮历史）
-            IntentType intent = recognizeIntent(emitter, thinking, request.content(), history, modelConfig);
+            IntentType intent = recognizeIntent(emitter, thinking, request.getContent(), history, modelConfig);
 
             // 3. 课程问答走 RAG 检索链路，否则直接应答
             String answer;
             List<ReferenceVO> references = List.of();
             if (isDirectAnswer(intent)) {
-                answer = respondDirect(emitter, thinking, request.content(), modelConfig, cancelled);
+                answer = respondDirect(emitter, thinking, request.getContent(), modelConfig, cancelled);
             } else {
-                RetrievalResult result = retrieve(emitter, thinking, request.content(), history, modelConfig, cancelled);
+                RetrievalResult result = retrieve(emitter, thinking, request.getContent(), history, modelConfig, cancelled);
                 references = emitReferences(emitter, result);
-                answer = generateAnswer(emitter, thinking, request.content(), history, result, modelConfig, cancelled);
+                answer = generateAnswer(emitter, thinking, request.getContent(), history, result, modelConfig, cancelled);
             }
 
             // 4. 持久化并结束（必须关闭 SSE 连接，否则前端 onEnd 不触发）
@@ -130,11 +130,11 @@ public class RagAgentOrchestrator {
         // 服务端模型切换
         if (request.hasServerModel()) {
             String base = openAiCompatBaseUrl(springAiBaseUrl);
-            return new LlmConfig(base, springAiApiKey, request.serverModel());
+            return new LlmConfig(base, springAiApiKey, request.getServerModel());
         }
         // 自定义模型
         if (request.hasCustomModel()) {
-            LlmConfig config = new LlmConfig(request.baseUrl(), request.apiKey(), request.model());
+            LlmConfig config = new LlmConfig(request.getBaseUrl(), request.getApiKey(), request.getModel());
             return config.isValid() ? config : null;
         }
         return null;
@@ -209,7 +209,7 @@ public class RagAgentOrchestrator {
         ssePublisher.send(emitter, "thinking", enhanceNode);
         EnhancedQuery enhanced = retrievalService.enhance(content, config,
                 progress -> pushProgress(emitter, enhanceNode, cancelled, progress), history);
-        String enhanceDetail = String.format("重写：%s", shortText(enhanced.rewritten()));
+        String enhanceDetail = String.format("重写：%s", shortText(enhanced.getRewritten()));
         finishThinking(thinking, emitter, "查询重写与 HyDE", enhanceDetail);
 
         // 步骤 2：图谱检索（local + global）
@@ -242,8 +242,8 @@ public class RagAgentOrchestrator {
         ssePublisher.send(emitter, "thinking", fuseNode);
         RetrievalResult result = retrievalService.fuseAndSupplement(content, graphChunks, vectorChunks,
                 keywordChunks, enhanced, config);
-        String fuseDetail = String.format("融合后共 %d 条%s", result.chunks().size(),
-                result.degraded() ? "（查询增强已降级）" : "");
+        String fuseDetail = String.format("融合后共 %d 条%s", result.getChunks().size(),
+                result.isDegraded() ? "（查询增强已降级）" : "");
         finishThinking(thinking, emitter, "融合与补全", fuseDetail);
         return result;
     }
@@ -254,7 +254,7 @@ public class RagAgentOrchestrator {
             return;
         }
         ssePublisher.send(emitter, "thinking",
-                new ThinkingNodeVO(node.stage(), node.agent(), "running", progress, null));
+                new ThinkingNodeVO(node.getStage(), node.getAgent(), "running", progress, null));
     }
 
     /** 截断长文本用于节点详情 */
@@ -373,9 +373,9 @@ public class RagAgentOrchestrator {
             return sb.toString();
         }
         int idx = 1;
-        for (RetrievedChunk chunk : result.chunks()) {
+        for (RetrievedChunk chunk : result.getChunks()) {
             sb.append("**片段 ").append(idx).append("** [citation:").append(idx).append("]\n\n")
-                    .append(chunk.content()).append("\n\n");
+                    .append(chunk.getContent()).append("\n\n");
             idx++;
         }
         return sb.toString();
@@ -396,9 +396,9 @@ public class RagAgentOrchestrator {
             return sb.toString();
         }
         int idx = 1;
-        for (RetrievedChunk chunk : result.chunks()) {
+        for (RetrievedChunk chunk : result.getChunks()) {
             sb.append("[citation:").append(idx).append("] ")
-                    .append(chunk.content()).append("\n\n");
+                    .append(chunk.getContent()).append("\n\n");
             idx++;
         }
         return sb.toString();
@@ -413,8 +413,8 @@ public class RagAgentOrchestrator {
         }
         List<ReferenceVO> refs = new ArrayList<>();
         int idx = 1;
-        for (RetrievedChunk chunk : result.chunks()) {
-            refs.add(new ReferenceVO(idx, extractFilename(chunk.filePath()), chunk.filePath(), chunk.content()));
+        for (RetrievedChunk chunk : result.getChunks()) {
+            refs.add(new ReferenceVO(idx, extractFilename(chunk.getFilePath()), chunk.getFilePath(), chunk.getContent()));
             idx++;
         }
         return refs;
@@ -454,9 +454,9 @@ public class RagAgentOrchestrator {
     private void finishThinking(List<ThinkingNodeVO> thinking, SseEmitter emitter, String stage, String detail) {
         for (int i = thinking.size() - 1; i >= 0; i--) {
             ThinkingNodeVO node = thinking.get(i);
-            if (node.stage().equals(stage) && "running".equals(node.status())) {
-                ThinkingNodeVO done = new ThinkingNodeVO(node.stage(), node.agent(),
-                        "done", node.message(), detail);
+            if (node.getStage().equals(stage) && "running".equals(node.getStatus())) {
+                ThinkingNodeVO done = new ThinkingNodeVO(node.getStage(), node.getAgent(),
+                        "done", node.getMessage(), detail);
                 thinking.set(i, done);
                 ssePublisher.send(emitter, "thinking", done);
                 return;
@@ -470,26 +470,16 @@ public class RagAgentOrchestrator {
     private void markThinkingFailed(List<ThinkingNodeVO> thinking) {
         for (int i = thinking.size() - 1; i >= 0; i--) {
             ThinkingNodeVO node = thinking.get(i);
-            if ("running".equals(node.status())) {
-                thinking.set(i, new ThinkingNodeVO(node.stage(), node.agent(), "failed",
-                        node.message(), "执行失败，已降级"));
+            if ("running".equals(node.getStatus())) {
+                thinking.set(i, new ThinkingNodeVO(node.getStage(), node.getAgent(), "failed",
+                        node.getMessage(), "执行失败，已降级"));
                 break;
             }
         }
     }
 
-    /** SHA-256 摘要（缓存 key 用） */
+    /** SHA-256 摘要（缓存 key 用，Hutool） */
     private String sha256(String text) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(text.getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hash) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
-        } catch (Exception e) {
-            return String.valueOf(text.hashCode());
-        }
+        return SecureUtil.sha256(text);
     }
 }

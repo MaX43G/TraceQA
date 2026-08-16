@@ -313,7 +313,12 @@ declare namespace API {
   type RegisterRequest = {
     username: string;
     password: string;
-    nickname?: string;
+    confirmPassword: string;
+    nickname: string;
+  };
+
+  type NicknameRequest = {
+    nickname: string;
   };
 
   type RoleChangeRequest = {

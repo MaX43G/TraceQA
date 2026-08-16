@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div>
     <div class="toolbar">
       <a-select v-model:value="selectedKbId" placeholder="选择知识库" style="width: 260px" @change="loadDocs">
@@ -65,9 +65,7 @@
           </a-tooltip>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-popconfirm title="确定删除该文档？" @confirm="handleDelete(record)">
-            <a-button type="link" size="small" danger>删除</a-button>
-          </a-popconfirm>
+          <ConfirmDelete title="确定删除该文档？" @confirm="handleDelete(record)" />
         </template>
       </template>
     </a-table>
@@ -81,6 +79,7 @@
  */
 import { UploadOutlined, FileZipOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
+import ConfirmDelete from '@/components/common/ConfirmDelete.vue'
 import { list1 as apiListKbs } from '@/api/traceqa/zhishiku'
 import { upload, delete2 as apiDeleteDoc, listByKb } from '@/api/traceqa/wendang'
 import { getAuthHeaders } from '@/utils/request'

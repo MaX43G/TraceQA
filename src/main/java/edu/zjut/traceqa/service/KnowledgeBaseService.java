@@ -7,15 +7,16 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import edu.zjut.traceqa.common.api.PageResult;
 import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.exception.BizException;
-import edu.zjut.traceqa.dto.kb.KnowledgeBaseDTO;
-import edu.zjut.traceqa.entity.Document;
-import edu.zjut.traceqa.entity.KnowledgeBase;
+import edu.zjut.traceqa.model.vo.KnowledgeBaseDTO;
+import edu.zjut.traceqa.model.po.Document;
+import edu.zjut.traceqa.model.po.KnowledgeBase;
 import edu.zjut.traceqa.mapper.DocumentMapper;
 import edu.zjut.traceqa.mapper.KnowledgeBaseMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import edu.zjut.traceqa.common.convert.DtoMapper;
 
 /**
  * 知识库服务。
@@ -52,24 +53,24 @@ public class KnowledgeBaseService {
     /** 创建知识库 */
     public KnowledgeBaseDTO create(KnowledgeBaseDTO dto) {
         KnowledgeBase kb = new KnowledgeBase();
-        kb.setName(dto.name());
-        kb.setDescription(dto.description());
-        kb.setCourse(dto.course());
-        kb.setStatus(dto.status() == null ? 1 : dto.status());
+        kb.setName(dto.getName());
+        kb.setDescription(dto.getDescription());
+        kb.setCourse(dto.getCourse());
+        kb.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         knowledgeBaseMapper.insert(kb);
         log.info("创建知识库：{}", kb.getName());
-        return KnowledgeBaseDTO.of(kb);
+        return DtoMapper.INSTANCE.toKnowledgeBaseDTO(kb);
     }
 
     /** 更新知识库 */
     public KnowledgeBaseDTO update(Long id, KnowledgeBaseDTO dto) {
         KnowledgeBase kb = requireById(id);
-        kb.setName(dto.name());
-        kb.setDescription(dto.description());
-        kb.setCourse(dto.course());
-        kb.setStatus(dto.status());
+        kb.setName(dto.getName());
+        kb.setDescription(dto.getDescription());
+        kb.setCourse(dto.getCourse());
+        kb.setStatus(dto.getStatus());
         knowledgeBaseMapper.updateById(kb);
-        return KnowledgeBaseDTO.of(kb);
+        return DtoMapper.INSTANCE.toKnowledgeBaseDTO(kb);
     }
 
     /** 删除知识库（同时逻辑删除其下文档） */

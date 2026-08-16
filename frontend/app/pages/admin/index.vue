@@ -18,6 +18,9 @@
         <a-tab-pane key="user" tab="用户与权限">
           <UserManager v-if="activeKey === 'user'" />
         </a-tab-pane>
+        <a-tab-pane key="monitor" tab="系统监控">
+          <MonitorPanel v-if="activeKey === 'monitor'" />
+        </a-tab-pane>
       </a-tabs>
     </a-card>
   </div>
@@ -32,6 +35,7 @@ import KnowledgeBaseManager from '@/components/admin/KnowledgeBaseManager.vue'
 import DocumentManager from '@/components/admin/DocumentManager.vue'
 import PromptManager from '@/components/admin/PromptManager.vue'
 import UserManager from '@/components/admin/UserManager.vue'
+import MonitorPanel from '@/components/admin/MonitorPanel.vue'
 
 useSeoMeta({
   title: '管理后台 - 溯知 · TraceQA',

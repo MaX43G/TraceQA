@@ -1,7 +1,5 @@
 package edu.zjut.traceqa.common.api;
 
-import java.io.Serializable;
-
 /**
  * 链路追踪 ID 的线程上下文持有器。
  *

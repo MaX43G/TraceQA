@@ -7,16 +7,17 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import edu.zjut.traceqa.common.api.PageResult;
 import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.exception.BizException;
-import edu.zjut.traceqa.dto.admin.AdminUserVO;
-import edu.zjut.traceqa.dto.admin.RoleDTO;
-import edu.zjut.traceqa.entity.Role;
-import edu.zjut.traceqa.entity.User;
+import edu.zjut.traceqa.model.vo.AdminUserVO;
+import edu.zjut.traceqa.model.vo.RoleDTO;
+import edu.zjut.traceqa.model.po.Role;
+import edu.zjut.traceqa.model.po.User;
 import edu.zjut.traceqa.mapper.RoleMapper;
 import edu.zjut.traceqa.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import edu.zjut.traceqa.common.convert.DtoMapper;
 
 /**
  * 管理员服务（RBAC 用户与角色管理）。
@@ -80,11 +81,11 @@ public class AdminService {
         if (role == null) {
             throw new BizException(ErrorCode.NOT_FOUND, "角色不存在");
         }
-        role.setName(dto.name());
-        role.setPermissions(dto.permissions());
-        role.setDescription(dto.description());
+        role.setName(dto.getName());
+        role.setPermissions(dto.getPermissions());
+        role.setDescription(dto.getDescription());
         roleMapper.updateById(role);
-        return RoleDTO.of(role);
+        return DtoMapper.INSTANCE.toRoleDTO(role);
     }
 
     /** 校验用户存在 */

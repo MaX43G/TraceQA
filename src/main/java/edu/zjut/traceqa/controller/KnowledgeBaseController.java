@@ -1,9 +1,10 @@
 package edu.zjut.traceqa.controller;
 
 import jakarta.annotation.Resource;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import edu.zjut.traceqa.common.api.ApiResponse;
 import edu.zjut.traceqa.common.api.PageResult;
-import edu.zjut.traceqa.dto.kb.KnowledgeBaseDTO;
+import edu.zjut.traceqa.model.vo.KnowledgeBaseDTO;
 import edu.zjut.traceqa.service.KnowledgeBaseService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -55,18 +56,21 @@ public class KnowledgeBaseController {
     }
 
     @Operation(summary = "创建知识库")
+    @SaCheckPermission("kb:manage")
     @PostMapping
     public ApiResponse<KnowledgeBaseDTO> create(@Valid @RequestBody KnowledgeBaseDTO dto) {
         return ApiResponse.ok(knowledgeBaseService.create(dto));
     }
 
     @Operation(summary = "更新知识库")
+    @SaCheckPermission("kb:manage")
     @PutMapping("/{id}")
     public ApiResponse<KnowledgeBaseDTO> update(@PathVariable Long id, @Valid @RequestBody KnowledgeBaseDTO dto) {
         return ApiResponse.ok(knowledgeBaseService.update(id, dto));
     }
 
     @Operation(summary = "删除知识库")
+    @SaCheckPermission("kb:manage")
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         knowledgeBaseService.delete(id);

@@ -33,6 +33,19 @@ spring:
           model: ${LLM_MODEL:THUDM/GLM-4-32B-0414}
           temperature: 0.3
 
+# sa-token 认证配置
+sa-token:
+  # token 从 Authorization: Bearer 头读取（兼容前端现有请求）
+  token-name: Authorization
+  token-prefix: Bearer
+  token-style: uuid
+  timeout: 86400
+  active-timeout: -1
+  # 单端登录：同一账号同时只允许一个用户在线（新登录顶掉旧会话）
+  is-concurrent: false
+  is-share: false
+  is-log: false
+
 # OpenAPI 规范（前端依据 /v3/api-docs 自动生成 API 客户端）
 springdoc:
   api-docs:

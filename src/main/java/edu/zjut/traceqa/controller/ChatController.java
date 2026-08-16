@@ -3,10 +3,10 @@ package edu.zjut.traceqa.controller;
 import edu.zjut.traceqa.agent.RagAgentOrchestrator;
 import edu.zjut.traceqa.common.api.ApiResponse;
 import edu.zjut.traceqa.common.auth.UserContext;
-import edu.zjut.traceqa.dto.chat.ChatMessageVO;
-import edu.zjut.traceqa.dto.chat.ChatStreamRequest;
-import edu.zjut.traceqa.dto.chat.SessionCreateRequest;
-import edu.zjut.traceqa.dto.chat.SessionVO;
+import edu.zjut.traceqa.model.vo.ChatMessageVO;
+import edu.zjut.traceqa.model.dto.ChatStreamRequest;
+import edu.zjut.traceqa.model.dto.SessionCreateRequest;
+import edu.zjut.traceqa.model.vo.SessionVO;
 import edu.zjut.traceqa.service.ChatService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,6 +27,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import edu.zjut.traceqa.common.convert.DtoMapper;
 
 /**
  * 对话接口。
@@ -73,8 +74,8 @@ public class ChatController {
     @Operation(summary = "创建会话")
     @PostMapping("/sessions")
     public ApiResponse<SessionVO> createSession(@Valid @RequestBody SessionCreateRequest request) {
-        var session = chatService.createSession(UserContext.getUserId(), request.title(), request.knowledgeBaseId());
-        return ApiResponse.ok(SessionVO.of(session));
+        var session = chatService.createSession(UserContext.getUserId(), request.getTitle(), request.getKnowledgeBaseId());
+        return ApiResponse.ok(DtoMapper.INSTANCE.toSessionVO(session));
     }
 
     @Operation(summary = "查询会话列表")

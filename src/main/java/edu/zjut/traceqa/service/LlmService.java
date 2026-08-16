@@ -1,7 +1,7 @@
 package edu.zjut.traceqa.service;
 
-import edu.zjut.traceqa.config.LlmConfig;
-import edu.zjut.traceqa.entity.SystemPrompt;
+import edu.zjut.traceqa.model.dto.LlmConfig;
+import edu.zjut.traceqa.model.po.SystemPrompt;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;

@@ -1,6 +1,6 @@
 package edu.zjut.traceqa.service;
 
-import edu.zjut.traceqa.dto.document.DocumentProgressVO;
+import edu.zjut.traceqa.model.vo.DocumentProgressVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -26,7 +26,7 @@ public class DocumentProgressStore {
 
     /** 更新文档进度快照 */
     public void update(DocumentProgressVO progress) {
-        snapshots.put(progress.documentId(), progress);
+        snapshots.put(progress.getDocumentId(), progress);
     }
 
     /** 获取最新进度快照，不存在返回 null */
