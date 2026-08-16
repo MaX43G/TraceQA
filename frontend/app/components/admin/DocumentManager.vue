@@ -32,7 +32,7 @@
               status="active"
             />
             <span v-if="partInfo[record.id]" class="part-progress">
-              已解析 {{ partInfo[record.id].done }} / {{ partInfo[record.id].total }} 块
+              已上传 {{ partInfo[record.id].done }} / {{ partInfo[record.id].total }} 块
             </span>
           </a-space>
         </template>

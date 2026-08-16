@@ -16,8 +16,8 @@ import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -48,10 +48,14 @@ public class DocumentParseWorker {
     private static final long POLL_INTERVAL_MS = 2000L;
     /** 解析轮询最大次数（约 10 分钟/块） */
     private static final int MAX_POLL_TIMES = 300;
-    /** 切分阈值：超过该字节数才切分 */
+    /** 切分阈值：PDF 超过该字节数才切分 */
     private static final long SPLIT_THRESHOLD_BYTES = 2L * 1024 * 1024;
-    /** 每块目标字节数（约 4MB） */
+    /** PDF 每块目标字节数（约 4MB） */
     private static final long TARGET_PART_BYTES = 4L * 1024 * 1024;
+    /** 文本（md/txt）每块目标字节数（无论大小均切分，便于展示上传进度） */
+    private static final long TEXT_PART_BYTES = 100L * 1024;
+    /** 文本切分最大块数 */
+    private static final int MAX_TEXT_PARTS = 20;
     /** 最大切分块数（防止切得过碎） */
     private static final int MAX_PARTS = 50;
     /** 块与块之间的提交限速间隔（毫秒），避免瞬时打爆 API 限流 */
@@ -77,16 +81,17 @@ public class DocumentParseWorker {
             for (int i = 0; i < total; i++) {
                 PartChunk part = parts.get(i);
                 String partName = total > 1 ? safePartName(part.name(), i + 1, total) : part.name();
-                updateStatus(doc, DocumentStatus.PROCESSING, partProgress(total, i), "正在提交第 " + (i + 1) + "/" + total + " 块");
+                // 提交当前块（上传成功即计入进度）
                 String trackId = lightRagClient.uploadDocument(part.bytes(), partName);
                 doc.setTrackId(trackId);
-                documentMapper.updateById(doc);
-                // 轮询该块解析状态
-                parsePartAndWait(doc, i + 1, total);
                 doc.setPartDone(i + 1);
                 documentMapper.updateById(doc);
-                updateStatus(doc, DocumentStatus.PROCESSING, partProgress(total, i + 1),
-                        "已完成第 " + (i + 1) + "/" + total + " 块");
+                updateStatus(doc, DocumentStatus.PROCESSING, uploadProgress(total, i + 1),
+                        "已上传第 " + (i + 1) + "/" + total + " 块");
+                // 轮询该块解析状态（进度条停在「已上传百分比」）
+                parsePartAndWait(doc, i + 1, total);
+                updateStatus(doc, DocumentStatus.PROCESSING, uploadProgress(total, i + 1),
+                        "第 " + (i + 1) + "/" + total + " 块解析完成");
                 // 限速：块间间隔，避免瞬时打爆 API 限流
                 if (i < total - 1) {
                     sleepQuietly(PART_INTERVAL_MS);
@@ -101,25 +106,19 @@ public class DocumentParseWorker {
         }
     }
 
-    /** 计算分块进度（15% - 90% 区间随已完成块数线性推进，最后 DONE 为 100%） */
-    private int partProgress(int total, int done) {
-        if (total <= 1) {
-            return done >= 1 ? 90 : 30;
-        }
-        return (int) Math.min(90, 15 + done * 75.0 / total);
+    /** 计算上传进度（已提交成功的块数占比，0-100） */
+    private int uploadProgress(int total, int uploaded) {
+        return (int) Math.min(100, uploaded * 100.0 / Math.max(1, total));
     }
 
-    /** 切分文件为多个子块；小文件或不支持的格式返回单块 */
+    /** 切分文件为多个子块；md/txt 无论大小均切分，PDF 仅超大时切分 */
     private List<PartChunk> splitParts(byte[] content, String filename) throws IOException {
         String ext = extensionOf(filename);
-        if (content.length <= SPLIT_THRESHOLD_BYTES) {
-            return List.of(new PartChunk(content, filename));
-        }
-        if ("pdf".equals(ext)) {
-            return splitPdf(content, filename);
-        }
         if ("md".equals(ext) || "txt".equals(ext)) {
             return splitText(content, filename);
+        }
+        if ("pdf".equals(ext) && content.length > SPLIT_THRESHOLD_BYTES) {
+            return splitPdf(content, filename);
         }
         // 其他格式（docx/pptx 等）暂不支持安全切分，整文件上传
         return List.of(new PartChunk(content, filename));
@@ -159,15 +158,21 @@ public class DocumentParseWorker {
         return (int) pagesPerPart;
     }
 
-    /** 按字节切分纯文本（md/txt） */
+    /** 按字符切分纯文本（md/txt），确保每块都是合法 UTF-8（避免切断多字节字符） */
     private List<PartChunk> splitText(byte[] content, String filename) {
+        if (content.length == 0) {
+            return List.of(new PartChunk(content, filename));
+        }
+        String text = new String(content, StandardCharsets.UTF_8);
+        // 中文字符最多 3 字节，按 TEXT_PART_BYTES 折算成字符目标，保证每块不超过目标字节数
+        int targetChars = Math.max(1, (int) (TEXT_PART_BYTES / 3));
+        int chunks = Math.max(1, (int) Math.ceil(text.length() / (double) targetChars));
+        int capped = Math.min(chunks, MAX_TEXT_PARTS);
+        int partChars = Math.max(1, (int) Math.ceil(text.length() / (double) capped));
         List<PartChunk> parts = new ArrayList<>();
-        int partBytes = (int) Math.max(1L, Math.min(TARGET_PART_BYTES, content.length));
-        int chunks = (int) Math.ceil(content.length / (double) partBytes);
-        int actualPartBytes = Math.max(1, (int) Math.ceil(content.length / (double) Math.min(chunks, MAX_PARTS)));
-        for (int start = 0; start < content.length; start += actualPartBytes) {
-            int end = Math.min(start + actualPartBytes, content.length);
-            parts.add(new PartChunk(Arrays.copyOfRange(content, start, end), filename));
+        for (int start = 0; start < text.length(); start += partChars) {
+            int end = Math.min(start + partChars, text.length());
+            parts.add(new PartChunk(text.substring(start, end).getBytes(StandardCharsets.UTF_8), filename));
         }
         return parts;
     }
@@ -204,7 +209,7 @@ public class DocumentParseWorker {
             }
             poll++;
             updateStatus(doc, DocumentStatus.PROCESSING,
-                    partProgress(total, doc.getPartDone()),
+                    uploadProgress(total, doc.getPartDone()),
                     "第 " + partIndex + "/" + total + " 块解析中");
             sleepQuietly(POLL_INTERVAL_MS);
         }
