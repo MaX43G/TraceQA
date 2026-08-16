@@ -1,6 +1,8 @@
 package edu.zjut.traceqa.service;
 
+import jakarta.annotation.Resource;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import edu.zjut.traceqa.common.enums.ChatRole;
 import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.exception.BizException;
@@ -28,17 +30,18 @@ import java.util.List;
 @Service
 public class ChatService {
 
+    @Resource
+    private ChatSessionMapper sessionMapper;
+
+    @Resource
+    private ChatMessageMapper messageMapper;
+
+    @Resource
+    private JsonUtils jsonUtils;
+
     private static final int TITLE_MAX_LENGTH = 20;
 
-    private final ChatSessionMapper sessionMapper;
-    private final ChatMessageMapper messageMapper;
-    private final JsonUtils jsonUtils;
-
-    public ChatService(ChatSessionMapper sessionMapper, ChatMessageMapper messageMapper, JsonUtils jsonUtils) {
-        this.sessionMapper = sessionMapper;
-        this.messageMapper = messageMapper;
-        this.jsonUtils = jsonUtils;
-    }
+    
 
     /** 创建会话 */
     public ChatSession createSession(Long userId, String title, Long knowledgeBaseId) {
@@ -219,6 +222,30 @@ public class ChatService {
             throw new BizException(ErrorCode.FORBIDDEN, "无权访问该会话");
         }
         return session;
+    }
+
+    /** 构建最近 N 条对话历史文本（用于多轮上下文注入，按时间正序） */
+    public String buildHistoryText(Long sessionId, int limit) {
+        // 用 Page 分页替代手写 LIMIT，符合「杜绝手写原生 SQL」约定
+        List<ChatMessage> messages = messageMapper.selectPage(
+                        new Page<>(1, limit),
+                        new LambdaQueryWrapper<ChatMessage>()
+                                .eq(ChatMessage::getSessionId, sessionId)
+                                .orderByDesc(ChatMessage::getId))
+                .getRecords();
+        if (messages.isEmpty()) {
+            return "";
+        }
+        // 逆序恢复时间正序
+        StringBuilder sb = new StringBuilder();
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            ChatMessage msg = messages.get(i);
+            String role = ChatRole.USER.name().equals(msg.getRole()) ? "用户" : "AI";
+            if (msg.getContent() != null && !msg.getContent().isBlank()) {
+                sb.append(role).append("：").append(msg.getContent()).append("\n");
+            }
+        }
+        return sb.toString();
     }
 
     /** 消息实体转 DTO（解析思考链路与引用） */

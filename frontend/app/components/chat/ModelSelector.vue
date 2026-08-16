@@ -16,8 +16,13 @@
           </div>
         </div>
       </template>
-      <a-select-option v-for="m in modelStore.serverModels" key="default" value="default">
-        <RobotOutlined /> {{ m.name || '默认模型' }}
+      <a-select-option
+        v-for="m in modelStore.serverModels"
+        :key="m.isDefault ? 'default' : `server:${m.model}`"
+        :value="m.isDefault ? 'default' : `server:${m.model}`"
+      >
+        <RobotOutlined /> {{ m.name || m.model }}
+        <a-tag v-if="m.isDefault" size="small" color="blue" style="margin-left: 4px">默认</a-tag>
       </a-select-option>
       <a-select-option
         v-for="cm in modelStore.customModels"

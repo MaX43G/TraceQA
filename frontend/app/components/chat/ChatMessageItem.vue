@@ -158,6 +158,17 @@ async function copyContent(): Promise<void> {
   min-width: 0;
 }
 
+/* 移动端：消息气泡更宽 */
+@media (max-width: 768px) {
+  .chat-msg {
+    gap: 8px;
+  }
+
+  .chat-msg__body {
+    max-width: 90%;
+  }
+}
+
 .chat-msg__user-bubble {
   background: #1677ff;
   color: #fff;

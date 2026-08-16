@@ -10,6 +10,7 @@ import edu.zjut.traceqa.dto.chat.SessionVO;
 import edu.zjut.traceqa.service.ChatService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -38,16 +39,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @RequestMapping("/api/chat")
 public class ChatController {
 
-    private final ChatService chatService;
-    private final RagAgentOrchestrator orchestrator;
-    private final Executor ragExecutor;
-
-    public ChatController(ChatService chatService, RagAgentOrchestrator orchestrator,
-                          @org.springframework.beans.factory.annotation.Qualifier("ragExecutor") Executor ragExecutor) {
-        this.chatService = chatService;
-        this.orchestrator = orchestrator;
-        this.ragExecutor = ragExecutor;
-    }
+    @Resource
+    private ChatService chatService;
+    @Resource
+    private RagAgentOrchestrator orchestrator;
+    @Resource(name = "ragExecutor")
+    private Executor ragExecutor;
 
     @Operation(summary = "流式对话（SSE：thinking/delta/references/done/error 事件）")
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

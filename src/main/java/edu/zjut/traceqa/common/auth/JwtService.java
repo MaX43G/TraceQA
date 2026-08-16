@@ -5,6 +5,7 @@ import edu.zjut.traceqa.common.exception.BizException;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -25,14 +26,16 @@ import java.util.List;
 public class JwtService {
 
     /** 令牌签发密钥（生产环境务必通过环境变量覆盖） */
-    private final SecretKey secretKey;
+    @Value("${app.jwt.secret:traceqa-secret-key-please-change-in-prod-2026}")
+    private String secret;
+    private SecretKey secretKey;
     /** 令牌有效期（毫秒） */
-    private final long expiration;
+    @Value("${app.jwt.expiration:7200000}")
+    private long expiration;
 
-    public JwtService(@Value("${app.jwt.secret:traceqa-secret-key-please-change-in-prod-2026}") String secret,
-                      @Value("${app.jwt.expiration:7200000}") long expiration) {
+    @PostConstruct
+    private void init() {
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-        this.expiration = expiration;
     }
 
     /** 为用户签发令牌 */

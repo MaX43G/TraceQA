@@ -32,12 +32,6 @@ public class PageResult<T> implements Serializable {
     /** 当前页数据 */
     private List<T> records;
 
-    /** 从 MyBatis-Plus 分页对象构造 */
-    public static <T> PageResult<T> of(IPage<T> pageResult) {
-        return new PageResult<>(pageResult.getCurrent(), pageResult.getSize(),
-                pageResult.getTotal(), pageResult.getRecords());
-    }
-
     /** 分页对象 + 元素类型转换器（用于 DTO 映射） */
     public static <S, T> PageResult<T> of(IPage<S> pageResult, Function<S, T> converter) {
         List<T> records = pageResult.getRecords().stream().map(converter).toList();

@@ -119,7 +119,7 @@ function handleAuthFailure(error: ApiError): void {
  * @param options 请求选项
  */
 export default async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', data, params, headers = {}, responseType, ...rest } = options
+  const { method = 'GET', data, params, headers = {}, ...rest } = options
   const query = buildQuery(params)
   const isFormData = data instanceof FormData
 
@@ -139,9 +139,7 @@ export default async function request<T>(url: string, options: RequestOptions = 
       // 后端全局异常已返回统一结构，尝试解包
       try {
         const json = (await res.json()) as ApiResponse<unknown>
-        const error = new ApiError(json.msg || `请求失败(${res.status})`, json.code || res.status, json.traceId)
-        handleAuthFailure(error)
-        throw error
+        throw new ApiError(json.msg || `请求失败(${res.status})`, json.code || res.status, json.traceId)
       } catch (e) {
         if (e instanceof ApiError) {
           throw e
@@ -151,6 +149,7 @@ export default async function request<T>(url: string, options: RequestOptions = 
     }
     return await unwrapResponse<T>(res)
   } catch (error) {
+    // 统一在此处处理认证失败（避免重复触发）
     if (error instanceof ApiError) {
       handleAuthFailure(error)
     }

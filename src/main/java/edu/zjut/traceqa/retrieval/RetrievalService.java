@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.retrieval;
 
+import jakarta.annotation.Resource;
 import edu.zjut.traceqa.config.LightRagClient;
 import edu.zjut.traceqa.config.LlmConfig;
 import edu.zjut.traceqa.service.LlmService;
@@ -31,63 +32,44 @@ import java.util.function.Consumer;
 @Service
 public class RetrievalService {
 
+    @Resource
+    private LightRagClient lightRagClient;
+
+    @Resource
+    private LlmService llmService;
+
     /** RRF 融合常数 */
     private static final double RRF_K = 60.0;
     /** 每路保留的最大结果数 */
     private static final int MAX_PER_PATH = 12;
 
-    private final LightRagClient lightRagClient;
-    private final LlmService llmService;
-
-    public RetrievalService(LightRagClient lightRagClient, LlmService llmService) {
-        this.lightRagClient = lightRagClient;
-        this.llmService = llmService;
-    }
+    
 
     /**
-     * 执行增强检索。
+     * 查询增强：重写 + HyDE 并行生成（结合多轮历史消除指代，提高召回）。
      *
-     * @param question 用户原始问题
-     * @return 融合后的检索结果（含增强查询信息）
+     * @param history 对话历史文本（可为空）
      */
-    public RetrievalResult retrieve(String question) {
-        return retrieve(question, null);
-    }
-
-    /**
-     * 执行增强检索。
-     *
-     * @param question 用户原始问题
-     * @param config   自定义模型配置（null 表示使用默认模型）
-     * @return 融合后的检索结果（含增强查询信息）
-     */
-    public RetrievalResult retrieve(String question, LlmConfig config) {
-        return retrieve(question, config, null);
-    }
-
-    /**
-     * 执行增强检索（支持进度回调，用于 SSE 实时提示）。
-     */
-    public RetrievalResult retrieve(String question, LlmConfig config, Consumer<String> progress) {
-        EnhancedQuery enhanced = enhance(question, config, progress);
-        List<RetrievedChunk> graphChunks = queryGraph(question, enhanced, config, progress);
-        List<RetrievedChunk> vectorChunks = queryVector(question, enhanced, config, progress);
-        return fuseAndSupplement(question, graphChunks, vectorChunks, enhanced, config);
-    }
-
-    /**
-     * 查询增强：重写 + HyDE 并行生成（提高召回）。
-     */
-    public EnhancedQuery enhance(String question, LlmConfig config, Consumer<String> progress) {
+    public EnhancedQuery enhance(String question, LlmConfig config, Consumer<String> progress, String history) {
         notify(progress, "正在生成查询重写与 HyDE");
+        String rewriteInput = buildQueryInput(question, history);
+        String hydeInput = buildQueryInput(question, history);
         CompletableFuture<String> rewriteFuture = CompletableFuture.supplyAsync(
-                () -> llmService.call("rewrite", question, config));
+                () -> llmService.call("rewrite", rewriteInput, config));
         CompletableFuture<String> hydeFuture = CompletableFuture.supplyAsync(
-                () -> llmService.call("hyde", question, config));
+                () -> llmService.call("hyde", hydeInput, config));
         String rewritten = rewriteFuture.join();
         String hyde = hydeFuture.join();
         log.debug("查询增强完成：rewritten={}, hydePresent={}", rewritten, hyde != null && !hyde.isBlank());
         return new EnhancedQuery(question, rewritten, hyde);
+    }
+
+    /** 拼接对话历史与当前问题（无历史时仅当前问题） */
+    private String buildQueryInput(String question, String history) {
+        if (history == null || history.isBlank()) {
+            return question;
+        }
+        return "对话历史：\n" + history + "当前问题：" + question;
     }
 
     /**
@@ -140,8 +122,7 @@ public class RetrievalService {
         List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks);
         List<RetrievedChunk> supplemented = reread(question, fused, config);
         boolean degraded = enhanced.rewritten() == null && enhanced.hyde() == null;
-        return new RetrievalResult(supplemented, enhanced,
-                graphChunks.size(), vectorChunks.size(), degraded);
+        return new RetrievalResult(supplemented, degraded);
     }
 
     /** 合并多路片段（按 reference_id+content 去重，保留首现） */
@@ -154,6 +135,55 @@ public class RetrievalService {
             }
         }
         return new ArrayList<>(merged.values());
+    }
+
+    /**
+     * LLM 复杂度判定：是否需要聚合检索链路（图谱 + 向量复合检索）。
+     *
+     * <p>策略：先做零成本快速预检（极短的单点事实问题直接判定简单，跳过 LLM 调用），
+     * 否则调用 LLM 按语义标准判定；LLM 失败/熔断时回退到规则判定（优雅降级）。</p>
+     */
+    public boolean isComplexQuery(String question, LlmConfig config) {
+        // 快速预检：极短问题且无明显复杂信号 → 简单，省一次 LLM 调用
+        if (question != null && question.length() <= 15 && !hasComplexSignal(question)) {
+            return false;
+        }
+        // LLM 判定
+        String result = llmService.call("complexity", question, config);
+        if (result != null) {
+            String upper = result.trim().toUpperCase();
+            if (upper.contains("COMPLEX")) {
+                return true;
+            }
+            if (upper.contains("SIMPLE")) {
+                return false;
+            }
+        }
+        // LLM 不可用：规则兜底
+        return ruleComplex(question);
+    }
+
+    /** 规则判定：复杂逻辑词 / 多实体 / 长问题 */
+    private boolean ruleComplex(String question) {
+        if (question == null || question.isBlank()) {
+            return false;
+        }
+        return hasComplexSignal(question) || question.trim().length() > 40;
+    }
+
+    /** 是否包含复杂信号（逻辑词或多实体分隔符） */
+    private boolean hasComplexSignal(String question) {
+        String[] complexWords = {
+                "对比", "比较", "区别", "差异", "关系", "关联", "联系", "影响", "总结", "综述",
+                "分析", "优缺点", "为什么", "如何选择", "vs", "VS", "versus", "相较于",
+                "与", "和", "及", "或"
+        };
+        for (String word : complexWords) {
+            if (question.contains(word)) {
+                return true;
+            }
+        }
+        return question.matches(".*[、，,;；].*");
     }
 
     /** 推送进度回调（空回调时忽略） */

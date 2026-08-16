@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.service;
 
+import jakarta.annotation.Resource;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -25,13 +26,13 @@ import java.util.List;
 @Service
 public class KnowledgeBaseService {
 
-    private final KnowledgeBaseMapper knowledgeBaseMapper;
-    private final DocumentMapper documentMapper;
+    @Resource
+    private KnowledgeBaseMapper knowledgeBaseMapper;
 
-    public KnowledgeBaseService(KnowledgeBaseMapper knowledgeBaseMapper, DocumentMapper documentMapper) {
-        this.knowledgeBaseMapper = knowledgeBaseMapper;
-        this.documentMapper = documentMapper;
-    }
+    @Resource
+    private DocumentMapper documentMapper;
+
+    
 
     /** 查询全部启用的知识库 */
     public List<KnowledgeBaseDTO> list() {

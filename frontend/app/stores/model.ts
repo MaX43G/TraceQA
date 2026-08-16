@@ -55,14 +55,12 @@ export const useModelStore = defineStore('model', {
       return null
     },
 
-    /** 当前选中模型展示名 */
-    selectedLabel(state): string {
-      if (state.selected === 'default') {
-        const def = state.serverModels.find((m) => m.isDefault)
-        return def?.name || '默认模型'
+    /** 当前选中的服务端模型名（选中默认模型时返回 null，由后端走默认配置） */
+    activeServerModel(state): string | null {
+      if (!state.selected.startsWith('server:')) {
+        return null
       }
-      const custom = state.customModels.find((m) => `custom:${m.id}` === state.selected)
-      return custom ? `自定义：${custom.name}` : '默认模型'
+      return state.selected.slice('server:'.length)
     }
   },
 
@@ -81,7 +79,7 @@ export const useModelStore = defineStore('model', {
         }
       }
       const selected = window.localStorage.getItem(SELECTED_MODEL_KEY)
-      if (selected === 'default' || (typeof selected === 'string' && selected.startsWith('custom:'))) {
+      if (selected === 'default' || (typeof selected === 'string' && (selected.startsWith('server:') || selected.startsWith('custom:')))) {
         this.selected = selected
       }
     },

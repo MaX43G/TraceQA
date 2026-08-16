@@ -38,12 +38,6 @@ export const useChatStore = defineStore('chat', {
     generating: false
   }),
 
-  getters: {
-    /** 当前会话 */
-    currentSession: (state): SessionVO | undefined =>
-      state.sessions.find((s) => s.id === state.currentSessionId)
-  },
-
   actions: {
     /** 拉取会话列表 */
     async loadSessions(): Promise<void> {
@@ -100,23 +94,6 @@ export const useChatStore = defineStore('chat', {
         return ''
       }
       return exportMarkdown({ id: this.currentSessionId })
-    },
-
-    /** 追加一条流式消息（作为临时消息参与渲染） */
-    appendStreamMessage(content: string): void {
-      const msg: StreamMessage = {
-        id: -Date.now(),
-        sessionId: this.currentSessionId ?? 0,
-        role: 'ASSISTANT',
-        content: '',
-        thinkingTrace: [],
-        references: [],
-        latencyMs: 0,
-        createTime: new Date().toISOString(),
-        streaming: true,
-        buffer: content
-      }
-      this.messages.push(msg)
     }
   }
 })

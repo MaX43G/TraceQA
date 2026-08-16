@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.service;
 
+import jakarta.annotation.Resource;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import edu.zjut.traceqa.common.auth.JwtService;
 import edu.zjut.traceqa.common.auth.UserContext;
@@ -31,18 +32,19 @@ import java.util.List;
 @Service
 public class AuthService {
 
-    private final UserMapper userMapper;
-    private final RoleMapper roleMapper;
-    private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
+    @Resource
+    private UserMapper userMapper;
 
-    public AuthService(UserMapper userMapper, RoleMapper roleMapper,
-                       PasswordEncoder passwordEncoder, JwtService jwtService) {
-        this.userMapper = userMapper;
-        this.roleMapper = roleMapper;
-        this.passwordEncoder = passwordEncoder;
-        this.jwtService = jwtService;
-    }
+    @Resource
+    private RoleMapper roleMapper;
+
+    @Resource
+    private PasswordEncoder passwordEncoder;
+
+    @Resource
+    private JwtService jwtService;
+
+    
 
     /** 用户注册（默认角色 USER） */
     public UserInfo register(RegisterRequest request) {

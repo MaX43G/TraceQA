@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.controller;
 
+import jakarta.annotation.Resource;
 import edu.zjut.traceqa.common.api.ApiResponse;
 import edu.zjut.traceqa.common.auth.UserContext;
 import edu.zjut.traceqa.dto.auth.LoginRequest;
@@ -26,11 +27,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    private final AuthService authService;
+    @Resource
+    private AuthService authService;
 
-    public AuthController(AuthService authService) {
-        this.authService = authService;
-    }
+    
 
     @Operation(summary = "用户注册")
     @PostMapping("/register")

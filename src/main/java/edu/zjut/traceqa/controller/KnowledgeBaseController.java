@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.controller;
 
+import jakarta.annotation.Resource;
 import edu.zjut.traceqa.common.api.ApiResponse;
 import edu.zjut.traceqa.common.api.PageResult;
 import edu.zjut.traceqa.dto.kb.KnowledgeBaseDTO;
@@ -28,11 +29,10 @@ import java.util.Map;
 @RequestMapping("/api/kbs")
 public class KnowledgeBaseController {
 
-    private final KnowledgeBaseService knowledgeBaseService;
+    @Resource
+    private KnowledgeBaseService knowledgeBaseService;
 
-    public KnowledgeBaseController(KnowledgeBaseService knowledgeBaseService) {
-        this.knowledgeBaseService = knowledgeBaseService;
-    }
+    
 
     @Operation(summary = "查询启用知识库列表")
     @GetMapping

@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.agent;
 
+import jakarta.annotation.Resource;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import edu.zjut.traceqa.service.SystemPromptService;
 import lombok.extern.slf4j.Slf4j;
@@ -17,18 +18,18 @@ import org.springframework.stereotype.Component;
 @Component
 public class RagAgents {
 
-    private final ChatModel chatModel;
-    private final SystemPromptService systemPromptService;
+    @Resource
+    private ChatModel chatModel;
+
+    @Resource
+    private SystemPromptService systemPromptService;
 
     /** 意图识别 Agent（懒加载缓存） */
     private volatile ReactAgent intentAgent;
     /** 总结生成 Agent（懒加载缓存） */
     private volatile ReactAgent answerAgent;
 
-    public RagAgents(ChatModel chatModel, SystemPromptService systemPromptService) {
-        this.chatModel = chatModel;
-        this.systemPromptService = systemPromptService;
-    }
+    
 
     /** 获取意图识别 Agent */
     public ReactAgent intentAgent() {

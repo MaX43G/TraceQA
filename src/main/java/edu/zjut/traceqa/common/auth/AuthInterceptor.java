@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.common.auth;
 
+import jakarta.annotation.Resource;
 import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.exception.BizException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,11 +27,8 @@ public class AuthInterceptor implements HandlerInterceptor {
     public static final String AUTHORIZATION_HEADER = "Authorization";
     public static final String BEARER_PREFIX = "Bearer ";
 
-    private final JwtService jwtService;
-
-    public AuthInterceptor(JwtService jwtService) {
-        this.jwtService = jwtService;
-    }
+    @Resource
+    private JwtService jwtService;
 
     @Override
     public boolean preHandle(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,

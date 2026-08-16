@@ -1,6 +1,8 @@
 package edu.zjut.traceqa.service;
 
 import edu.zjut.traceqa.config.AppProperties;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -20,9 +22,12 @@ import java.util.concurrent.atomic.AtomicLong;
 @Service
 public class CircuitBreakerService {
 
-    private final int failureThreshold;
-    private final long openMillis;
-    private final int halfOpenMaxCalls;
+    @Resource
+    private AppProperties properties;
+
+    private int failureThreshold;
+    private long openMillis;
+    private int halfOpenMaxCalls;
 
     private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
     private final AtomicLong openedAt = new AtomicLong(0);
@@ -31,7 +36,8 @@ public class CircuitBreakerService {
     /** 熔断状态 */
     public enum State { CLOSED, OPEN, HALF_OPEN }
 
-    public CircuitBreakerService(AppProperties properties) {
+    @PostConstruct
+    private void init() {
         AppProperties.CircuitBreaker cfg = properties.getCircuitBreaker();
         this.failureThreshold = cfg.getFailureThreshold();
         this.openMillis = cfg.getOpenMillis();

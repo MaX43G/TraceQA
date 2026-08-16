@@ -99,13 +99,5 @@ export default defineNuxtConfig({
   // 方案：仅开发模式将 dayjs 及其插件解析到 ESM 构建；生产构建交由打包器原生处理。
   vite: {
     plugins: [fixDayjsEsmDev()]
-  },
-
-  // 运行时配置：后端地址供服务端渲染场景使用
-  runtimeConfig: {
-    apiProxyTarget: process.env.API_PROXY_TARGET || 'http://localhost:8080',
-    public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || '/api'
-    }
   }
 })

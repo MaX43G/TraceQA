@@ -1,6 +1,5 @@
 package edu.zjut.traceqa.entity;
 
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -30,8 +29,4 @@ public class User extends BaseEntity {
 
     /** 用户状态：1 启用，0 禁用 */
     private Integer status;
-
-    /** 头像（可选） */
-    @TableField(exist = false)
-    private String avatar;
 }

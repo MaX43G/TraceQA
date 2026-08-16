@@ -64,19 +64,3 @@ export function renderMarkdown(content: string, availableIndexes?: Set<number>):
   }
   return md.render(decorateCitations(content, availableIndexes))
 }
-
-/** 提取内容中的全部引用序号（用于与引用面板联动） */
-export function extractCitationIndexes(content: string): number[] {
-  if (!content) {
-    return []
-  }
-  const indexes = new Set<number>()
-  let match: RegExpExecArray | null
-  const re = new RegExp(CITATION_RE.source, 'g')
-  while ((match = re.exec(content)) !== null) {
-    indexes.add(Number(match[1]))
-  }
-  return Array.from(indexes).sort((a, b) => a - b)
-}
-
-export default md

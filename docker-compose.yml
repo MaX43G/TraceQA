@@ -42,7 +42,11 @@ services:
       LLM_BINDING: openai
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn/v1}
       LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-THUDM/GLM-Z1-9B-0414}
+      LLM_MODEL: ${LIGHTRAG_LLM_MODEL:-Qwen/Qwen3.5-4B}
+      # 抽取限流优化：低并发 + 重试退避，避免免费额度被瞬时打爆
+      MAX_ASYNC_LLM: 1
+      LLM_MAX_RETRIES: 5
+      MAX_TOKENS: 2000
       # Embedding（同 OpenAI 兼容端点）
       EMBEDDING_BINDING: openai
       EMBEDDING_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn/v1}
@@ -53,7 +57,6 @@ services:
       # 服务
       PORT: 9621
       WORKING_DIR: /app/data/rag_storage
-      MAX_ASYNC: 4
     volumes:
       - traceqa-lightrag-data:/app/data
     ports:
@@ -83,7 +86,7 @@ services:
       LIGHTRAG_API_KEY: ${LIGHTRAG_API_KEY:-}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn/v1}
       LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-THUDM/GLM-Z1-9B-0414}
+      LLM_MODEL: ${LLM_MODEL:-THUDM/GLM-4-32B-0414}
       APP_JWT_SECRET: ${APP_JWT_SECRET:-traceqa-prod-secret-change-me-please-2026}
       APP_STORAGE_ROOT: /app/data/files
       TZ: Asia/Shanghai

@@ -30,6 +30,8 @@ export async function streamChat(
     sessionId?: number | null
     knowledgeBaseId?: number | null
     content: string
+    /** 选中的服务端模型名（平台默认 Key/URL） */
+    serverModel?: string
     /** 自定义模型：OpenAI 兼容地址 / API Key / 模型名（仅本次请求） */
     model?: string
     baseUrl?: string

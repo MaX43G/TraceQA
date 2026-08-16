@@ -15,11 +15,15 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // SSR 水合后 Pinia 状态中的 token 为空，先从 localStorage 恢复登录态
   auth.initToken()
 
-  // 已登录访问登录页 → 跳回首页
+  // 首页（/）公开，不拦截；聊天与后台需登录
+  const isPublic = to.path === '/' || to.path === '/login'
   if (to.path === '/login') {
     if (auth.isLoggedIn) {
-      return navigateTo('/')
+      return navigateTo('/chat')
     }
+    return
+  }
+  if (isPublic) {
     return
   }
 

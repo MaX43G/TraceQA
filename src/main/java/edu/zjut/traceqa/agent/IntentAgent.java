@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.agent;
 
+import jakarta.annotation.Resource;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import edu.zjut.traceqa.common.enums.IntentType;
 import edu.zjut.traceqa.config.LlmConfig;
@@ -18,30 +19,27 @@ import org.springframework.stereotype.Component;
 @Component
 public class IntentAgent {
 
-    private final RagAgents ragAgents;
-    private final LlmService llmService;
+    @Resource
+    private RagAgents ragAgents;
 
-    public IntentAgent(RagAgents ragAgents, LlmService llmService) {
-        this.ragAgents = ragAgents;
-        this.llmService = llmService;
-    }
+    @Resource
+    private LlmService llmService;
 
-    /** 默认模型意图识别 */
-    public IntentType identify(String message) {
-        return identify(message, null);
-    }
+    
 
     /**
-     * 识别用户消息意图。
+     * 识别用户消息意图（支持多轮历史）。
      *
      * @param message 用户消息
+     * @param history 对话历史文本（可为空）
      * @param config  自定义模型配置（null 表示使用默认模型）
      * @return 意图类型（失败返回 UNKNOWN）
      */
-    public IntentType identify(String message, LlmConfig config) {
+    public IntentType identify(String message, String history, LlmConfig config) {
+        String input = buildContextInput(message, history);
         // 自定义模型：直接走 OpenAI 兼容直连
         if (config != null && config.isValid()) {
-            String text = llmService.call("intent", message, config);
+            String text = llmService.call("intent", input, config);
             return parseIntent(text);
         }
         ReactAgent agent = ragAgents.intentAgent();
@@ -50,12 +48,20 @@ public class IntentAgent {
             return IntentType.UNKNOWN;
         }
         try {
-            String text = agent.call(message).getText();
+            String text = agent.call(input).getText();
             return parseIntent(text);
         } catch (Exception e) {
             log.warn("意图识别失败，降级为 UNKNOWN：{}", e.getMessage());
             return IntentType.UNKNOWN;
         }
+    }
+
+    /** 拼接对话历史与当前消息（无历史时仅当前消息） */
+    private String buildContextInput(String message, String history) {
+        if (history == null || history.isBlank()) {
+            return message;
+        }
+        return "对话历史：\n" + history + "当前用户消息：" + message;
     }
 
     /** 解析模型输出的意图编码 */

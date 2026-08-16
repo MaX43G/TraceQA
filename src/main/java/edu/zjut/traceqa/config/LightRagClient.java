@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.exception.BizException;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
@@ -36,14 +38,18 @@ import java.util.function.Consumer;
 @Component
 public class LightRagClient {
 
-    private final RestClient restClient;
-    private final WebClient webClient;
-    private final ObjectMapper objectMapper;
-    private final AppProperties properties;
+    @Resource
+    private RestClient.Builder builder;
+    @Resource
+    private ObjectMapper objectMapper;
+    @Resource
+    private AppProperties properties;
 
-    public LightRagClient(RestClient.Builder builder, AppProperties properties, ObjectMapper objectMapper) {
-        this.properties = properties;
-        this.objectMapper = objectMapper;
+    private RestClient restClient;
+    private WebClient webClient;
+
+    @PostConstruct
+    private void init() {
         AppProperties.LightRag cfg = properties.getLightrag();
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofMillis(cfg.getConnectTimeout()));

@@ -121,11 +121,11 @@ async function handleRegister(): Promise<void> {
   }
 }
 
-/** 登录/注册成功后跳转：优先回退到来源页 */
+/** 登录/注册成功后跳转：优先回退到来源页，否则进入问答页 */
 async function goHome(): Promise<void> {
   const route = useRoute()
   const redirect = route.query.redirect as string | undefined
-  await navigateTo(redirect && redirect.startsWith('/') ? redirect : '/')
+  await navigateTo(redirect && redirect.startsWith('/') ? redirect : '/chat')
 }
 
 /** 确认密码校验 */

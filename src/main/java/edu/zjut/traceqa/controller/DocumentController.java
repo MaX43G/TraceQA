@@ -10,6 +10,7 @@ import edu.zjut.traceqa.service.DocumentProgressStore;
 import edu.zjut.traceqa.service.DocumentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -26,12 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.Executor;
 
 /**
  * 文档接口。
@@ -47,28 +43,15 @@ public class DocumentController {
 
     private static final long POLL_INTERVAL_MS = 2000L;
 
-    private final DocumentService documentService;
-    private final DocumentProgressStore progressStore;
-    private final ObjectMapper objectMapper;
-    /** 进度 SSE 轮询线程池：有界队列 + 命名线程，防止连接过多时线程无限增长 */
-    private final ExecutorService sseExecutor = new ThreadPoolExecutor(            2, 8, 60L, TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(100),
-            new ThreadFactory() {
-                private final AtomicInteger seq = new AtomicInteger(1);
-
-                @Override
-                public Thread newThread(Runnable r) {
-                    return new Thread(r, "doc-progress-sse-" + seq.getAndIncrement());
-                }
-            },
-            new ThreadPoolExecutor.DiscardPolicy());
-
-    public DocumentController(DocumentService documentService, DocumentProgressStore progressStore,
-                              ObjectMapper objectMapper) {
-        this.documentService = documentService;
-        this.progressStore = progressStore;
-        this.objectMapper = objectMapper;
-    }
+    @Resource
+    private DocumentService documentService;
+    @Resource
+    private DocumentProgressStore progressStore;
+    @Resource
+    private ObjectMapper objectMapper;
+    /** 进度 SSE 轮询线程（复用 docExecutor，避免重复自建线程池） */
+    @Resource(name = "docExecutor")
+    private Executor sseExecutor;
 
     @Operation(summary = "上传文档（异步解析，立即返回 202）")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.config;
 
+import jakarta.annotation.Resource;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import edu.zjut.traceqa.entity.KnowledgeBase;
 import edu.zjut.traceqa.entity.Role;
@@ -32,22 +33,16 @@ public class DataInitializer implements ApplicationRunner {
     private static final String DEFAULT_ADMIN_PASSWORD = "admin123456";
     private static final String DEFAULT_USER_PASSWORD = "user123456";
 
-    private final UserMapper userMapper;
-    private final RoleMapper roleMapper;
-    private final KnowledgeBaseMapper knowledgeBaseMapper;
-    private final SystemPromptMapper systemPromptMapper;
-    private final PasswordEncoder passwordEncoder;
-
-    public DataInitializer(UserMapper userMapper, RoleMapper roleMapper,
-                           KnowledgeBaseMapper knowledgeBaseMapper,
-                           SystemPromptMapper systemPromptMapper,
-                           PasswordEncoder passwordEncoder) {
-        this.userMapper = userMapper;
-        this.roleMapper = roleMapper;
-        this.knowledgeBaseMapper = knowledgeBaseMapper;
-        this.systemPromptMapper = systemPromptMapper;
-        this.passwordEncoder = passwordEncoder;
-    }
+    @Resource
+    private UserMapper userMapper;
+    @Resource
+    private RoleMapper roleMapper;
+    @Resource
+    private KnowledgeBaseMapper knowledgeBaseMapper;
+    @Resource
+    private SystemPromptMapper systemPromptMapper;
+    @Resource
+    private PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional

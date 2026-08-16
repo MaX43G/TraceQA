@@ -38,8 +38,4 @@ public class ChatMessage extends BaseEntity {
 
     /** 消息状态：1 正常 */
     private Integer status;
-
-    /** 是否为本会话内由用户主动删除（隐藏），逻辑删除走 deleted 字段 */
-    @TableField(exist = false)
-    private Boolean deletedByUser;
 }

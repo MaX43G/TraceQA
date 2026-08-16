@@ -3,6 +3,8 @@ package edu.zjut.traceqa.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.zjut.traceqa.config.LlmConfig;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -23,11 +25,13 @@ import java.util.Map;
 @Component
 public class OpenAiCompatClient {
 
-    private final ObjectMapper objectMapper;
-    private final WebClient webClient;
+    @Resource
+    private ObjectMapper objectMapper;
 
-    public OpenAiCompatClient(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+    private WebClient webClient;
+
+    @PostConstruct
+    private void init() {
         // 直接构建 WebClient（无连接器时回退 JDK HttpClient），避免依赖自动配置 Bean
         this.webClient = WebClient.builder().build();
     }

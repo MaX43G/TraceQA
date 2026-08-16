@@ -7,7 +7,8 @@
       </div>
       <div class="app-header__nav">
         <a-space>
-          <a-button type="text" @click="navigateTo('/')">智能问答</a-button>
+          <a-button type="text" @click="navigateTo('/')">首页</a-button>
+          <a-button type="text" @click="navigateTo('/chat')">智能问答</a-button>
           <a-button v-if="auth.isAdmin" type="text" @click="navigateTo('/admin')">
             管理后台
           </a-button>
@@ -115,5 +116,21 @@ async function handleLogout(): Promise<void> {
 .app-header__user-info {
   cursor: pointer;
   color: #1f2329;
+}
+
+/* 移动端：顶栏紧凑 */
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .app-header__title {
+    font-size: 14px;
+  }
+
+  .app-header__nav {
+    display: none;
+  }
 }
 </style>

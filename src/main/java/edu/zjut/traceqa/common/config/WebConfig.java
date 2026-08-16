@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.common.config;
 
+import jakarta.annotation.Resource;
 import edu.zjut.traceqa.common.auth.AuthInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.lang.NonNull;
@@ -16,11 +17,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    private final AuthInterceptor authInterceptor;
-
-    public WebConfig(AuthInterceptor authInterceptor) {
-        this.authInterceptor = authInterceptor;
-    }
+    @Resource
+    private AuthInterceptor authInterceptor;
 
     @Override
     public void addInterceptors(@NonNull InterceptorRegistry registry) {

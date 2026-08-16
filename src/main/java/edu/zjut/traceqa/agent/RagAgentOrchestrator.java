@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.agent;
 
+import jakarta.annotation.Resource;
 import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.enums.IntentType;
 import edu.zjut.traceqa.config.LlmConfig;
@@ -16,6 +17,7 @@ import edu.zjut.traceqa.service.ChatService;
 import edu.zjut.traceqa.service.LlmService;
 import edu.zjut.traceqa.sse.SsePublisher;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
@@ -41,22 +43,32 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Component
 public class RagAgentOrchestrator {
 
-    private final ChatService chatService;
-    private final IntentAgent intentAgent;
-    private final AnswerAgent answerAgent;
-    private final RetrievalService retrievalService;
-    private final LlmService llmService;
-    private final SsePublisher ssePublisher;
+    @Resource
+    private ChatService chatService;
 
-    public RagAgentOrchestrator(ChatService chatService, IntentAgent intentAgent, AnswerAgent answerAgent,
-                                RetrievalService retrievalService, LlmService llmService, SsePublisher ssePublisher) {
-        this.chatService = chatService;
-        this.intentAgent = intentAgent;
-        this.answerAgent = answerAgent;
-        this.retrievalService = retrievalService;
-        this.llmService = llmService;
-        this.ssePublisher = ssePublisher;
-    }
+    @Resource
+    private IntentAgent intentAgent;
+
+    @Resource
+    private AnswerAgent answerAgent;
+
+    @Resource
+    private RetrievalService retrievalService;
+
+    @Resource
+    private LlmService llmService;
+
+    @Resource
+    private SsePublisher ssePublisher;
+
+    /** Spring AI 默认 Base URL 与 API Key（服务端模型切换时使用） */
+    @Value("${spring.ai.openai.base-url:https://api.siliconflow.cn}")
+    private String springAiBaseUrl;
+
+    @Value("${spring.ai.openai.api-key:}")
+    private String springAiApiKey;
+
+    
 
     /**
      * 流式执行完整 Agent 工作流（由 ragExecutor 线程调用）。
@@ -70,13 +82,14 @@ public class RagAgentOrchestrator {
         // 解析自定义模型配置（仅本次请求使用，不持久化）
         LlmConfig modelConfig = toLlmConfig(request);
         try {
-            // 1. 获取/创建会话并保存用户消息
+            // 1. 获取/创建会话；先取历史（不含当前消息），再保存当前用户消息
             ChatSession session = chatService.getOrCreateSession(userId, request.sessionId(),
                     request.knowledgeBaseId(), request.content());
+            String history = chatService.buildHistoryText(session.getId(), 6);
             chatService.saveUserMessage(session.getId(), request.content());
 
-            // 2. 意图识别
-            IntentType intent = recognizeIntent(emitter, thinking, request.content(), modelConfig);
+            // 2. 意图识别（带多轮历史）
+            IntentType intent = recognizeIntent(emitter, thinking, request.content(), history, modelConfig);
 
             // 3. 课程问答走 RAG 检索链路，否则直接应答
             String answer;
@@ -84,9 +97,9 @@ public class RagAgentOrchestrator {
             if (isDirectAnswer(intent)) {
                 answer = respondDirect(emitter, thinking, request.content(), modelConfig, cancelled);
             } else {
-                RetrievalResult result = retrieve(emitter, thinking, request.content(), modelConfig, cancelled);
+                RetrievalResult result = retrieve(emitter, thinking, request.content(), history, modelConfig, cancelled);
                 references = emitReferences(emitter, result);
-                answer = generateAnswer(emitter, thinking, request.content(), result, modelConfig, cancelled);
+                answer = generateAnswer(emitter, thinking, request.content(), history, result, modelConfig, cancelled);
             }
 
             // 4. 持久化并结束（必须关闭 SSE 连接，否则前端 onEnd 不触发）
@@ -101,23 +114,47 @@ public class RagAgentOrchestrator {
         }
     }
 
-    /** 从请求构造自定义模型配置（未携带则返回 null 使用默认模型） */
+    /** 从请求构造模型配置：
+     *  服务端模型（serverModel）用平台默认 Base URL/API Key + 选中模型；
+     *  自定义模型（model+baseUrl+apiKey）用用户提供的配置；
+     *  默认走 Spring AI 自动配置的模型。 */
     private LlmConfig toLlmConfig(ChatStreamRequest request) {
-        if (!request.hasCustomModel()) {
-            return null;
+        // 服务端模型切换
+        if (request.hasServerModel()) {
+            String base = openAiCompatBaseUrl(springAiBaseUrl);
+            return new LlmConfig(base, springAiApiKey, request.serverModel());
         }
-        LlmConfig config = new LlmConfig(request.baseUrl(), request.apiKey(), request.model());
-        return config.isValid() ? config : null;
+        // 自定义模型
+        if (request.hasCustomModel()) {
+            LlmConfig config = new LlmConfig(request.baseUrl(), request.apiKey(), request.model());
+            return config.isValid() ? config : null;
+        }
+        return null;
+    }
+
+    /** 将 Spring AI 的 Base URL（不带 /v1）转为 OpenAI 兼容地址（带 /v1） */
+    private String openAiCompatBaseUrl(String springAiBase) {
+        String base = springAiBase == null ? "" : springAiBase.trim();
+        if (base.isBlank()) {
+            return "";
+        }
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        if (base.contains("/v1")) {
+            return base;
+        }
+        return base + "/v1";
     }
 
     /**
      * 意图识别节点，返回意图类型
      */
     private IntentType recognizeIntent(SseEmitter emitter, List<ThinkingNodeVO> thinking, String content,
-                                       LlmConfig config) {
+                                       String history, LlmConfig config) {
         ThinkingNodeVO node = startThinking(thinking, "意图识别", "intent-agent", "正在分析用户意图");
         ssePublisher.send(emitter, "thinking", node);
-        IntentType intent = intentAgent.identify(content, config);
+        IntentType intent = intentAgent.identify(content, history, config);
         finishThinking(thinking, emitter, "意图识别", "识别结果：" + intent.getLabel());
         return intent;
     }
@@ -126,13 +163,34 @@ public class RagAgentOrchestrator {
      * 查询增强 + 双路检索 + ReRead 节点
      */
     private RetrievalResult retrieve(SseEmitter emitter, List<ThinkingNodeVO> thinking, String content,
-                                     LlmConfig config, AtomicBoolean cancelled) {
+                                     String history, LlmConfig config, AtomicBoolean cancelled) {
+        // 步骤 0：检索策略调度 —— LLM 判定复杂度并选择检索路径
+        ThinkingNodeVO routerNode = startThinking(thinking, "检索策略调度", "router-agent",
+                "正在分析问题复杂度并选择检索路径");
+        ssePublisher.send(emitter, "thinking", routerNode);
+        boolean complex = retrievalService.isComplexQuery(content, config);
+        String pathLabel = complex ? "复杂问题 → 聚合链路（图谱 + 向量）" : "简单问题 → 仅向量检索";
+        finishThinking(thinking, emitter, "检索策略调度", pathLabel);
+
+        // 简单问题：仅向量检索原问题（跳过重写/HyDE 与图谱，响应更快）
+        if (!complex) {
+            EnhancedQuery simple = new EnhancedQuery(content, null, null);
+            ThinkingNodeVO vectorNode = startThinking(thinking, "向量检索", "vector-agent",
+                    "正在执行向量语义检索");
+            ssePublisher.send(emitter, "thinking", vectorNode);
+            List<RetrievedChunk> vectorChunks = retrievalService.queryVector(content, simple, config,
+                    progress -> pushProgress(emitter, vectorNode, cancelled, progress));
+            finishThinking(thinking, emitter, "向量检索", "向量命中 " + vectorChunks.size() + " 条");
+            return new RetrievalResult(vectorChunks, true);
+        }
+
+        // 复杂问题：完整复合检索链路
         // 步骤 1：查询重写与 HyDE（并行）
         ThinkingNodeVO enhanceNode = startThinking(thinking, "查询重写与 HyDE", "rewrite-agent",
                 "正在生成查询重写与假设性文档");
         ssePublisher.send(emitter, "thinking", enhanceNode);
         EnhancedQuery enhanced = retrievalService.enhance(content, config,
-                progress -> pushProgress(emitter, enhanceNode, cancelled, progress));
+                progress -> pushProgress(emitter, enhanceNode, cancelled, progress), history);
         String enhanceDetail = String.format("重写：%s", shortText(enhanced.rewritten()));
         finishThinking(thinking, emitter, "查询重写与 HyDE", enhanceDetail);
 
@@ -195,12 +253,12 @@ public class RagAgentOrchestrator {
      * 流式生成回答：Alibaba Agent 优先，ChatClient 兜底
      */
     private String generateAnswer(SseEmitter emitter, List<ThinkingNodeVO> thinking,
-                                  String content, RetrievalResult result, LlmConfig config,
+                                  String content, String history, RetrievalResult result, LlmConfig config,
                                   AtomicBoolean cancelled) {
         ThinkingNodeVO node = startThinking(thinking, "总结生成", "answer-agent", "正在生成回答");
         ssePublisher.send(emitter, "thinking", node);
 
-        String prompt = buildAnswerPrompt(content, result);
+        String prompt = buildAnswerPrompt(content, history, result);
         String answer = streamAnswer(emitter, prompt, config, cancelled);
         if (answer == null || answer.isBlank()) {
             // 最终降级：直接返回纯检索上下文
@@ -300,8 +358,12 @@ public class RagAgentOrchestrator {
     /**
      * 组装「问题 + 上下文」总结提示词
      */
-    private String buildAnswerPrompt(String question, RetrievalResult result) {
+    private String buildAnswerPrompt(String question, String history, RetrievalResult result) {
         StringBuilder sb = new StringBuilder();
+        // 多轮历史上下文（帮助理解指代与延续话题）
+        if (history != null && !history.isBlank()) {
+            sb.append("【对话历史】\n").append(history).append("\n");
+        }
         sb.append("【用户问题】\n").append(question).append("\n\n【检索上下文】\n");
         if (result == null || !result.hasContent()) {
             sb.append("（未检索到相关上下文，请如实告知用户资料库中暂无相关内容）");

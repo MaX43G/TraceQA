@@ -55,8 +55,6 @@ public class AppProperties {
         private String baseUrl = "http://localhost:9621";
         /** API 密钥（X-API-Key 请求头） */
         private String apiKey = "";
-        /** 默认查询模式（mix 为图谱+向量融合） */
-        private String queryMode = "mix";
         /** 检索条数 */
         private int topK = 20;
         /** 建连超时（毫秒） */

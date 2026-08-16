@@ -5,6 +5,7 @@ import edu.zjut.traceqa.config.AppProperties;
 import edu.zjut.traceqa.dto.model.ModelVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,17 +25,14 @@ import java.util.List;
 @RequestMapping("/api/models")
 public class ModelController {
 
-    private final AppProperties properties;
+    @Resource
+    private AppProperties properties;
 
     @Value("${spring.ai.openai.chat.options.model:}")
     private String defaultModelName;
 
     @Value("${spring.ai.openai.base-url:}")
     private String defaultBaseUrl;
-
-    public ModelController(AppProperties properties) {
-        this.properties = properties;
-    }
 
     @Operation(summary = "查询可用模型列表")
     @GetMapping
@@ -46,8 +44,8 @@ public class ModelController {
                     ? defaultModelName : item.getModel();
             String baseUrl = item.getBaseUrl() == null || item.getBaseUrl().isBlank()
                     ? defaultBaseUrl : item.getBaseUrl();
-            boolean isDefault = item.getName() == null || item.getName().isBlank()
-                    || "默认模型".equals(item.getName());
+            // 默认模型：模型名与 Spring AI 默认模型一致
+            boolean isDefault = defaultModelName != null && defaultModelName.equals(model);
             if (isDefault) {
                 hasDefault = true;
             }
@@ -55,7 +53,7 @@ public class ModelController {
         }
         // 兜底：确保至少返回一个默认模型
         if (!hasDefault) {
-            result.add(0, new ModelVO("默认模型", defaultModelName, defaultBaseUrl, true));
+            result.add(0, new ModelVO(defaultModelName, defaultModelName, defaultBaseUrl, true));
         }
         return ApiResponse.ok(result);
     }

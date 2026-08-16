@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.sse;
 
+import jakarta.annotation.Resource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -17,11 +18,10 @@ import java.io.IOException;
 @Component
 public class SsePublisher {
 
-    private final ObjectMapper objectMapper;
+    @Resource
+    private ObjectMapper objectMapper;
 
-    public SsePublisher(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
+    
 
     /** 写入一个 SSE 事件 */
     public void send(SseEmitter emitter, String event, Object data) {

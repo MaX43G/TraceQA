@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.service;
 
+import jakarta.annotation.Resource;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -24,13 +25,13 @@ import java.util.List;
 @Service
 public class AdminService {
 
-    private final UserMapper userMapper;
-    private final RoleMapper roleMapper;
+    @Resource
+    private UserMapper userMapper;
 
-    public AdminService(UserMapper userMapper, RoleMapper roleMapper) {
-        this.userMapper = userMapper;
-        this.roleMapper = roleMapper;
-    }
+    @Resource
+    private RoleMapper roleMapper;
+
+    
 
     /** 分页查询用户列表 */
     public PageResult<AdminUserVO> pageUsers(String keyword, long page, long size) {
@@ -57,13 +58,12 @@ public class AdminService {
 
     /** 变更用户角色 */
     public void updateUserRole(Long id, String roleCode) {
-        requireUser(id);
+        User user = requireUser(id);
         Role role = roleMapper.selectOne(
                 new LambdaQueryWrapper<Role>().eq(Role::getCode, roleCode).last("LIMIT 1"));
         if (role == null) {
             throw new BizException(ErrorCode.PARAM_ERROR, "角色不存在");
         }
-        User user = requireUser(id);
         user.setRoleCode(roleCode);
         userMapper.updateById(user);
         log.info("用户角色变更：id={}, role={}", id, roleCode);

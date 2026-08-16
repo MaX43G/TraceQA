@@ -1,409 +1,270 @@
 ﻿<template>
-  <div class="chat-page">
-    <aside class="chat-page__aside">
-      <SessionList
-        :sessions="chat.sessions"
-        :current-session-id="chat.currentSessionId"
-        @new="handleNew"
-        @select="handleSelect"
-        @pin="handlePin"
-        @remove="handleRemove"
-      />
-    </aside>
-    <main class="chat-page__main">
-      <div class="chat-page__toolbar">
-        <a-space :size="12">
-          <a-select
-            v-model:value="chat.knowledgeBaseId"
-            placeholder="选择知识库（不选则全局检索）"
-            allow-clear
-            style="width: 240px"
-            @change="handleKbChange"
-          >
-            <a-select-option v-for="kb in kbs" :key="kb.id" :value="kb.id">{{ kb.name }}</a-select-option>
-          </a-select>
-          <ModelSelector />
+  <div class="home">
+    <!-- Hero 区 -->
+    <section class="home__hero">
+      <div class="home__hero-inner">
+        <div class="home__logo">溯</div>
+        <h1 class="home__title">溯知 · TraceQA</h1>
+        <p class="home__subtitle">《数据挖掘》课程智能问答平台</p>
+        <p class="home__desc">
+          基于知识图谱（LightRAG）与向量检索的增强 RAG 引擎，
+          多 Agent 协同、流式思考、引用溯源，助你高效学习数据挖掘。
+        </p>
+        <a-space :size="16" class="home__cta">
+          <a-button type="primary" size="large" @click="goChat">
+            <template #icon><MessageOutlined /></template>
+            开始问答
+          </a-button>
+          <a-button v-if="!auth.isLoggedIn" size="large" @click="goLogin">登录 / 注册</a-button>
         </a-space>
-        <a-button v-if="chat.currentSessionId" type="text" @click="handleExport">
-          <template #icon><ExportOutlined /></template>
-          导出对话
-        </a-button>
       </div>
+    </section>
 
-      <div ref="listRef" class="chat-page__list">
-        <div v-if="chat.messages.length === 0" class="chat-page__welcome">
-          <div class="chat-page__welcome-logo">溯</div>
-          <h2>溯知 · TraceQA</h2>
-          <p>基于知识图谱与向量检索的《数据挖掘》课程智能问答</p>
-          <a-space wrap>
-            <a-tag v-for="q in quickQuestions" :key="q" class="chat-page__quick" @click="askQuick(q)">
-              {{ q }}
-            </a-tag>
-          </a-space>
-        </div>
-        <template v-else>
-          <ChatMessageItem
-            v-for="msg in chat.messages"
-            :key="msg.id"
-            :msg="msg"
-            :streaming="isStreamingMsg(msg)"
-            @delete="handleDeleteMessage"
-          />
-        </template>
-      </div>
+    <!-- 功能亮点 -->
+    <section class="home__features">
+      <h2 class="home__section-title">核心能力</h2>
+      <a-row :gutter="[24, 24]">
+        <a-col v-for="f in features" :key="f.title" :xs="24" :sm="12" :md="8">
+          <a-card :bordered="false" class="home__feature-card">
+            <div class="home__feature-icon" :style="{ background: f.color }">
+              <component :is="f.icon" />
+            </div>
+            <h3 class="home__feature-title">{{ f.title }}</h3>
+            <p class="home__feature-desc">{{ f.desc }}</p>
+          </a-card>
+        </a-col>
+      </a-row>
+    </section>
 
-      <div class="chat-page__input">
-        <ChatInput :disabled="chat.generating" :generating="chat.generating" @send="handleSend" @stop="stopGenerating" />
+    <!-- 课程/工作流说明 -->
+    <section class="home__workflow">
+      <h2 class="home__section-title">Agent 工作流</h2>
+      <p class="home__workflow-desc">从意图识别到答案生成，全流程可视化，检索过程实时可见。</p>
+      <div class="home__workflow-flow">
+        <span>意图识别</span><i>→</i>
+        <span>策略调度</span><i>→</i>
+        <span>图谱检索</span><i>→</i>
+        <span>向量检索</span><i>→</i>
+        <span>融合补全</span><i>→</i>
+        <span>总结生成</span>
       </div>
-    </main>
+    </section>
+
+    <footer class="home__footer">
+      <p>溯知 · TraceQA —— 《数据挖掘》课程 RAG 智能问答平台</p>
+    </footer>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * 智能问答主页面（SSR + SEO）。
- *
- * <p>布局：左侧会话列表 + 右侧聊天区（工具栏 / 消息流 / 输入框）。
- * 流式回答基于 SSE 实时渲染（打字机 + 思考折叠 + 引用溯源）。</p>
+ * 首页（品牌介绍 + 核心能力 + 入口）。
+ * 公开页面，SSR 渲染利于 SEO。
  */
-import { ExportOutlined } from '@ant-design/icons-vue'
-import { message, Modal } from 'ant-design-vue'
-import { useChatStore } from '@/stores/chat'
+import {
+  MessageOutlined,
+  RobotOutlined,
+  ApartmentOutlined,
+  FileSearchOutlined,
+  ApiOutlined,
+  ThunderboltOutlined,
+  SafetyCertificateOutlined
+} from '@ant-design/icons-vue'
 import { useAuthStore } from '@/stores/auth'
-import { streamChat } from '@/composables/useChatStream'
-import SessionList from '@/components/chat/SessionList.vue'
-import ChatMessageItem from '@/components/chat/ChatMessageItem.vue'
-import ChatInput from '@/components/chat/ChatInput.vue'
-import ModelSelector from '@/components/chat/ModelSelector.vue'
-import type { SessionVO, KnowledgeBaseDTO, ChatMessageVO, ThinkingNodeVO, ReferenceVO } from '@/utils/api-types'
-import type { StreamMessage } from '@/stores/chat'
-import { useModelStore } from '@/stores/model'
-import { list1 as apiListKbs } from '@/api/traceqa/zhishiku'
 
 useSeoMeta({
-  title: '溯知 · TraceQA - 智能问答',
-  description: '基于知识图谱与向量检索的《数据挖掘》课程智能问答平台'
+  title: '溯知 · TraceQA - 数据挖掘课程智能问答平台',
+  description: '基于知识图谱与向量检索的《数据挖掘》课程智能问答平台，多 Agent 协同、流式思考、引用溯源。',
+  keywords: '数据挖掘,TraceQA,溯知,RAG,知识图谱,智能问答'
 })
 
-const chat = useChatStore()
 const auth = useAuthStore()
-const modelStore = useModelStore()
-const listRef = ref<HTMLElement | null>(null)
 
-/** 知识库列表 */
-const kbs = ref<KnowledgeBaseDTO[]>([])
-const kbsLoaded = ref(false)
-
-/** 快捷提问示例 */
-const quickQuestions = ['什么是 K 均值聚类？', '解释一下 Apriori 关联规则算法', '决策树是如何进行特征选择的？']
-
-/** 判断是否为流式临时消息 */
-function isStreamingMsg(msg: ChatMessageVO | StreamMessage): boolean {
-  return 'streaming' in msg && msg.streaming
-}
-
-onMounted(async () => {
-  // 认证由全局路由守卫（middleware/auth.global.ts）保证
-  modelStore.initFromStorage()
-  await Promise.all([chat.loadSessions(), loadKnowledgeBases(), modelStore.loadServerModels()])
-})
-
-async function loadKnowledgeBases(): Promise<void> {
-  if (kbsLoaded.value) {
-    return
-  }
-  try {
-    const res = await apiListKbs()
-    kbs.value = res.data ?? []
-    kbsLoaded.value = true
-  } catch (err) {
-    message.error((err as Error).message || '知识库加载失败')
-  }
-}
-
-function handleKbChange(): void {
-  // 切换知识库时重置会话
-  chat.currentSessionId = null
-  chat.messages = []
-}
-
-function handleNew(): void {
-  chat.currentSessionId = null
-  chat.messages = []
-}
-
-async function handleSelect(sessionId: number | string): Promise<void> {
-  await chat.openSession(sessionId)
-}
-
-async function handlePin(session: SessionVO): Promise<void> {
-  await chat.pinSession(session.id, session.pinned !== 1)
-}
-
-async function handleRemove(session: SessionVO): Promise<void> {
-  Modal.confirm({
-    title: '删除会话',
-    content: `确定删除「${session.title}」吗？删除后不可恢复。`,
-    okText: '删除',
-    okType: 'danger',
-    cancelText: '取消',
-    onOk: async () => {
-      await chat.removeSession(session.id)
-      message.success('会话已删除')
-    }
-  })
-}
-
-async function handleDeleteMessage(messageId: number): Promise<void> {
-  await chat.removeMessage(messageId)
-  // 后端已级联删除配对的 USER/ASSISTANT 消息，刷新列表保持 UI 一致
-  if (chat.currentSessionId) {
-    await chat.openSession(chat.currentSessionId)
-  }
-  message.success('消息已删除')
-}
-
-async function handleExport(): Promise<void> {
-  try {
-    const md = await chat.exportCurrentSession()
-    if (!md) {
-      message.warning('当前会话为空')
-      return
-    }
-    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `traceqa-${chat.currentSessionId}.md`
-    a.click()
-    URL.revokeObjectURL(url)
-    message.success('已导出 Markdown')
-  } catch (err) {
-    message.error((err as Error).message || '导出失败')
-  }
-}
-
-/** 点击快捷提问 */
-async function askQuick(question: string): Promise<void> {
-  await handleSend(question)
-}
-
-/** 发送消息（SSE 流式消费） */
-async function handleSend(content: string): Promise<void> {
-  if (chat.generating) {
-    return
-  }
-  chat.generating = true
-
-  // 确保存在会话
-  if (!chat.currentSessionId) {
-    await chat.newSession()
-  }
-  const sessionId = chat.currentSessionId
-
-  // 追加临时用户消息
-  chat.messages.push({
-    id: -Date.now() - 1,
-    sessionId,
-    role: 'USER',
-    content,
-    thinkingTrace: [],
-    references: [],
-    latencyMs: 0,
-    createTime: new Date().toISOString()
-  } as ChatMessageVO)
-
-  // 追加流式 AI 消息占位（reactive 保证后续增量实时响应渲染）
-  const streamMsg = reactive({
-    id: -Date.now() - 2,
-    sessionId,
-    role: 'ASSISTANT',
-    content: '',
-    thinkingTrace: [] as ThinkingNodeVO[],
-    references: [] as ReferenceVO[],
-    latencyMs: 0,
-    createTime: new Date().toISOString(),
-    streaming: true,
-    buffer: ''
-  }) as StreamMessage
-  chat.messages.push(streamMsg)
-
-  // 携带自定义模型配置（默认模型不传，后端使用配置的默认模型）
-  const modelConfig = modelStore.activeCustomConfig
-  // 中止控制器：页面卸载时中断未完成的流式请求
-  const abortController = new AbortController()
-  activeStreamAbort = abortController
-  await streamChat(
-    {
-      sessionId,
-      knowledgeBaseId: chat.knowledgeBaseId,
-      content,
-      ...(modelConfig ? { model: modelConfig.model, baseUrl: modelConfig.baseUrl, apiKey: modelConfig.apiKey } : {})
-    },
-    {
-      onThinking: (node) => {
-        mergeThinkingNode(streamMsg, node)
-      },
-      onDelta: (chunk) => {
-        streamMsg.buffer += chunk
-      },
-      onReferences: (references) => {
-        streamMsg.references = references
-      },
-      onDone: () => {
-        streamMsg.streaming = false
-        streamMsg.content = streamMsg.buffer
-      },
-      onError: (err) => {
-        streamMsg.streaming = false
-        streamMsg.content = streamMsg.buffer || err.msg || '服务异常'
-        message.error(err.msg || 'AI 服务暂时不可用')
-      },
-      onEnd: async () => {
-        chat.generating = false
-        activeStreamAbort = null
-        // 用户主动停止：保留本地已生成内容，不重新加载后端（可能尚未保存）
-        if (userStopped) {
-          userStopped = false
-          return
-        }
-        // 刷新会话与消息（获取真实 ID）
-        await chat.loadSessions()
-        if (chat.currentSessionId) {
-          await chat.openSession(chat.currentSessionId)
-        }
-      }
-    },
-    abortController.signal
-  )
-}
-
-/** 合并思考节点（按 stage 更新状态） */
-function mergeThinkingNode(streamMsg: StreamMessage, node: ThinkingNodeVO): void {
-  const nodes = streamMsg.thinkingTrace ?? []
-  const idx = nodes.findIndex((n) => n.stage === node.stage)
-  if (idx === -1) {
-    nodes.push(node)
-  } else {
-    nodes[idx] = node
-  }
-  streamMsg.thinkingTrace = [...nodes]
-}
-
-/** 当前进行中的流式请求 AbortController */
-let activeStreamAbort: AbortController | null = null
-/** 是否由用户主动停止当前回答 */
-let userStopped = false
-
-/** 用户主动中断回答：保留已生成内容并结束本次流 */
-function stopGenerating(): void {
-  if (!chat.generating) {
-    return
-  }
-  userStopped = true
-  const last = chat.messages[chat.messages.length - 1]
-  if (last && isStreamingMsg(last)) {
-    if (!last.buffer) {
-      // 尚未生成任何内容（思考/检索阶段停止）：移除空占位，与后端「不保存空消息」保持一致
-      chat.messages.pop()
-    } else {
-      last.streaming = false
-      last.content = last.buffer || last.content
-    }
-  }
-  chat.generating = false
-  activeStreamAbort?.abort()
-  activeStreamAbort = null
-}
-
-onBeforeUnmount(() => {
-  activeStreamAbort?.abort()
-})
-
-/** 消息或流式缓冲变化时自动滚动到底部 */
-watch(
-  () => {
-    const last = chat.messages[chat.messages.length - 1]
-    return last
-      ? [chat.messages.length, last.content, (last as StreamMessage).buffer]
-      : [0, '', '']
+const features = [
+  {
+    title: '多 Agent 协同',
+    desc: '意图识别、检索调度、重写/HyDE、图谱检索、向量检索、融合补全、总结生成，多 Agent 编排为完整工作流',
+    icon: RobotOutlined,
+    color: '#1677ff'
   },
-  () => {
-    nextTick(() => {
-      listRef.value?.scrollTo({ top: listRef.value.scrollHeight, behavior: 'smooth' })
-    })
+  {
+    title: '图谱 + 向量双路检索',
+    desc: 'LightRAG 知识图谱与语义向量并行检索，RRF 融合 + ReRead 二次补全，召回更准',
+    icon: ApartmentOutlined,
+    color: '#722ed1'
   },
-  { deep: true }
-)
+  {
+    title: '流式思考可视化',
+    desc: 'Agent 工作流状态图实时展示，检索过程分步可见，答案打字机式输出',
+    icon: ThunderboltOutlined,
+    color: '#fa8c16'
+  },
+  {
+    title: '引用溯源',
+    desc: '回答逐句标注来源，点击即可查看文献全文，学习有据可查',
+    icon: FileSearchOutlined,
+    color: '#13c2c2'
+  },
+  {
+    title: '模型自由切换',
+    desc: '平台内置多款模型一键切换，也支持自填 OpenAI 兼容的私有模型（仅存本地）',
+    icon: ApiOutlined,
+    color: '#52c41a'
+  },
+  {
+    title: '异步文档解析',
+    desc: '教材/PPT 上传后后台异步构建知识图谱，进度实时追踪',
+    icon: SafetyCertificateOutlined,
+    color: '#eb2f96'
+  }
+]
+
+function goChat(): void {
+  navigateTo('/chat')
+}
+
+function goLogin(): void {
+  navigateTo('/login')
+}
 </script>
 
 <style scoped>
-.chat-page {
-  display: flex;
-  height: calc(100vh - 56px);
+.home {
+  min-height: calc(100vh - 56px);
+  background: linear-gradient(180deg, #f0f5ff 0%, #f5f7fb 40%, #fff 100%);
 }
 
-.chat-page__aside {
-  width: 260px;
-  flex-shrink: 0;
-  background: #fff;
-  border-right: 1px solid #f0f0f0;
-  overflow: hidden;
-}
-
-.chat-page__main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 24px;
-}
-
-.chat-page__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 0;
-}
-
-.chat-page__list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 4px 24px;
-}
-
-.chat-page__welcome {
+.home__hero {
   text-align: center;
-  padding-top: 14vh;
-  color: #4e5969;
+  padding: 72px 24px 48px;
 }
 
-.chat-page__welcome-logo {
+.home__logo {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
   background: linear-gradient(135deg, #1677ff, #06b6d4);
   color: #fff;
-  font-size: 32px;
+  font-size: 36px;
   font-weight: 700;
+  box-shadow: 0 8px 24px rgba(22, 119, 255, 0.25);
 }
 
-.chat-page__welcome h2 {
-  margin: 16px 0 8px;
+.home__title {
+  margin: 20px 0 8px;
+  font-size: 40px;
   color: #1f2329;
 }
 
-.chat-page__quick {
-  cursor: pointer;
-  padding: 4px 12px;
+.home__subtitle {
+  margin: 0 0 12px;
+  font-size: 18px;
+  color: #1677ff;
+  font-weight: 600;
 }
 
-.chat-page__input {
-  padding: 12px 0 20px;
+.home__desc {
+  max-width: 560px;
+  margin: 0 auto 28px;
+  color: #4e5969;
+  line-height: 1.8;
+}
+
+.home__features {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px 8px;
+}
+
+.home__section-title {
+  text-align: center;
+  color: #1f2329;
+  font-size: 26px;
+  margin-bottom: 28px;
+}
+
+.home__feature-card {
+  height: 100%;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+}
+
+.home__feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 20px;
+  margin-bottom: 12px;
+}
+
+.home__feature-title {
+  margin: 0 0 8px;
+  color: #1f2329;
+  font-size: 16px;
+}
+
+.home__feature-desc {
+  margin: 0;
+  color: #4e5969;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.home__workflow {
+  max-width: 900px;
+  margin: 40px auto;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.home__workflow-desc {
+  color: #86909c;
+  margin-bottom: 24px;
+}
+
+.home__workflow-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.home__workflow-flow span {
+  background: #fff;
+  border: 1px solid #d9e4ff;
+  color: #1677ff;
+  padding: 6px 12px;
+  border-radius: 16px;
+}
+
+.home__workflow-flow i {
+  color: #c9cdd4;
+  font-style: normal;
+}
+
+.home__footer {
+  text-align: center;
+  color: #86909c;
+  font-size: 12px;
+  padding: 24px 0 32px;
+}
+
+@media (max-width: 768px) {
+  .home__hero {
+    padding: 40px 16px 32px;
+  }
+
+  .home__title {
+    font-size: 30px;
+  }
 }
 </style>

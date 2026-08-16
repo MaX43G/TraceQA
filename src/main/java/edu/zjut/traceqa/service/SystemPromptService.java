@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.service;
 
+import jakarta.annotation.Resource;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import edu.zjut.traceqa.common.enums.ErrorCode;
@@ -22,11 +23,10 @@ import java.util.List;
 @Service
 public class SystemPromptService {
 
-    private final SystemPromptMapper systemPromptMapper;
+    @Resource
+    private SystemPromptMapper systemPromptMapper;
 
-    public SystemPromptService(SystemPromptMapper systemPromptMapper) {
-        this.systemPromptMapper = systemPromptMapper;
-    }
+    
 
     /** 分页查询提示词列表 */
     public List<SystemPrompt> list() {
@@ -59,15 +59,6 @@ public class SystemPromptService {
         fallback.setContent(content);
         fallback.setEnabled(1);
         return fallback;
-    }
-
-    /** 创建提示词（若同场景已有启用项，新创建默认停用） */
-    public SystemPrompt create(SystemPrompt prompt) {
-        if (prompt.getEnabled() == null || prompt.getEnabled() == 1) {
-            prompt.setEnabled(0);
-        }
-        systemPromptMapper.insert(prompt);
-        return prompt;
     }
 
     /** 更新提示词 */

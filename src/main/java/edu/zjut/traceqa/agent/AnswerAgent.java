@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.agent;
 
+import jakarta.annotation.Resource;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import edu.zjut.traceqa.config.LlmConfig;
 import edu.zjut.traceqa.service.LlmService;
@@ -19,18 +20,13 @@ import reactor.core.publisher.Flux;
 @Component
 public class AnswerAgent {
 
-    private final RagAgents ragAgents;
-    private final LlmService llmService;
+    @Resource
+    private RagAgents ragAgents;
 
-    public AnswerAgent(RagAgents ragAgents, LlmService llmService) {
-        this.ragAgents = ragAgents;
-        this.llmService = llmService;
-    }
+    @Resource
+    private LlmService llmService;
 
-    /** 默认模型流式生成回答 */
-    public Flux<String> streamAnswer(String userPrompt) {
-        return streamAnswer(userPrompt, null);
-    }
+    
 
     /**
      * 流式生成回答。

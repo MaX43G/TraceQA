@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.controller;
 
+import jakarta.annotation.Resource;
 import edu.zjut.traceqa.common.api.ApiResponse;
 import edu.zjut.traceqa.common.auth.RequirePermission;
 import edu.zjut.traceqa.common.enums.ErrorCode;
@@ -29,11 +30,10 @@ import java.util.List;
 @RequestMapping("/api/prompts")
 public class SystemPromptController {
 
-    private final SystemPromptService systemPromptService;
+    @Resource
+    private SystemPromptService systemPromptService;
 
-    public SystemPromptController(SystemPromptService systemPromptService) {
-        this.systemPromptService = systemPromptService;
-    }
+    
 
     @Operation(summary = "查询全部系统提示词")
     @GetMapping

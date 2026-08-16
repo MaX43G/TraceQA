@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.controller;
 
+import jakarta.annotation.Resource;
 import edu.zjut.traceqa.common.api.ApiResponse;
 import edu.zjut.traceqa.common.api.PageResult;
 import edu.zjut.traceqa.common.auth.RequirePermission;
@@ -30,11 +31,10 @@ import java.util.List;
 @RequestMapping("/api/admin")
 public class AdminController {
 
-    private final AdminService adminService;
+    @Resource
+    private AdminService adminService;
 
-    public AdminController(AdminService adminService) {
-        this.adminService = adminService;
-    }
+    
 
     @Operation(summary = "分页查询用户")
     @GetMapping("/users")
