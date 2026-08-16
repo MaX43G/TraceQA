@@ -47,10 +47,11 @@ services:
       OPENAI_API_KEY: ${LLM_API_KEY:-}
       OPENAI_BASE_URL: ${LIGHTRAG_LLM_BASE_URL:-https://api.siliconflow.cn/v1}
       LLM_MODEL: ${LIGHTRAG_LLM_MODEL:-Qwen/Qwen3.5-4B}
-      # 抽取限流优化：低并发 + 重试退避，避免免费额度被瞬时打爆
-      MAX_ASYNC_LLM: 1
-      MAX_ASYNC_EMBEDDING: 1
-      LLM_MAX_RETRIES: 5
+      # 抽取并发优化：按硅基流动配额（1000 RPM / 80K TPM）调优
+      # TPM 是瓶颈 → 并发 4 匹配 80K TPM；RPM 充足无需担心调用次数
+      MAX_ASYNC_LLM: 4
+      MAX_ASYNC_EMBEDDING: 8
+      LLM_MAX_RETRIES: 8
       MAX_TOKENS: 2000
       # Embedding（同 OpenAI 兼容端点）
       EMBEDDING_BINDING: openai
