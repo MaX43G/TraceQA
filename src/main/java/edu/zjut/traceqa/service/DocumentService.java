@@ -37,8 +37,8 @@ import java.util.UUID;
 @Service
 public class DocumentService {
 
-    /** 允许上传的文件扩展名集合 */
-    private static final Set<String> ALLOWED_TYPES = Set.of("pdf", "pptx", "ppt", "docx", "doc", "md", "txt");
+    /** 允许上传的文件扩展名集合（仅文本格式；PDF/PPT/Word 等需先转换为 Markdown） */
+    private static final Set<String> ALLOWED_TYPES = Set.of("md", "txt");
 
     @Resource
     private DocumentMapper documentMapper;
@@ -58,7 +58,8 @@ public class DocumentService {
         knowledgeBaseService.requireById(knowledgeBaseId);
         String fileType = resolveFileType(file.getOriginalFilename());
         if (!ALLOWED_TYPES.contains(fileType)) {
-            throw new BizException(ErrorCode.PARAM_ERROR, "不支持的文件类型：" + fileType);
+            throw new BizException(ErrorCode.PARAM_ERROR,
+                    "不支持的文件类型：" + fileType + "。PDF/PPT/Word/图片等格式请先用 MinerU 等工具转换为 Markdown（.md）后再上传");
         }
         // 同步读取文件字节（transferTo 会移动 Tomcat 临时文件，异步线程中再读将失败）
         byte[] content;

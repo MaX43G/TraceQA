@@ -7,13 +7,16 @@
       <a-upload
         :show-upload-list="false"
         :disabled="!selectedKbId"
-        accept=".pdf,.pptx,.ppt,.docx,.doc,.md,.txt"
+        accept=".md,.txt"
+        :before-upload="handleBeforeUpload"
         :custom-request="handleUpload"
       >
-        <a-button type="primary" :disabled="!selectedKbId" :loading="uploading">
-          <template #icon><UploadOutlined /></template>
-          上传文档
-        </a-button>
+        <a-tooltip title="支持 Markdown(.md) / 文本(.txt)。PDF、PPT、Word、图片等格式请先用 MinerU 等工具转换为 Markdown 后再上传">
+          <a-button type="primary" :disabled="!selectedKbId" :loading="uploading">
+            <template #icon><UploadOutlined /></template>
+            上传文档
+          </a-button>
+        </a-tooltip>
       </a-upload>
     </div>
 
@@ -103,6 +106,16 @@ async function loadDocs(): Promise<void> {
   } finally {
     loading.value = false
   }
+}
+
+/** 上传前校验：仅允许 .md/.txt 文本格式 */
+function handleBeforeUpload(file: File): boolean {
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+  if (!['md', 'txt'].includes(ext)) {
+    message.error(`不支持的文件类型：${ext || '未知'}。PDF/PPT/Word/图片等请先用 MinerU 等工具转换为 Markdown 后再上传`)
+    return false
+  }
+  return true
 }
 
 /** 自定义上传：调用后端接口并跟踪解析进度 */
