@@ -319,6 +319,60 @@ public class RetrievalService {
         return question.matches(".*[、，,;；].*");
     }
 
+    /**
+     * 问题类型（查询意图路由依据）。
+     */
+    public enum QueryType {
+        /** 术语/概念定义（"什么是K均值"）→ 仅关键词 + 向量，最快 */
+        DEFINITION,
+        /** 对比/比较类（"A和B的区别"）→ 查询分解 + 全链路 */
+        COMPARE,
+        /** 一般简单问题 → 仅向量 */
+        SIMPLE,
+        /** 一般复杂问题 → 全链路（图谱 + 向量 + 关键词） */
+        COMPLEX
+    }
+
+    /**
+     * 查询意图路由分类（规则优先，零 LLM 调用，快速）。
+     * 术语定义/对比类问题有明确标志词；其余按复杂度判定。
+     */
+    public QueryType classifyQuery(String question, LlmConfig config) {
+        if (question == null || question.isBlank()) {
+            return QueryType.SIMPLE;
+        }
+        String q = question.trim();
+        // 对比类：含对比标志词
+        if (isCompareQuestion(q)) {
+            return QueryType.COMPARE;
+        }
+        // 术语定义类：以"什么是/何为/啥是/解释一下什么是"开头，或短句 + 定义标志
+        if (isDefinitionQuestion(q)) {
+            return QueryType.DEFINITION;
+        }
+        // 其余按复杂度
+        return isComplexQuery(q, config) ? QueryType.COMPLEX : QueryType.SIMPLE;
+    }
+
+    /** 是否对比/比较类问题 */
+    private boolean isCompareQuestion(String q) {
+        String[] words = {"对比", "比较", "区别", "差异", "不同之处", "vs", "VS", "versus", "相较于", "和...相比", "哪个更好"};
+        for (String w : words) {
+            if (q.contains(w)) {
+                return true;
+            }
+        }
+        return q.matches(".*(与|和|及).*(区别|差异|不同).*");
+    }
+
+    /** 是否术语定义类问题 */
+    private boolean isDefinitionQuestion(String q) {
+        return q.matches("^(什么是|何为|啥是|何谓|解释一下什么是|简单解释)[\\s]?.*")
+                || q.matches("^.{0,12}是.{0,6}(吗|吧|的意思|概念|原理)$")
+                || (q.length() <= 20 && (q.endsWith("？") || q.endsWith("?")) && !isCompareQuestion(q)
+                && !hasComplexSignal(q) && !q.matches(".*(为什么|如何|怎样|怎么).*"));
+    }
+
     /** 推送进度回调（空回调时忽略） */
     private void notify(Consumer<String> progress, String message) {
         if (progress != null) {
@@ -405,8 +459,8 @@ public class RetrievalService {
         return List.of();
     }
 
-    /** RRF 倒数排名融合：图谱 + 向量 + 关键词 三路合并去重 */
-    private List<RetrievedChunk> fuse(List<RetrievedChunk>... sources) {
+    /** RRF 倒数排名融合：多路结果合并去重（varargs，供编排器定义类问题复用） */
+    public List<RetrievedChunk> fuse(List<RetrievedChunk>... sources) {
         Map<String, RetrievedChunk> merged = new LinkedHashMap<>();
         for (List<RetrievedChunk> source : sources) {
             mergePath(merged, source);

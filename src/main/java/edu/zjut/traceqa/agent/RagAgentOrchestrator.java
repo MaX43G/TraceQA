@@ -178,38 +178,59 @@ public class RagAgentOrchestrator {
     }
 
     /**
-     * 查询增强 + 双路检索 + ReRead 节点
+     * 查询意图路由 + 三路检索 + ReRead + 精排节点。
+     *
+     * <p>按 {@link RetrievalService.QueryType} 分流：
+     * 术语定义 → 仅关键词+向量（最快）；对比类 → 查询分解+全链路；
+     * 简单 → 仅向量；复杂 → 全链路（图谱+向量+关键词）。</p>
      */
     private RetrievalResult retrieve(SseEmitter emitter, List<ThinkingNodeVO> thinking, String content,
                                      String history, LlmConfig config, AtomicBoolean cancelled) {
-        // 步骤 0：检索策略调度 —— LLM 判定复杂度并选择检索路径
+        // 步骤 0：查询意图路由 —— 规则分类并选择检索路径
         ThinkingNodeVO routerNode = startThinking(thinking, "检索策略调度", "router-agent",
-                "正在分析问题复杂度并选择检索路径");
+                "正在分析问题类型并选择检索路径");
         ssePublisher.send(emitter, "thinking", routerNode);
-        boolean complex = retrievalService.isComplexQuery(content, config);
-        String pathLabel = complex ? "复杂问题 → 聚合链路（图谱 + 向量）" : "简单问题 → 仅向量检索";
+        RetrievalService.QueryType type = retrievalService.classifyQuery(content, config);
+        String pathLabel = switch (type) {
+            case DEFINITION -> "术语定义 → 关键词 + 向量检索（最快）";
+            case COMPARE -> "对比问题 → 查询分解 + 聚合链路（图谱 + 向量 + 关键词）";
+            case SIMPLE -> "简单问题 → 仅向量检索";
+            case COMPLEX -> "复杂问题 → 聚合链路（图谱 + 向量 + 关键词）";
+        };
         finishThinking(thinking, emitter, "检索策略调度", pathLabel);
 
-        // 简单问题：仅向量检索原问题（跳过重写/HyDE 与图谱，响应更快）
-        if (!complex) {
+        // 术语定义：仅关键词 + 向量，跳过图谱/HyDE/重写，响应最快
+        if (type == RetrievalService.QueryType.DEFINITION) {
             EnhancedQuery simple = new EnhancedQuery(content, null, null);
-            ThinkingNodeVO vectorNode = startThinking(thinking, "向量检索", "vector-agent",
-                    "正在执行向量语义检索");
-            ssePublisher.send(emitter, "thinking", vectorNode);
-            List<RetrievedChunk> vectorChunks = retrievalService.queryVector(content, simple, config,
-                    progress -> pushProgress(emitter, vectorNode, cancelled, progress));
-            finishThinking(thinking, emitter, "向量检索", "向量命中 " + vectorChunks.size() + " 条");
+            List<RetrievedChunk> vectorChunks = runVector(emitter, thinking, content, simple, config, cancelled);
+            List<RetrievedChunk> keywordChunks = runKeyword(emitter, thinking, content, simple, config, cancelled);
+            List<RetrievedChunk> fused = retrievalService.fuse(vectorChunks, keywordChunks);
+            ThinkingNodeVO fuseNode = startThinking(thinking, "融合与补全", "fusion-agent",
+                    "正在融合关键词与向量结果");
+            ssePublisher.send(emitter, "thinking", fuseNode);
+            finishThinking(thinking, emitter, "融合与补全", "融合后共 " + fused.size() + " 条");
+            return new RetrievalResult(fused, true);
+        }
+
+        // 简单问题：仅向量检索原问题（跳过重写/HyDE 与图谱，响应更快）
+        if (type == RetrievalService.QueryType.SIMPLE) {
+            EnhancedQuery simple = new EnhancedQuery(content, null, null);
+            List<RetrievedChunk> vectorChunks = runVector(emitter, thinking, content, simple, config, cancelled);
             return new RetrievalResult(vectorChunks, true);
         }
 
-        // 复杂问题：完整复合检索链路
-        // 步骤 1：查询重写与 HyDE（并行）
+        // 对比/复杂问题：完整复合检索链路
+        // 步骤 1：查询重写与 HyDE（并行；对比类还会做查询分解）
         ThinkingNodeVO enhanceNode = startThinking(thinking, "查询重写与 HyDE", "rewrite-agent",
                 "正在生成查询重写与假设性文档");
         ssePublisher.send(emitter, "thinking", enhanceNode);
         EnhancedQuery enhanced = retrievalService.enhance(content, config,
                 progress -> pushProgress(emitter, enhanceNode, cancelled, progress), history);
         String enhanceDetail = String.format("重写：%s", shortText(enhanced.getRewritten()));
+        if (type == RetrievalService.QueryType.COMPARE && enhanced.getSubqueries() != null
+                && !enhanced.getSubqueries().isEmpty()) {
+            enhanceDetail += String.format("（分解 %d 个子问题）", enhanced.getSubqueries().size());
+        }
         finishThinking(thinking, emitter, "查询重写与 HyDE", enhanceDetail);
 
         // 步骤 2：图谱检索（local + global）
@@ -221,20 +242,10 @@ public class RagAgentOrchestrator {
         finishThinking(thinking, emitter, "图谱检索", "图谱命中 " + graphChunks.size() + " 条");
 
         // 步骤 3：向量检索（多查询扩展）
-        ThinkingNodeVO vectorNode = startThinking(thinking, "向量检索", "vector-agent",
-                "正在执行向量语义检索");
-        ssePublisher.send(emitter, "thinking", vectorNode);
-        List<RetrievedChunk> vectorChunks = retrievalService.queryVector(content, enhanced, config,
-                progress -> pushProgress(emitter, vectorNode, cancelled, progress));
-        finishThinking(thinking, emitter, "向量检索", "向量命中 " + vectorChunks.size() + " 条");
+        List<RetrievedChunk> vectorChunks = runVector(emitter, thinking, content, enhanced, config, cancelled);
 
         // 步骤 4：关键词检索（术语/编号类问题召回更准）
-        ThinkingNodeVO kwNode = startThinking(thinking, "关键词检索", "keyword-agent",
-                "正在执行关键词检索");
-        ssePublisher.send(emitter, "thinking", kwNode);
-        List<RetrievedChunk> keywordChunks = retrievalService.queryKeyword(content, enhanced, config,
-                progress -> pushProgress(emitter, kwNode, cancelled, progress));
-        finishThinking(thinking, emitter, "关键词检索", "关键词命中 " + keywordChunks.size() + " 条");
+        List<RetrievedChunk> keywordChunks = runKeyword(emitter, thinking, content, enhanced, config, cancelled);
 
         // 步骤 5：三路融合 + ReRead 补全 + LLM 精排
         ThinkingNodeVO fuseNode = startThinking(thinking, "融合与补全", "fusion-agent",
@@ -246,6 +257,30 @@ public class RagAgentOrchestrator {
                 result.isDegraded() ? "（查询增强已降级）" : "");
         finishThinking(thinking, emitter, "融合与补全", fuseDetail);
         return result;
+    }
+
+    /** 向量检索节点（含 SSE 进度推送） */
+    private List<RetrievedChunk> runVector(SseEmitter emitter, List<ThinkingNodeVO> thinking, String content,
+                                           EnhancedQuery enhanced, LlmConfig config, AtomicBoolean cancelled) {
+        ThinkingNodeVO vectorNode = startThinking(thinking, "向量检索", "vector-agent",
+                "正在执行向量语义检索");
+        ssePublisher.send(emitter, "thinking", vectorNode);
+        List<RetrievedChunk> chunks = retrievalService.queryVector(content, enhanced, config,
+                progress -> pushProgress(emitter, vectorNode, cancelled, progress));
+        finishThinking(thinking, emitter, "向量检索", "向量命中 " + chunks.size() + " 条");
+        return chunks;
+    }
+
+    /** 关键词检索节点（含 SSE 进度推送） */
+    private List<RetrievedChunk> runKeyword(SseEmitter emitter, List<ThinkingNodeVO> thinking, String content,
+                                            EnhancedQuery enhanced, LlmConfig config, AtomicBoolean cancelled) {
+        ThinkingNodeVO kwNode = startThinking(thinking, "关键词检索", "keyword-agent",
+                "正在执行关键词检索");
+        ssePublisher.send(emitter, "thinking", kwNode);
+        List<RetrievedChunk> chunks = retrievalService.queryKeyword(content, enhanced, config,
+                progress -> pushProgress(emitter, kwNode, cancelled, progress));
+        finishThinking(thinking, emitter, "关键词检索", "关键词命中 " + chunks.size() + " 条");
+        return chunks;
     }
 
     /** 推送检索过程进度（取消时停止推送） */
