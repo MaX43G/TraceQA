@@ -97,7 +97,7 @@ async function unwrapResponse<T>(res: Response): Promise<T> {
 }
 
 /** 认证失败错误码：清除本地令牌并跳转登录页 */
-function handleAuthFailure(error: ApiError): void {
+export function handleAuthFailure(error: ApiError): void {
   if (error.code !== 40100 && error.code !== 40101) {
     return
   }

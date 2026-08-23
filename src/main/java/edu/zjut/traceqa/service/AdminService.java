@@ -4,6 +4,7 @@ import jakarta.annotation.Resource;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import cn.dev33.satoken.stp.StpUtil;
 import edu.zjut.traceqa.common.api.PageResult;
 import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.exception.BizException;
@@ -46,7 +47,7 @@ public class AdminService {
         return PageResult.of(result, AdminUserVO::of);
     }
 
-    /** 启用/禁用用户 */
+    /** 启用/禁用用户（禁用时立即强制注销其全部登录会话，杜绝「禁用后仍可继续使用」） */
     public void updateUserStatus(Long id, int status) {
         User user = requireUser(id);
         if (status != 0 && status != 1) {
@@ -54,7 +55,27 @@ public class AdminService {
         }
         user.setStatus(status);
         userMapper.updateById(user);
+        if (status == 0) {
+            kickUserSessions(id);
+        }
         log.info("用户状态更新：id={}, status={}", id, status);
+    }
+
+    /**
+     * 强制注销用户的所有 sa-token 会话。
+     *
+     * <p>Web 拦截器已按请求实时校验用户状态，此处再主动清理会话缓存，
+     * 保证禁用瞬间旧 Token 立即失效（无需等下一次请求才被发现）。</p>
+     */
+    private void kickUserSessions(Long userId) {
+        try {
+            // 注销该账号的所有会话（含其全部已签发 Token），并同步清理会话内缓存数据
+            StpUtil.logout(userId);
+            log.info("已强制注销被禁用用户的全部会话：userId={}", userId);
+        } catch (Exception e) {
+            // 会话清理失败不影响状态落库，拦截器仍会拦截后续请求
+            log.warn("强制注销用户会话失败：userId={}, err={}", userId, e.getMessage());
+        }
     }
 
     /** 变更用户角色 */

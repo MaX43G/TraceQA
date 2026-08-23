@@ -2,7 +2,7 @@
 /* eslint-disable */
 import request from "@/utils/request";
 
-/** 查询启用知识库列表 GET /api/kbs */
+/** 查询知识库列表 GET /api/kbs */
 export async function list1(options?: { [key: string]: any }) {
   return request<API.ApiResponseListKnowledgeBaseDTO>("/api/kbs", {
     method: "GET",

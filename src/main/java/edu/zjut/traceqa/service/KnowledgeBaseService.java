@@ -21,7 +21,8 @@ import edu.zjut.traceqa.common.convert.DtoMapper;
 /**
  * 知识库服务。
  *
- * <p>提供知识库的增删改查与文档计数，支撑管理员后台与聊天时的知识库选择。</p>
+ * <p>提供知识库的增删改查与文档计数，支撑管理员后台的知识库与文档管理。
+ * 系统使用<b>全部知识库</b>检索，不区分知识库、不做按库隔离（LightRAG 为单一全局索引）。</p>
  */
 @Slf4j
 @Service
@@ -33,12 +34,11 @@ public class KnowledgeBaseService {
     @Resource
     private DocumentMapper documentMapper;
 
-    
-
-    /** 查询全部启用的知识库 */
+    /** 查询全部知识库 */
     public List<KnowledgeBaseDTO> list() {
         return knowledgeBaseMapper.selectList(
-                        new LambdaQueryWrapper<KnowledgeBase>().orderByAsc(KnowledgeBase::getId))
+                        new LambdaQueryWrapper<KnowledgeBase>()
+                                .orderByAsc(KnowledgeBase::getId))
                 .stream().map(KnowledgeBaseDTO::of).toList();
     }
 
@@ -56,7 +56,6 @@ public class KnowledgeBaseService {
         kb.setName(dto.getName());
         kb.setDescription(dto.getDescription());
         kb.setCourse(dto.getCourse());
-        kb.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         knowledgeBaseMapper.insert(kb);
         log.info("创建知识库：{}", kb.getName());
         return DtoMapper.INSTANCE.toKnowledgeBaseDTO(kb);
@@ -68,7 +67,6 @@ public class KnowledgeBaseService {
         kb.setName(dto.getName());
         kb.setDescription(dto.getDescription());
         kb.setCourse(dto.getCourse());
-        kb.setStatus(dto.getStatus());
         knowledgeBaseMapper.updateById(kb);
         return DtoMapper.INSTANCE.toKnowledgeBaseDTO(kb);
     }

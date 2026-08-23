@@ -14,12 +14,7 @@
       :pagination="false"
     >
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'">
-          <a-tag :color="record.status === 1 ? 'green' : 'default'">
-            {{ record.status === 1 ? '启用' : '停用' }}
-          </a-tag>
-        </template>
-        <template v-else-if="column.key === 'action'">
+        <template v-if="column.key === 'action'">
           <a-space>
             <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
             <ConfirmDelete title="删除后其下文档将一并移除，确定？" @confirm="handleDelete(record)" />
@@ -38,9 +33,6 @@
         </a-form-item>
         <a-form-item label="描述">
           <a-textarea v-model:value="form.description" :rows="3" placeholder="知识库描述" />
-        </a-form-item>
-        <a-form-item label="状态">
-          <a-switch v-model:checked="enabledFlag" checked-children="启用" un-checked-children="停用" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -61,7 +53,6 @@ const columns = [
   { title: '名称', dataIndex: 'name', key: 'name' },
   { title: '课程', dataIndex: 'course', key: 'course' },
   { title: '描述', dataIndex: 'description', key: 'description' },
-  { title: '状态', key: 'status' },
   { title: '创建时间', dataIndex: 'createTime', key: 'createTime' },
   { title: '操作', key: 'action' }
 ]
@@ -70,7 +61,6 @@ const loading = ref(false)
 const list = ref<KnowledgeBaseDTO[]>([])
 const modalOpen = ref(false)
 const editing = ref<KnowledgeBaseDTO | null>(null)
-const enabledFlag = ref(true)
 const form = reactive({ name: '', course: '', description: '' })
 
 async function load(): Promise<void> {
@@ -88,7 +78,6 @@ function openCreate(): void {
   form.name = ''
   form.course = ''
   form.description = ''
-  enabledFlag.value = true
   modalOpen.value = true
 }
 
@@ -97,7 +86,6 @@ function openEdit(record: KnowledgeBaseDTO): void {
   form.name = record.name ?? ''
   form.course = record.course ?? ''
   form.description = record.description ?? ''
-  enabledFlag.value = record.status === 1
   modalOpen.value = true
 }
 
@@ -113,16 +101,14 @@ async function handleSave(): Promise<void> {
         {
           name: form.name.trim(),
           course: form.course,
-          description: form.description,
-          status: enabledFlag.value ? 1 : 0
+          description: form.description
         }
       )
     } else {
       await apiCreate({
         name: form.name.trim(),
         course: form.course,
-        description: form.description,
-        status: enabledFlag.value ? 1 : 0
+        description: form.description
       })
     }
     message.success('保存成功')

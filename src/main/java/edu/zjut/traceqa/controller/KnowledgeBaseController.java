@@ -35,7 +35,7 @@ public class KnowledgeBaseController {
 
     
 
-    @Operation(summary = "查询启用知识库列表")
+    @Operation(summary = "查询知识库列表")
     @GetMapping
     public ApiResponse<List<KnowledgeBaseDTO>> list() {
         return ApiResponse.ok(knowledgeBaseService.list());

@@ -51,14 +51,22 @@ public class DocumentParseWorker {
     private static final long SPLIT_THRESHOLD_BYTES = 2L * 1024 * 1024;
     /** PDF 每块目标字节数（约 4MB） */
     private static final long TARGET_PART_BYTES = 4L * 1024 * 1024;
-    /** 文本（md/txt）每块目标字节数（无论大小均切分，便于展示上传进度） */
-    private static final long TEXT_PART_BYTES = 100L * 1024;
+    /**
+     * 文本（md/txt）切分阈值：低于该字节数的文档不切分、整体提交为一个 LightRAG 文档。
+     *
+     * <p>LightRAG 抽取实体/关系时每个 chunk 都要调用一次 LLM，按 100KB 切块会成倍放大
+     * LLM 调用次数（一个 700KB 文档被切成 7 块 → 7 个独立文档 → 每块内部再切 ~19 chunk，
+     * 总计百余次 LLM 抽取），这是「小文档上传极慢」的根因。仅对真正的大文档切块。</p>
+     */
+    private static final long TEXT_SPLIT_THRESHOLD_BYTES = 1024L * 1024;
+    /** 文本（md/txt）每块目标字节数（大文档切块时使用） */
+    private static final long TEXT_PART_BYTES = 1024L * 1024;
     /** 文本切分最大块数 */
-    private static final int MAX_TEXT_PARTS = 20;
+    private static final int MAX_TEXT_PARTS = 8;
     /** 最大切分块数（防止切得过碎） */
     private static final int MAX_PARTS = 50;
-    /** 块与块之间的提交限速间隔（毫秒），避免瞬时打爆 API 限流 */
-    private static final long PART_INTERVAL_MS = 5000L;
+    /** 块与块之间的提交限速间隔（毫秒），仅在大文档多块时生效，避免不必要等待 */
+    private static final long PART_INTERVAL_MS = 1000L;
 
     /** 单个子块：内容 + 文件名 */
     private record PartChunk(byte[] bytes, String name) {
@@ -138,16 +146,16 @@ public class DocumentParseWorker {
         return (int) Math.min(100, uploaded * 100.0 / Math.max(1, total));
     }
 
-    /** 切分文件为多个子块；md/txt 无论大小均切分，PDF 仅超大时切分 */
+    /** 切分文件为多个子块；md/txt 仅超大时切分，PDF 仅超大时切分 */
     private List<PartChunk> splitParts(byte[] content, String filename) throws IOException {
         String ext = extensionOf(filename);
-        if ("md".equals(ext) || "txt".equals(ext)) {
+        if (("md".equals(ext) || "txt".equals(ext)) && content.length > TEXT_SPLIT_THRESHOLD_BYTES) {
             return splitText(content, filename);
         }
         if ("pdf".equals(ext) && content.length > SPLIT_THRESHOLD_BYTES) {
             return splitPdf(content, filename);
         }
-        // 其他格式（docx/pptx 等）暂不支持安全切分，整文件上传
+        // 小文件（含绝大多数 md/txt）整文件提交为单个 LightRAG 文档，避免放大 LLM 抽取成本
         return List.of(new PartChunk(content, filename));
     }
 

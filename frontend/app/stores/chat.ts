@@ -31,8 +31,6 @@ export const useChatStore = defineStore('chat', {
     currentSessionId: null as number | null,
     /** 当前会话消息列表 */
     messages: [] as ChatMessageVO[],
-    /** 知识库筛选（null 表示全局检索） */
-    knowledgeBaseId: null as number | null,
     /** 是否正在生成回答 */
     generating: false
   }),
@@ -48,7 +46,7 @@ export const useChatStore = defineStore('chat', {
     async newSession(): Promise<void> {
       const res = await createSession({
         title: '新对话',
-        knowledgeBaseId: this.knowledgeBaseId ?? null
+        knowledgeBaseId: null
       })
       const session = res.data
       if (session) {

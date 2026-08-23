@@ -43,18 +43,7 @@
     <a-table :data-source="docs" :columns="columns" row-key="id" :loading="loading" :pagination="false">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
-          <a-space direction="vertical" style="width: 100%">
-            <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
-            <a-progress
-              v-if="record.status === 'PROCESSING' || record.status === 'PENDING'"
-              :percent="progressMap[record.id] ?? 30"
-              size="small"
-              status="active"
-            />
-            <span v-if="partInfo[record.id]" class="part-progress">
-              已上传 {{ partInfo[record.id].done }} / {{ partInfo[record.id].total }} 块
-            </span>
-          </a-space>
+          <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'stats'">
           <span class="stats">分块 {{ record.chunkCount ?? 0 }} / 实体 {{ record.entityCount ?? 0 }} / 关系 {{ record.relationCount ?? 0 }}</span>
@@ -75,7 +64,7 @@
 <script setup lang="ts">
 /**
  * 文档管理（管理员）：上传后异步解析（202 Accepted），
- * 通过 SSE 轮询解析进度并展示进度面板。
+ * 状态列仅以标签展示（解析中/已完成/失败等），解析结束后自动刷新列表。
  */
 import { UploadOutlined, FileZipOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
@@ -100,9 +89,6 @@ const selectedKbId = ref<number | null>(null)
 const docs = ref<DocumentVO[]>([])
 const loading = ref(false)
 const uploading = ref(false)
-const progressMap = reactive<Record<number, number>>({})
-/** 分块进度（SSE 推送） */
-const partInfo = reactive<Record<number, { total: number; done: number }>>({})
 /** 解析队列统计 */
 const queueStats = ref<{ pending?: number; processing?: number; dead?: number } | null>(null)
 
@@ -166,9 +152,8 @@ async function handleUpload(options: Record<string, unknown>): Promise<void> {
       throw new Error('上传失败')
     }
     message.success('上传成功，正在后台解析')
-    progressMap[uploadData.documentId] = 10
     await loadDocs()
-    // 通过 SSE 追踪解析进度
+    // 通过 SSE 等待解析结束，结束后刷新列表展示最终状态标签
     await trackProgress(uploadData.documentId)
     // 解析结束后刷新列表
     await loadDocs()
@@ -179,7 +164,7 @@ async function handleUpload(options: Record<string, unknown>): Promise<void> {
   }
 }
 
-/** 消费文档解析进度 SSE */
+/** 消费文档解析进度 SSE：等待解析结束（成功/失败）后返回，由调用方刷新列表 */
 async function trackProgress(documentId: number): Promise<void> {
   try {
     const res = await fetch(`/api/documents/${documentId}/progress`, {
@@ -207,9 +192,6 @@ async function trackProgress(documentId: number): Promise<void> {
         if (dataLine) {
           try {
             const payload = JSON.parse(dataLine.slice(5).trim())
-            if (payload.progress !== undefined) {
-              progressMap[payload.documentId] = payload.progress
-            }
             if (payload.status === 'DONE' || payload.status === 'FAILED') {
               return
             }

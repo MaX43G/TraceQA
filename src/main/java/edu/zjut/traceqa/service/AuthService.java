@@ -96,12 +96,17 @@ public class AuthService {
         StpUtil.logout();
     }
 
-    /** 查询当前登录用户信息 */
+    /** 查询当前登录用户信息（账号被禁用时拒绝返回并注销会话） */
     public UserInfo currentUser() {
         Long userId = UserContext.getUserId();
         User user = userMapper.selectById(userId);
         if (user == null) {
             throw new BizException(ErrorCode.UNAUTHORIZED);
+        }
+        // 防御纵深：即使拦截器未拦截（如缓存延迟），被禁用账号也拿不到用户信息
+        if (user.getStatus() == null || user.getStatus() != 1) {
+            StpUtil.logout();
+            throw new BizException(ErrorCode.UNAUTHORIZED, "账号已被禁用");
         }
         return DtoMapper.INSTANCE.toUserInfo(user, resolvePermissions(user.getRoleCode()));
     }

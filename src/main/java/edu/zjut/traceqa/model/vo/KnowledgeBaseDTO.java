@@ -23,13 +23,11 @@ public class KnowledgeBaseDTO {
 
     private String course;
 
-    private Integer status;
-
     private LocalDateTime createTime;
 
 /** 由实体组装 */
     public static KnowledgeBaseDTO of(KnowledgeBase kb) {
         return new KnowledgeBaseDTO(kb.getId(), kb.getName(), kb.getDescription(),
-                kb.getCourse(), kb.getStatus(), kb.getCreateTime());
+                kb.getCourse(), kb.getCreateTime());
     }
 }

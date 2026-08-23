@@ -41,6 +41,8 @@ services:
     command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--appendonly", "no", "--save", ""]
     volumes:
       - traceqa-redis-data:/data
+    ports:
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -64,9 +66,19 @@ services:
       LLM_MODEL: ${LIGHTRAG_LLM_MODEL:-Qwen/Qwen3.5-4B}
       # 抽取并发优化：按硅基流动配额（1000 RPM / 80K TPM）调优
       # TPM 是瓶颈 → 并发 4 匹配 80K TPM；RPM 充足无需担心调用次数
-      MAX_ASYNC_LLM: 4
+      MAX_ASYNC_LLM: ${LIGHTRAG_MAX_ASYNC_LLM:-4}
       MAX_ASYNC_EMBEDDING: 8
+      # 单次抽取可并行提交的文档数（大文档多块时生效，避免瞬时打爆限流）
+      MAX_PARALLEL_INSERT: ${LIGHTRAG_MAX_PARALLEL_INSERT:-2}
       LLM_MAX_RETRIES: 8
+      # LLM 请求超时（秒）：硅基流动免费额度的 4B 小模型生成较慢，
+      # 默认 480s 太紧容易在抽取中途被判定超时导致整篇失败，放宽到 900s
+      LLM_TIMEOUT: ${LIGHTRAG_LLM_TIMEOUT:-900}
+      # Embedding 请求超时（秒）：bge-m3 一般 1-3s 返回，60s 足够
+      EMBEDDING_TIMEOUT: ${LIGHTRAG_EMBEDDING_TIMEOUT:-60}
+      # 限制实体/关系抽取的单次 LLM 输出上限（防止部分 LLM 无限输出触发超时），
+      # 经验公式：LLM_TIMEOUT * 输出速度 ≈ 900s * 50 tokens/s
+      OPENAI_LLM_MAX_TOKENS: ${LIGHTRAG_LLM_MAX_OUTPUT_TOKENS:-9000}
       MAX_TOKENS: 2000
       # Embedding（同 OpenAI 兼容端点）
       EMBEDDING_BINDING: openai

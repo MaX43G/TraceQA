@@ -5,7 +5,7 @@
  * {@code thinking} 思考节点、{@code delta} 内容增量、{@code references} 引用、
  * {@code done} 结束、{@code error} 错误。此处逐行解析并分发回调。</p>
  */
-import { getAuthHeaders } from '@/utils/request'
+import { getAuthHeaders, ApiError, handleAuthFailure } from '@/utils/request'
 import type { ThinkingNodeVO, ReferenceVO } from '@/utils/api-types'
 
 /** SSE 事件回调集合 */
@@ -54,15 +54,23 @@ export async function streamChat(
     return
   }
 
-  if (!res || !res.ok || !res.body) {
-    // 后端返回非 SSE（如鉴权失败），尽力解析统一错误结构
+  const contentType = res.headers.get('content-type') || ''
+
+  // 后端返回非 SSE（如鉴权失败/业务错误），统一按 JSON 错误结构处理
+  if (!res || !res.ok || !res.body || !contentType.includes('text/event-stream')) {
     let msg = `请求失败(${res?.status ?? '未知'})`
+    let code: number | undefined
     try {
       const json = await res?.json()
       msg = json?.msg || msg
-      handlers.onError?.({ code: json?.code, msg })
+      code = json?.code
+      handlers.onError?.({ code, msg })
     } catch {
       handlers.onError?.({ msg })
+    }
+    // 账号被禁用 / Token 失效：走统一登出逻辑（清除令牌并跳转登录页）
+    if (code === 40100 || code === 40101) {
+      handleAuthFailure(new ApiError(msg, code, '-'))
     }
     handlers.onEnd?.()
     return
@@ -142,7 +150,17 @@ function dispatchBlock(block: string, handlers: ChatStreamHandlers): void {
     case 'error':
       handlers.onError?.(payload as { code?: number; msg?: string })
       break
-    default:
+    default: {
+      // 后端以 JSON 错误结构返回（非 SSE 事件）时按错误处理：
+      // 兼容鉴权被拦截（如账号禁用）在 content-type 判定失效的场景
+      const p = payload as { code?: number; msg?: string } | null
+      if (p && typeof p.code === 'number' && p.code !== 200) {
+        handlers.onError?.({ code: p.code, msg: p.msg })
+        if (p.code === 40100 || p.code === 40101) {
+          handleAuthFailure(new ApiError(p.msg || '登录已失效', p.code, '-'))
+        }
+      }
       break
+    }
   }
 }

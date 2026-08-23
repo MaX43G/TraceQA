@@ -63,8 +63,12 @@ docker run -d --name lightrag -p 9621:9621 \
   -e LLM_BINDING=openai -e LLM_BASE_URL=https://api.siliconflow.cn/v1 \
   -e LLM_API_KEY=sk-xxx -e LLM_MODEL=Qwen/Qwen3.5-4B \
   -e EMBEDDING_BINDING=openai -e EMBEDDING_MODEL=BAAI/bge-m3 \
+  -e LLM_TIMEOUT=900 -e EMBEDDING_TIMEOUT=60 -e OPENAI_LLM_MAX_TOKENS=9000 \
+  -e MAX_ASYNC_LLM=4 -e MAX_ASYNC_EMBEDDING=8 \
   ghcr.io/hkuds/lightrag:latest
 ```
+
+> 本地运行时按需调参：`LLM_TIMEOUT`（单次抽取超时，硅基流动小模型慢，900s 较稳）、`EMBEDDING_TIMEOUT`（嵌入超时，默认 30s 偏紧）、`OPENAI_LLM_MAX_TOKENS`（抽取输出上限，防无限生成触发超时）、`MAX_ASYNC_LLM`（抽取并发，越高越快但更易限流）。
 
 > Redis 不可用时系统自动降级（无缓存、文档任务改为直接解析），不影响核心功能。
 
@@ -101,6 +105,13 @@ cd frontend && pnpm gen:api   # 依据 http://localhost:8080/v3/api-docs 生成 
 | LLM 精排 | scenario=rerank 筛除无关片段并按相关度重排 |
 
 > 查询/决策结果经 `RedisCacheService` 短 TTL 缓存；Redis 不可用时自动降级。
+>
+> **知识库粒度**：检索基于单一 LightRAG 全局索引，**不区分知识库、不做按库选择或隔离**——所有已入库文档都会参与检索。上传时指定知识库仅用于归档与管理。
+
+### 5.1 用户禁用
+
+- `AdminService.updateUserStatus` 禁用（status=0）时调用 `StpUtil.logout(userId)` 立即踢出全部会话。
+- `WebConfig.checkUserEnabled()` 拦截器每请求校验（40100 强制登出）；`AuthService.currentUser()` 对禁用账号拒绝并注销，形成双重防线。
 
 ## 6. 模型体系
 
@@ -140,6 +151,13 @@ t_system_prompt (各 Agent 场景提示词，管理员可编辑)
 - 雪花 ID 序列化为字符串传输（避免 JS 精度丢失）。
 - 逻辑删除统一 `deleted` 字段。
 - 系统提示词缺省回退 `PromptDefaults`，保证始终有提示词。
+
+### 8.1 文档切分与入库（DocumentParseWorker）
+
+- 文本（md/txt）仅当文件 **> 1MB** 才切块（`TEXT_SPLIT_THRESHOLD_BYTES`），小文档整体提交为一个 LightRAG 文档——避免按 100KB 无脑切块导致 LLM 抽取调用成倍放大（700KB 文档曾因切 7 块导致上百次抽取，单次超时即失败）。
+- PDF 仅 > 2MB 才切块；其余格式整体上传。
+- 块间隔 `PART_INTERVAL_MS=1000` 限速；单块轮询 `MAX_POLL_TIMES×POLL_INTERVAL_MS≈30 分钟`。
+- 大文档用 `MAX_PARALLEL_INSERT`（Docker 默认 2）限制并行入库，避免瞬时打爆 LLM 限流。
 
 ## 9. 前端关键实现
 

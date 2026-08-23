@@ -227,7 +227,6 @@ declare namespace API {
     name: string;
     description?: string;
     course?: string;
-    status?: number;
     createTime?: string;
   };
 

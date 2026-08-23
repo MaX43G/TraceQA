@@ -36,16 +36,6 @@
           <a-button class="chat-page__menu-btn" type="text" @click="sidebarOpen = true">
             <template #icon><MenuOutlined /></template>
           </a-button>
-          <a-select
-            v-model:value="chat.knowledgeBaseId"
-            placeholder="选择知识库"
-            allow-clear
-            style="width: 160px"
-            class="chat-page__kb-select"
-            @change="handleKbChange"
-          >
-            <a-select-option v-for="kb in kbs" :key="kb.id" :value="kb.id">{{ kb.name }}</a-select-option>
-          </a-select>
           <ModelSelector />
         </a-space>
         <a-button v-if="chat.currentSessionId" type="text" @click="handleExport">
@@ -100,9 +90,8 @@ import SessionList from '@/components/chat/SessionList.vue'
 import ChatMessageItem from '@/components/chat/ChatMessageItem.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ModelSelector from '@/components/chat/ModelSelector.vue'
-import type { SessionVO, KnowledgeBaseDTO, ChatMessageVO, ThinkingNodeVO, ReferenceVO } from '@/utils/api-types'
+import type { SessionVO, ChatMessageVO, ThinkingNodeVO, ReferenceVO } from '@/utils/api-types'
 import type { StreamMessage } from '@/stores/chat'
-import { list1 as apiListKbs } from '@/api/traceqa/zhishiku'
 
 useSeoMeta({
   title: '智能问答 - 溯知 · TraceQA',
@@ -116,10 +105,6 @@ const listRef = ref<HTMLElement | null>(null)
 /** 移动端会话抽屉开关 */
 const sidebarOpen = ref(false)
 
-/** 知识库列表 */
-const kbs = ref<KnowledgeBaseDTO[]>([])
-const kbsLoaded = ref(false)
-
 /** 快捷提问示例 */
 const quickQuestions = ['什么是 K 均值聚类？', '解释一下 Apriori 关联规则算法', '决策树是如何进行特征选择的？']
 
@@ -131,27 +116,8 @@ function isStreamingMsg(msg: ChatMessageVO | StreamMessage): boolean {
 onMounted(async () => {
   // 认证由全局路由守卫（middleware/auth.global.ts）保证
   modelStore.initFromStorage()
-  await Promise.all([chat.loadSessions(), loadKnowledgeBases(), modelStore.loadServerModels()])
+  await Promise.all([chat.loadSessions(), modelStore.loadServerModels()])
 })
-
-async function loadKnowledgeBases(): Promise<void> {
-  if (kbsLoaded.value) {
-    return
-  }
-  try {
-    const res = await apiListKbs()
-    kbs.value = res.data ?? []
-    kbsLoaded.value = true
-  } catch (err) {
-    message.error((err as Error).message || '知识库加载失败')
-  }
-}
-
-function handleKbChange(): void {
-  // 切换知识库时重置会话
-  chat.currentSessionId = null
-  chat.messages = []
-}
 
 function handleNew(): void {
   chat.currentSessionId = null
@@ -260,7 +226,7 @@ async function handleSend(content: string): Promise<void> {
   await streamChat(
     {
       sessionId,
-      knowledgeBaseId: chat.knowledgeBaseId,
+      knowledgeBaseId: null,
       content,
       ...(serverModel ? { serverModel } : {}),
       ...(modelConfig ? { model: modelConfig.model, baseUrl: modelConfig.baseUrl, apiKey: modelConfig.apiKey } : {})
@@ -415,10 +381,6 @@ watch(
 
   .chat-page__toolbar {
     gap: 8px;
-  }
-
-  .chat-page__kb-select {
-    width: 120px !important;
   }
 
   .chat-page__list {
