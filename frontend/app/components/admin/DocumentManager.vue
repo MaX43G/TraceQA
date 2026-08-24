@@ -114,7 +114,7 @@ async function load(): Promise<void> {
   const res = await apiListKbs()
   kbs.value = res.data ?? []
   if (kbs.value.length > 0 && selectedKbId.value === null) {
-    selectedKbId.value = kbs.value[0].id
+    selectedKbId.value = kbs.value[0]?.id || null
     await loadDocs()
   }
 }
@@ -173,7 +173,7 @@ async function handleRefreshAll(): Promise<void> {
   }
   refreshing.value = true
   try {
-    await Promise.all(docs.value.map((d) => apiRefresh({ id: d.id }).catch(() => null)))
+    await Promise.all(docs.value.map((d) => apiRefresh({ id: d.id || 0 }).catch(() => null)))
     message.success('状态已刷新')
   } catch {
     message.error('刷新失败，请稍后重试')
@@ -222,7 +222,7 @@ async function handleBatchUpload(options: Record<string, unknown>): Promise<void
 
 async function handleDelete(record: DocumentVO): Promise<void> {
   try {
-    await apiDeleteDoc({ id: record.id })
+    await apiDeleteDoc({ id: record.id || 0 })
     message.success('已删除')
     await loadDocs()
   } catch (err) {

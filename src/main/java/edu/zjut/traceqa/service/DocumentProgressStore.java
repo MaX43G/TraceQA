@@ -23,11 +23,6 @@ public class DocumentProgressStore {
     /** 每个文档的切分子块 track_id 列表（用于按需刷新时逐个查询状态） */
     private final ConcurrentMap<Long, List<String>> trackIds = new ConcurrentHashMap<>();
 
-    /** 注册文档进度（初始化占位） */
-    public void register(Long documentId, DocumentProgressVO initial) {
-        snapshots.put(documentId, initial);
-    }
-
     /** 更新文档进度快照 */
     public void update(DocumentProgressVO progress) {
         snapshots.put(progress.getDocumentId(), progress);

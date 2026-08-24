@@ -93,15 +93,13 @@ services:
       # 服务
       PORT: 9621
       WORKING_DIR: /app/data/rag_storage
-      # 鉴权：设置 LIGHTRAG_API_KEY 后，所有 API 与 WebUI(/webui) 均需
-      # X-API-Key 请求头（或 WebUI 登录）验证；未设置则完全开放（不安全）
-      LIGHTRAG_API_KEY: ${LIGHTRAG_API_KEY:-}
-      # 仅放行 /health 存活探测；其余端点（含默认开放的 /api/* Ollama 模拟）一律要求 API Key
+      # 反向代理前缀：WebUI 与所有 API 都挂在该前缀下，仅经后端 /lightrag-webui/** 代理访问
+      LIGHTRAG_API_PREFIX: /lightrag-webui
+      # 鉴权由后端反向代理（管理员 Cookie）统一承担，故不再为 LightRAG 配置 API Key 与 WebUI 账号，
+      # LightRAG 仅限 Docker 内网访问，不对外暴露端口
+      LIGHTRAG_API_KEY: ""
+      AUTH_ACCOUNTS: ""
       WHITELIST_PATHS: /health
-      # WebUI 账号鉴权（必配）：仅配 API Key 时 WebUI 以 Guest 身份打开，无法执行文档操作。
-      # 配置后 /webui 需管理员账号密码登录；AUTH_ACCOUNTS 格式：用户名:{bcrypt}bcrypt哈希 或明文 用户名:密码
-      # 生成 bcrypt 哈希：docker run --rm ghcr.io/hkuds/lightrag:latest lightrag-hash-password --username admin
-      AUTH_ACCOUNTS: ${LIGHTRAG_AUTH_ACCOUNTS:-}
       TOKEN_SECRET: ${LIGHTRAG_TOKEN_SECRET:-}
       TOKEN_EXPIRE_HOURS: ${LIGHTRAG_TOKEN_EXPIRE_HOURS:-48}
     volumes:
@@ -131,7 +129,7 @@ services:
       MYSQL_USER: ${MYSQL_USER:-traceqa}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traceqa123}
       LIGHTRAG_BASE_URL: http://lightrag:9621
-      LIGHTRAG_API_KEY: ${LIGHTRAG_API_KEY:-}
+      LIGHTRAG_API_KEY: ""
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-THUDM/GLM-4-32B-0414}

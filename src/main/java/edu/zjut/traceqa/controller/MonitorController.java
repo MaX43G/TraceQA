@@ -2,11 +2,14 @@ package edu.zjut.traceqa.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
 import edu.zjut.traceqa.common.api.ApiResponse;
+import edu.zjut.traceqa.common.config.LightRagWebuiSessionStore;
 import edu.zjut.traceqa.service.LightRagMonitorService;
 import edu.zjut.traceqa.service.MonitorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,6 +30,9 @@ public class MonitorController {
 
     @Resource
     private LightRagMonitorService lightRagMonitorService;
+
+    @Resource
+    private LightRagWebuiSessionStore webuiSessionStore;
 
     @Operation(summary = "查询系统运行指标")
     @SaCheckRole("ADMIN")
@@ -68,5 +74,20 @@ public class MonitorController {
     @PostMapping("/lightrag/scan")
     public ApiResponse<Map<String, Object>> scan() {
         return ApiResponse.ok(lightRagMonitorService.scanDocuments());
+    }
+
+    @Operation(summary = "获取 LightRAG WebUI 访问会话（签发短期 HttpOnly Cookie，供反向代理鉴权）")
+    @SaCheckRole("ADMIN")
+    @PostMapping("/lightrag/webui-session")
+    public ApiResponse<Void> webuiSession(HttpServletResponse response) {
+        String token = webuiSessionStore.create();
+        Cookie cookie = new Cookie("tq_webui", token);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(false);
+        cookie.setPath("/lightrag-webui");
+        cookie.setMaxAge(60 * 60);
+        cookie.setAttribute("SameSite", "Lax");
+        response.addCookie(cookie);
+        return ApiResponse.ok();
     }
 }

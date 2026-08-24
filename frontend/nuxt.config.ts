@@ -87,6 +87,10 @@ export default defineNuxtConfig({
     '/api/**': {
       proxy: `${process.env.API_PROXY_TARGET || 'http://localhost:8080'}/api/**`
     },
+    // LightRAG WebUI：经后端反向代理（管理员 Cookie 鉴权）转发，不暴露真实端口
+    '/lightrag-webui/**': {
+      proxy: `${process.env.API_PROXY_TARGET || 'http://localhost:8080'}/lightrag-webui/**`
+    },
     // 页面 HTML 不缓存，避免浏览器加载旧版 JS（新版部署后状态图等失效）
     '/': { headers: { 'Cache-Control': 'no-store' } },
     '/chat': { headers: { 'Cache-Control': 'no-store' } },
