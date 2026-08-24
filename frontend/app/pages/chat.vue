@@ -244,11 +244,15 @@ async function handleSend(content: string): Promise<void> {
       onDone: () => {
         streamMsg.streaming = false
         streamMsg.content = streamMsg.buffer
+        // 回答已完成即解除输入锁定（onEnd 可能因 SSE 连接未及时关闭而不触发）
+        chat.generating = false
       },
       onError: (err) => {
         streamMsg.streaming = false
         streamMsg.content = streamMsg.buffer || err.msg || '服务异常'
         message.error(err.msg || 'AI 服务暂时不可用')
+        // 出错即解除输入锁定，避免持续禁用
+        chat.generating = false
       },
       onEnd: async () => {
         chat.generating = false
