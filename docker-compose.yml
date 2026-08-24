@@ -91,12 +91,23 @@ services:
       # 服务
       PORT: 9621
       WORKING_DIR: /app/data/rag_storage
+      # 鉴权：设置 LIGHTRAG_API_KEY 后，所有 API 与 WebUI(/webui) 均需
+      # X-API-Key 请求头（或 WebUI 登录）验证；未设置则完全开放（不安全）
+      LIGHTRAG_API_KEY: ${LIGHTRAG_API_KEY:-}
+      # 仅放行 /health 存活探测；其余端点（含默认开放的 /api/* Ollama 模拟）一律要求 API Key
+      WHITELIST_PATHS: /health
+      # WebUI 账号鉴权（必配）：仅配 API Key 时 WebUI 以 Guest 身份打开，无法执行文档操作。
+      # 配置后 /webui 需管理员账号密码登录；AUTH_ACCOUNTS 格式：用户名:{bcrypt}bcrypt哈希 或明文 用户名:密码
+      # 生成 bcrypt 哈希：docker run --rm ghcr.io/hkuds/lightrag:latest lightrag-hash-password --username admin
+      AUTH_ACCOUNTS: ${LIGHTRAG_AUTH_ACCOUNTS:-}
+      TOKEN_SECRET: ${LIGHTRAG_TOKEN_SECRET:-}
+      TOKEN_EXPIRE_HOURS: ${LIGHTRAG_TOKEN_EXPIRE_HOURS:-48}
     volumes:
       - traceqa-lightrag-data:/app/data
     ports:
       - "9621:9621"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:9621/docs', timeout=5)"]
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:9621/health', timeout=5)"]
       interval: 15s
       timeout: 8s
       retries: 10
