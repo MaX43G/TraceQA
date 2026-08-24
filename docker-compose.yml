@@ -25,7 +25,8 @@ services:
       - ./src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - traceqa-mysql-data:/var/lib/mysql
     ports:
-      - "3306:3306"
+      # 映射到宿主机 6118，供外部访问
+      - "6118:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root123456}"]
       interval: 10s
@@ -42,7 +43,8 @@ services:
     volumes:
       - traceqa-redis-data:/data
     ports:
-      - "6379:6379"
+      # 映射到宿主机 6117，供外部访问
+      - "6117:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
