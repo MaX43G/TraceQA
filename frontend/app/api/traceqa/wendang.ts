@@ -79,15 +79,15 @@ export async function delete2(
   });
 }
 
-/** 文档解析进度 SSE（先补发快照，再轮询推送） GET /api/documents/${param0}/progress */
-export async function progress(
+/** 按需刷新文档解析状态 POST /api/documents/${param0}/refresh */
+export async function refresh(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.progressParams,
+  params: API.delete2Params,
   options?: { [key: string]: any }
 ) {
   const { id: param0, ...queryParams } = params;
-  return request<API.SseEmitter>(`/api/documents/${param0}/progress`, {
-    method: "GET",
+  return request<API.ApiResponseListDocumentVO>(`/api/documents/${param0}/refresh`, {
+    method: "POST",
     params: { ...queryParams },
     ...(options || {}),
   });

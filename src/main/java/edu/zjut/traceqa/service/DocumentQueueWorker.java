@@ -129,7 +129,7 @@ public class DocumentQueueWorker {
         }
         processingCount.incrementAndGet();
         try {
-            return parseWorker.parse(doc, content, doc.getOriginalName());
+            return parseWorker.submit(doc, content, doc.getOriginalName());
         } finally {
             processingCount.decrementAndGet();
         }

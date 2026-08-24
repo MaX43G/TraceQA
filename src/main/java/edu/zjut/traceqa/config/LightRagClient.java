@@ -237,6 +237,83 @@ public class LightRagClient {
         }
     }
 
+    /** 查询文档索引流水线状态（是否繁忙、批次进度、是否需恢复等） */
+    public Map<String, Object> getPipelineStatus() {
+        return getJson("/documents/pipeline_status");
+    }
+
+    /** 查询文档按状态统计（PENDING/PROCESSING/PREPROCESSED/PROCESSED/FAILED） */
+    public Map<String, Object> getStatusCounts() {
+        return getJson("/documents/status_counts");
+    }
+
+    /** 查询图谱热门标签（按节点度排序，最连通的实体） */
+    public Map<String, Object> getPopularLabels(int limit) {
+        return getJson("/graph/label/popular?limit=" + limit);
+    }
+
+    /** 查询 LightRAG 可用模型（Ollama 兼容 /api/tags） */
+    public Map<String, Object> getModels() {
+        return getJson("/api/tags");
+    }
+
+    /** 查询当前加载运行的模型（Ollama 兼容 /api/ps） */
+    public Map<String, Object> getRunningModels() {
+        return getJson("/api/ps");
+    }
+
+    /** 重试 LightRAG 中解析失败的文档 */
+    public Map<String, Object> reprocessFailed() {
+        return postJson("/documents/reprocess_failed", null);
+    }
+
+    /** 清空 LightRAG 缓存 */
+    public Map<String, Object> clearCache() {
+        return postJson("/documents/clear_cache", Map.of());
+    }
+
+    /** 取消当前运行的索引流水线 */
+    public Map<String, Object> cancelPipeline() {
+        return postJson("/documents/cancel_pipeline", null);
+    }
+
+    /** 触发 LightRAG 目录扫描 */
+    public Map<String, Object> scanDocuments() {
+        return postJson("/documents/scan", null);
+    }
+
+    /** 发送 GET 请求并解析 JSON（失败统一抛 BizException） */
+    private Map<String, Object> getJson(String uri) {
+        try {
+            return parseJson(restClient.get().uri(uri).retrieve().body(String.class));
+        } catch (RestClientResponseException e) {
+            log.warn("LightRAG GET 失败：uri={}, status={}", uri, e.getStatusCode());
+            throw new BizException(ErrorCode.LLM_UNAVAILABLE, "知识图谱服务暂时不可用，请稍后再试");
+        } catch (Exception e) {
+            log.warn("LightRAG GET 异常：uri={}, err={}", uri, e.getMessage());
+            throw new BizException(ErrorCode.LLM_UNAVAILABLE, "知识图谱服务暂时不可用，请稍后再试");
+        }
+    }
+
+    /** 发送 POST 请求并解析 JSON（失败统一抛 BizException） */
+    private Map<String, Object> postJson(String uri, Object body) {
+        try {
+            String resp;
+            if (body == null) {
+                resp = restClient.post().uri(uri).retrieve().body(String.class);
+            } else {
+                resp = restClient.post().uri(uri).body(body).retrieve().body(String.class);
+            }
+            return parseJson(resp);
+        } catch (RestClientResponseException e) {
+            log.warn("LightRAG POST 失败：uri={}, status={}", uri, e.getStatusCode());
+            throw new BizException(ErrorCode.LLM_UNAVAILABLE, "知识图谱服务暂时不可用，请稍后再试");
+        } catch (Exception e) {
+            log.warn("LightRAG POST 异常：uri={}, err={}", uri, e.getMessage());
+            throw new BizException(ErrorCode.LLM_UNAVAILABLE, "知识图谱服务暂时不可用，请稍后再试");
+        }
+    }
+
     /** 组装 multipart 上传体 */
     private MultiValueMap<String, Object> buildUploadBody(byte[] content, String filename) {
         MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();

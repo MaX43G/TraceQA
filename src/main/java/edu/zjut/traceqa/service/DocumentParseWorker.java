@@ -2,10 +2,10 @@ package edu.zjut.traceqa.service;
 
 import jakarta.annotation.Resource;
 import edu.zjut.traceqa.common.enums.DocumentStatus;
-import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.exception.BizException;
 import edu.zjut.traceqa.config.LightRagClient;
 import edu.zjut.traceqa.model.vo.DocumentProgressVO;
+import edu.zjut.traceqa.model.vo.DocumentVO;
 import edu.zjut.traceqa.model.po.Document;
 import edu.zjut.traceqa.mapper.DocumentMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -23,11 +23,13 @@ import java.util.Map;
 /**
  * 文档解析服务。
  *
- * <p>由 {@link DocumentQueueWorker}（Redis Stream 队列消费者）同步调用，执行
- * LightRAG 文档解析与进度追踪。超大文件切块、限速提交、进度聚合均在此完成。</p>
+ * <p>由 {@link DocumentQueueWorker}（Redis Stream 队列消费者）同步调用。文档提交
+ * 阶段仅做「切块 + 限速上传 LightRAG」，**不进行后端轮询**；LightRAG 的抽取状态
+ * 由用户在管理端点击「刷新」时通过 {@link #refresh(Document)} 按需查询一次并聚合
+ * 更新，避免后台持续轮询占用系统资源。</p>
  *
  * <p>超大文件（PDF / 文本）自动切分为多个子块，逐块以限速间隔提交 LightRAG，
- * 每块独立 track_id 轮询，进度按「已完成块数 / 总块数」聚合展示，
+ * 每块独立 track_id，进度按「已完成块数 / 总块数」聚合展示，
  * 单块失败只影响该块，避免整篇重来与瞬时打爆限流。</p>
  */
 @Slf4j
@@ -43,10 +45,6 @@ public class DocumentParseWorker {
     @Resource
     private DocumentProgressStore progressStore;
 
-    /** 解析轮询间隔（毫秒） */
-    private static final long POLL_INTERVAL_MS = 2000L;
-    /** 解析轮询最大次数（约 30 分钟/块，避免解析超时误报） */
-    private static final int MAX_POLL_TIMES = 900;
     /** 切分阈值：PDF 超过该字节数才切分 */
     private static final long SPLIT_THRESHOLD_BYTES = 2L * 1024 * 1024;
     /** PDF 每块目标字节数（约 4MB） */
@@ -73,53 +71,119 @@ public class DocumentParseWorker {
     }
 
     /**
-     * 同步执行 LightRAG 解析（由队列消费者调用），返回是否成功。
+     * 提交文档至 LightRAG（由队列消费者调用，仅上传不轮询），返回是否成功。
      *
-     * <p>超大文件自动切块逐块限速提交；失败时清理 LightRAG 中残留的失败记录
+     * <p>超大文件自动切块逐块限速提交，保存每个子块的 track_id；之后不再后台轮询，
+     * 由用户在前端点击「刷新」时按需查询。失败时清理 LightRAG 中残留的失败记录
      * （供队列重试时重新上传，避免内容去重拦截）。</p>
      */
-    public boolean parse(Document doc, byte[] content, String filename) {
+    public boolean submit(Document doc, byte[] content, String filename) {
         try {
-            // 1. 切分大文件为多块（PDF 按页、文本按大小），小文件为单块
             List<PartChunk> parts = splitParts(content, filename);
             int total = parts.size();
             doc.setPartTotal(total);
             doc.setPartDone(0);
             documentMapper.updateById(doc);
-            log.info("文档开始解析：{}，切分为 {} 块", doc.getOriginalName(), total);
+            log.info("文档开始提交：{}，切分为 {} 块", doc.getOriginalName(), total);
 
-            // 2. 逐块提交 + 轮询 + 限速
+            List<String> trackIds = new ArrayList<>();
+            // 逐块限速提交（仅上传，不轮询）
             for (int i = 0; i < total; i++) {
                 PartChunk part = parts.get(i);
                 String partName = total > 1 ? safePartName(part.name(), i + 1, total) : part.name();
-                // 提交当前块（上传成功即计入进度）
                 String trackId = lightRagClient.uploadDocument(part.bytes(), partName);
+                trackIds.add(trackId);
                 doc.setTrackId(trackId);
                 doc.setPartDone(i + 1);
                 documentMapper.updateById(doc);
                 updateStatus(doc, DocumentStatus.PROCESSING, uploadProgress(total, i + 1),
                         "已上传第 " + (i + 1) + "/" + total + " 块");
-                // 轮询该块解析状态（进度条停在「已上传百分比」）
-                parsePartAndWait(doc, i + 1, total);
-                updateStatus(doc, DocumentStatus.PROCESSING, uploadProgress(total, i + 1),
-                        "第 " + (i + 1) + "/" + total + " 块解析完成");
-                // 限速：块间间隔，避免瞬时打爆 API 限流
                 if (i < total - 1) {
                     sleepQuietly(PART_INTERVAL_MS);
                 }
             }
-            updateStatus(doc, DocumentStatus.DONE, 100, "解析完成");
+            progressStore.putTrackIds(doc.getId(), trackIds);
+            updateStatus(doc, DocumentStatus.PROCESSING, uploadProgress(total, total),
+                    "全部 " + total + " 块已提交，等待 LightRAG 抽取（可点击刷新查看进度）");
             return true;
         } catch (BizException e) {
             failDocument(doc, e.getMessage());
             cleanupFailedLightRag(doc);
             return false;
         } catch (Exception e) {
-            log.error("文档解析异常：{}", doc.getOriginalName(), e);
-            failDocument(doc, "解析失败，请稍后重试");
+            log.error("文档提交异常：{}", doc.getOriginalName(), e);
+            failDocument(doc, "提交失败，请稍后重试");
             cleanupFailedLightRag(doc);
             return false;
         }
+    }
+
+    /**
+     * 按需刷新文档解析状态（由前端「刷新」按钮触发）。
+     *
+     * <p>逐个查询该文档各子块的 LightRAG track_status 一次，聚合后更新数据库与进度
+     * 快照并返回最新 {@link DocumentVO}。任意块失败即整篇失败；全部完成即 DONE；
+     * 否则保持 PROCESSING。</p>
+     */
+    public DocumentVO refresh(Document doc) {
+        List<String> trackIds = progressStore.getTrackIds(doc.getId());
+        if ((trackIds == null || trackIds.isEmpty())
+                && doc.getTrackId() != null && !doc.getTrackId().isBlank()) {
+            trackIds = List.of(doc.getTrackId());
+        }
+        if (trackIds == null || trackIds.isEmpty()) {
+            return DocumentVO.of(doc);
+        }
+
+        int total = trackIds.size();
+        int done = 0;
+        int failed = 0;
+        int chunk = 0;
+        int entity = 0;
+        int relation = 0;
+        for (String trackId : trackIds) {
+            try {
+                Map<String, Object> status = lightRagClient.queryTrackStatus(trackId);
+                String state = resolveDocState(status);
+                if (isDoneState(state)) {
+                    done++;
+                    Map<?, ?> stats = firstDocMap(status);
+                    chunk += intOf(stats == null ? null : stats.get("chunks_count"));
+                    entity += intOf(stats == null ? null : stats.get("entities_count"));
+                    relation += intOf(stats == null ? null : stats.get("relations_count"));
+                } else if (isFailedState(state)) {
+                    failed++;
+                }
+            } catch (Exception e) {
+                log.debug("刷新查询异常（视为处理中）：trackId={}, err={}", trackId, e.getMessage());
+            }
+        }
+
+        String message;
+        if (failed > 0) {
+            doc.setStatus(DocumentStatus.FAILED.name());
+            doc.setErrorMsg("LightRAG 解析失败（" + failed + "/" + total + " 块）");
+            message = doc.getErrorMsg();
+        } else if (done == total) {
+            doc.setStatus(DocumentStatus.DONE.name());
+            doc.setErrorMsg(null);
+            message = "解析完成";
+        } else {
+            doc.setStatus(DocumentStatus.PROCESSING.name());
+            message = "图谱构建中（向量检索已可用），已完成 " + done + "/" + total + " 块";
+        }
+        doc.setPartDone(done);
+        doc.setChunkCount(chunk);
+        doc.setEntityCount(entity);
+        doc.setRelationCount(relation);
+        documentMapper.updateById(doc);
+        progressStore.update(new DocumentProgressVO(
+                doc.getId(), doc.getTrackId(), doc.getStatus(),
+                (int) Math.min(100, done * 100.0 / Math.max(1, total)),
+                doc.getPartTotal(), doc.getPartDone(),
+                chunk, entity, relation, message));
+        log.info("文档状态刷新：{}，status={}，done={}/{}", doc.getOriginalName(), doc.getStatus(), done, total);
+        return DocumentVO.of(doc);
     }
 
     /** 清理 LightRAG 中该文档的失败记录（重试前删除，避免内容去重拦截） */
@@ -228,29 +292,6 @@ public class DocumentParseWorker {
         return base + "_part" + index + "of" + total + ext;
     }
 
-    /** 轮询单块解析状态直至完成 */
-    private void parsePartAndWait(Document doc, int partIndex, int total) {
-        int poll = 0;
-        while (poll < MAX_POLL_TIMES) {
-            Map<String, Object> status = lightRagClient.queryTrackStatus(doc.getTrackId());
-            String state = resolveDocState(status);
-            if (isDoneState(state)) {
-                accumulateStats(doc, status);
-                return;
-            }
-            if (isFailedState(state)) {
-                throw new BizException(ErrorCode.FILE_ERROR,
-                        "LightRAG 解析失败（第 " + partIndex + "/" + total + " 块）");
-            }
-            poll++;
-            updateStatus(doc, DocumentStatus.PROCESSING,
-                    uploadProgress(total, doc.getPartDone()),
-                    "第 " + partIndex + "/" + total + " 块图谱构建中（向量检索已可用）");
-            sleepQuietly(POLL_INTERVAL_MS);
-        }
-        throw new BizException(ErrorCode.FILE_ERROR, "解析超时，请稍后重试");
-    }
-
     /** 从 LightRAG 状态响应中解析文档状态（取 documents 数组首个元素） */
     private String resolveDocState(Map<String, Object> status) {
         Object docs = status.get("documents");
@@ -264,6 +305,18 @@ public class DocumentParseWorker {
         return state == null ? "processing" : String.valueOf(state);
     }
 
+    /** 取 LightRAG 状态响应 documents 数组首个元素，无则返回 null */
+    private Map<?, ?> firstDocMap(Map<String, Object> status) {
+        Object docs = status.get("documents");
+        if (docs instanceof List<?> documentList && !documentList.isEmpty()) {
+            Object first = documentList.get(0);
+            if (first instanceof Map<?, ?> docMap) {
+                return docMap;
+            }
+        }
+        return null;
+    }
+
     /** 判断是否为完成状态 */
     private boolean isDoneState(String state) {
         return "processed".equalsIgnoreCase(state) || "completed".equalsIgnoreCase(state)
@@ -273,19 +326,6 @@ public class DocumentParseWorker {
     /** 判断是否为失败状态 */
     private boolean isFailedState(String state) {
         return "failed".equalsIgnoreCase(state) || "error".equalsIgnoreCase(state);
-    }
-
-    /** 将单块解析统计累加到文档（多块聚合） */
-    private void accumulateStats(Document doc, Map<String, Object> status) {
-        Object docs = status.get("documents");
-        if (docs instanceof List<?> documentList && !documentList.isEmpty()) {
-            Object first = documentList.get(0);
-            if (first instanceof Map<?, ?> docMap) {
-                doc.setChunkCount(intOf(doc.getChunkCount()) + intOf(docMap.get("chunks_count")));
-                doc.setEntityCount(intOf(doc.getEntityCount()) + intOf(docMap.get("entities_count")));
-                doc.setRelationCount(intOf(doc.getRelationCount()) + intOf(docMap.get("relations_count")));
-            }
-        }
     }
 
     /** 更新文档状态与进度 */

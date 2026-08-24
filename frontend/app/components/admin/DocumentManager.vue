@@ -31,6 +31,10 @@
           </a-button>
         </a-tooltip>
       </a-upload>
+      <a-button :disabled="!docs.length" :loading="refreshing" @click="handleRefreshAll">
+        <template #icon><ReloadOutlined /></template>
+        刷新
+      </a-button>
     </div>
     <div v-if="queueStats" class="queue-stats">
       <span class="queue-stats__label">解析队列：</span>
@@ -64,13 +68,13 @@
 <script setup lang="ts">
 /**
  * 文档管理（管理员）：上传后异步解析（202 Accepted），
- * 状态列仅以标签展示（解析中/已完成/失败等），解析结束后自动刷新列表。
+ * 状态列仅以标签展示（解析中/已完成/失败等）；顶部「刷新状态」按钮一键刷新整表。
  */
-import { UploadOutlined, FileZipOutlined } from '@ant-design/icons-vue'
+import { UploadOutlined, FileZipOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import ConfirmDelete from '@/components/common/ConfirmDelete.vue'
 import { list1 as apiListKbs } from '@/api/traceqa/zhishiku'
-import { upload, delete2 as apiDeleteDoc, listByKb } from '@/api/traceqa/wendang'
+import { upload, refresh as apiRefresh, delete2 as apiDeleteDoc, listByKb } from '@/api/traceqa/wendang'
 import { getAuthHeaders } from '@/utils/request'
 import type { KnowledgeBaseDTO, DocumentVO } from '@/utils/api-types'
 
@@ -91,6 +95,8 @@ const loading = ref(false)
 const uploading = ref(false)
 /** 解析队列统计 */
 const queueStats = ref<{ pending?: number; processing?: number; dead?: number } | null>(null)
+/** 是否正在批量刷新状态 */
+const refreshing = ref(false)
 
 async function loadQueueStats(): Promise<void> {
   try {
@@ -137,7 +143,7 @@ function handleBeforeUpload(file: File): boolean {
   return true
 }
 
-/** 自定义上传：调用后端接口并跟踪解析进度 */
+/** 自定义上传：调用后端接口提交解析，进度由「刷新」按钮按需获取 */
 async function handleUpload(options: Record<string, unknown>): Promise<void> {
   const file = options.file as File
   const kbId = selectedKbId.value
@@ -151,11 +157,7 @@ async function handleUpload(options: Record<string, unknown>): Promise<void> {
     if (!uploadData) {
       throw new Error('上传失败')
     }
-    message.success('上传成功，正在后台解析')
-    await loadDocs()
-    // 通过 SSE 等待解析结束，结束后刷新列表展示最终状态标签
-    await trackProgress(uploadData.documentId)
-    // 解析结束后刷新列表
+    message.success('上传成功，正在后台解析，可点击「刷新」查看进度')
     await loadDocs()
   } catch (err) {
     message.error((err as Error).message || '上传失败')
@@ -164,45 +166,20 @@ async function handleUpload(options: Record<string, unknown>): Promise<void> {
   }
 }
 
-/** 消费文档解析进度 SSE：等待解析结束（成功/失败）后返回，由调用方刷新列表 */
-async function trackProgress(documentId: number): Promise<void> {
+/** 一键刷新当前表格中全部文档的解析状态（逐个查询 LightRAG），随后重载列表 */
+async function handleRefreshAll(): Promise<void> {
+  if (!docs.value.length || refreshing.value) {
+    return
+  }
+  refreshing.value = true
   try {
-    const res = await fetch(`/api/documents/${documentId}/progress`, {
-      headers: getAuthHeaders()
-    })
-    if (!res.body) {
-      return
-    }
-    const reader = res.body.getReader()
-    const decoder = new TextDecoder('utf-8')
-    let buffer = ''
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) {
-        break
-      }
-      buffer += decoder.decode(value, { stream: true })
-      let sep: number
-      while ((sep = buffer.indexOf('\n\n')) !== -1) {
-        const block = buffer.slice(0, sep)
-        buffer = buffer.slice(sep + 2)
-        const dataLine = block
-          .split('\n')
-          .find((l) => l.startsWith('data:'))
-        if (dataLine) {
-          try {
-            const payload = JSON.parse(dataLine.slice(5).trim())
-            if (payload.status === 'DONE' || payload.status === 'FAILED') {
-              return
-            }
-          } catch {
-            // 忽略解析失败的块
-          }
-        }
-      }
-    }
+    await Promise.all(docs.value.map((d) => apiRefresh({ id: d.id }).catch(() => null)))
+    message.success('状态已刷新')
   } catch {
-    // SSE 中断：忽略，下次刷新列表可见最终状态
+    message.error('刷新失败，请稍后重试')
+  } finally {
+    refreshing.value = false
+    await loadDocs()
   }
 }
 

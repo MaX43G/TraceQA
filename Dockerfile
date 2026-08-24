@@ -8,6 +8,18 @@ FROM eclipse-temurin:25-jdk AS build
 WORKDIR /app
 
 # 利用 Maven Wrapper 下载依赖（only-script 分发，自动拉取 Maven）
+RUN mkdir -p /root/.m2 && \
+    echo '<?xml version="1.0" encoding="UTF-8"?>\
+<settings>\
+  <mirrors>\
+    <mirror>\
+      <id>aliyun</id>\
+      <mirrorOf>central</mirrorOf>\
+      <name>Aliyun Maven Mirror</name>\
+      <url>https://maven.aliyun.com/repository/public</url>\
+    </mirror>\
+  </mirrors>\
+</settings>' > /root/.m2/settings.xml
 COPY .mvn .mvn
 COPY mvnw pom.xml ./
 RUN chmod +x mvnw && ./mvnw -q -DskipTests dependency:go-offline

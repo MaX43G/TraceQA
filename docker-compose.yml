@@ -107,7 +107,7 @@ services:
     volumes:
       - traceqa-lightrag-data:/app/data
     ports:
-      - "9621:9621"
+      - "6116:9621"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:9621/health', timeout=5)"]
       interval: 15s
@@ -141,7 +141,7 @@ services:
     volumes:
       - traceqa-backend-data:/app/data
     ports:
-      - "8080:8080"
+      - "6114:8080"
     depends_on:
       mysql:
         condition: service_healthy
@@ -160,7 +160,7 @@ services:
     container_name: traceqa-frontend
     restart: unless-stopped
     ports:
-      - "80:3000"
+      - "6115:3000"
     depends_on:
       - backend
 

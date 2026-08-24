@@ -10,7 +10,6 @@ import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.exception.BizException;
 import edu.zjut.traceqa.config.AppProperties;
 import edu.zjut.traceqa.model.vo.BatchUploadVO;
-import edu.zjut.traceqa.model.vo.DocumentProgressVO;
 import edu.zjut.traceqa.model.vo.DocumentUploadVO;
 import edu.zjut.traceqa.model.vo.DocumentVO;
 import edu.zjut.traceqa.model.po.Document;
@@ -56,6 +55,8 @@ public class DocumentService {
     private DocumentProgressStore progressStore;
     @Resource
     private DocumentQueueWorker documentQueueWorker;
+    @Resource
+    private DocumentParseWorker parseWorker;
     @Resource
     private KnowledgeBaseService knowledgeBaseService;
 
@@ -167,9 +168,13 @@ public class DocumentService {
         log.info("文档已删除：{}", doc.getOriginalName());
     }
 
-    /** 获取文档进度快照（供 SSE 重连补发） */
-    public DocumentProgressVO getProgress(Long documentId) {
-        return progressStore.get(documentId);
+    /** 按需刷新文档解析状态（前端「刷新」按钮触发），返回最新文档信息 */
+    public DocumentVO refreshProgress(Long id) {
+        Document doc = documentMapper.selectById(id);
+        if (doc == null) {
+            throw new BizException(ErrorCode.NOT_FOUND, "文档不存在");
+        }
+        return parseWorker.refresh(doc);
     }
 
     /** 解析队列统计（待处理/处理中/死信），供管理后台可视化 */
