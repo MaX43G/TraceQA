@@ -7,11 +7,13 @@
 FROM node:latest AS build
 WORKDIR /app
 
-# 使用国内镜像源
-RUN pnpm config set registry https://registry.npmmirror.com
+RUN npm config set registry https://registry.npmmirror.com
 
 # 启用 corepack 以使用 pnpm
 RUN npm install -g corepack && corepack enable
+
+# 使用国内镜像源（必须在 pnpm 可用之后）
+RUN pnpm config set registry https://registry.npmmirror.com
 
 # 先安装依赖（利用层缓存）
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
