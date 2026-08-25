@@ -115,7 +115,7 @@ cd frontend && pnpm gen:api   # 依据 http://localhost:8080/v3/api-docs 生成 
 
 ## 6. 模型体系
 
-- **服务端模型**：`app.models` 配置（默认 GLM-4-32B + 其余 5 个），共享硅基流动 Key/URL，前端一键切换（`serverModel` 字段）。
+- **服务端模型**：`app.models` 配置（默认 GLM-4-9B + 其余 5 个），共享硅基流动 Key/URL，前端一键切换（`serverModel` 字段）。
 - **自定义模型**：用户填 OpenAI 兼容 Base URL/Key/模型名，**仅存浏览器 localStorage**，随请求发送（不持久化）。
 - 模型路由（`RagAgentOrchestrator.toLlmConfig`）：
   - `serverModel` → 平台默认 URL/Key + 选中模型（OpenAiCompatClient）

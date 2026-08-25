@@ -85,7 +85,7 @@
 
 | 模型 | 名称 |
 | --- | --- |
-| **默认** | `THUDM/GLM-4-32B-0414` |
+| **默认** | `THUDM/GLM-4-9B-0414` |
 | GLM-4-9B | `THUDM/GLM-4-9B-0414` |
 | DeepSeek-R1-0528 | `deepseek-ai/DeepSeek-R1-0528-Qwen3-8B` |
 | Qwen3-8B | `Qwen/Qwen3-8B` |

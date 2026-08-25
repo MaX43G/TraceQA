@@ -132,7 +132,7 @@ services:
       LIGHTRAG_API_KEY: ""
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn}
       LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-THUDM/GLM-4-32B-0414}
+      LLM_MODEL: ${LLM_MODEL:-THUDM/GLM-4-9B-0414}
       APP_JWT_SECRET: ${APP_JWT_SECRET:-traceqa-prod-secret-change-me-please-2026}
       APP_STORAGE_ROOT: /app/data/files
       TZ: Asia/Shanghai

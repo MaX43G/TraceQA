@@ -30,7 +30,7 @@ spring:
         timeout: 30s
         max-retries: 1
         options:
-          model: ${LLM_MODEL:THUDM/GLM-4-32B-0414}
+          model: ${LLM_MODEL:THUDM/GLM-4-9B-0414}
           temperature: 0.3
 
 # sa-token 认证配置
@@ -89,9 +89,6 @@ app:
   # 可用模型列表（模型选择功能；默认模型名称取自 spring.ai.openai 配置）
   # 服务端模型共享硅基流动的 API Key / Base URL，可在前端一键切换
   models:
-    - name: GLM-4-32B
-      model: ${LLM_MODEL:THUDM/GLM-4-32B-0414}
-      baseUrl: https://api.siliconflow.cn/v1
     - name: GLM-4-9B
       model: THUDM/GLM-4-9B-0414
       baseUrl: https://api.siliconflow.cn/v1
