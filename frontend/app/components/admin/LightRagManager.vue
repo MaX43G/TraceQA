@@ -64,6 +64,35 @@
         </a-col>
       </a-row>
 
+      <!-- 可观测性：抽取进度 + 任务耗时 -->
+      <a-row :gutter="16" style="margin-top: 16px">
+        <a-col :span="12">
+          <a-card size="small" title="抽取进度">
+            <template v-if="extractionStats.totalChunks">
+              <a-progress
+                :percent="extractionPercent"
+                size="small"
+                :status="pipeline?.busy ? 'active' : 'normal'"
+              />
+              <span class="lightrag-sub">
+                已处理 {{ extractionStats.processedChunks }} / {{ extractionStats.totalChunks }} 块，
+                共抽取 {{ extractionStats.entities }} 实体 + {{ extractionStats.relations }} 关系
+              </span>
+            </template>
+            <a-empty v-else description="暂无抽取任务" :image="false" />
+          </a-card>
+        </a-col>
+        <a-col :span="12">
+          <a-card size="small" title="任务耗时">
+            <div class="metric-value">{{ jobDuration || '-' }}</div>
+            <div class="lightrag-sub" style="margin-top: 4px">
+              开始时间：{{ pipeline?.job_start ? new Date(pipeline.job_start).toLocaleString() : '-' }}
+            </div>
+            <div class="lightrag-sub">最近消息：{{ pipeline?.latest_message || '-' }}</div>
+          </a-card>
+        </a-col>
+      </a-row>
+
       <a-row :gutter="16" style="margin-top: 16px">
         <a-col :span="12">
           <a-card size="small" title="图谱热门实体（Top 20）">
@@ -93,6 +122,21 @@
           </a-card>
         </a-col>
       </a-row>
+
+      <!-- 可观测性：运行日志控制台 -->
+      <a-card size="small" title="运行日志（最近）" style="margin-top: 16px">
+        <template v-if="recentMessages.length">
+          <div class="log-console">
+            <div
+              v-for="(msg, i) in recentMessages"
+              :key="i"
+              class="log-line"
+              :class="{ 'log-error': isErrorMsg(msg) }"
+            >{{ msg }}</div>
+          </div>
+        </template>
+        <a-empty v-else description="暂无日志" :image="false" />
+      </a-card>
     </template>
   </div>
 </template>
@@ -127,7 +171,7 @@ interface OllamaModel {
 
 interface LightragPanel {
   pipeline?: PipelineStatus
-  statusCounts?: Record<string, number>
+  statusCounts?: { status_counts?: Record<string, number> }
   models?: { models?: OllamaModel[] }
   runningModels?: { models?: OllamaModel[] }
   popularLabels?: string[]
@@ -151,9 +195,12 @@ const batchPercent = computed<number>(() => {
 })
 
 const statusList = computed<{ status: string; count: number }[]>(() => {
-  const counts = lightrag.value?.statusCounts ?? {}
+  // 后端返回 statusCounts.status_counts（如 pending/processing/processed/failed/all），
+  // 其中 all 为合计，不单独展示
+  const counts = lightrag.value?.statusCounts?.status_counts ?? {}
   return Object.entries(counts)
-    .map(([status, count]) => ({ status, count: Number(count) ?? 0 }))
+    .filter(([status]) => status !== 'all')
+    .map(([status, count]) => ({ status, count: Number(count) || 0 }))
     .sort((a, b) => statusOrder(a.status) - statusOrder(b.status))
 })
 
@@ -166,20 +213,91 @@ const modelCount = computed<number>(() => lightrag.value?.models?.models?.length
 
 const popularLabels = computed<string[]>(() => lightrag.value?.popularLabels ?? [])
 
+// ---- 可观测性增强 ----
+
+/** 从流水线日志中解析抽取统计：已处理块 / 总块 / 实体 / 关系 */
+const extractionStats = computed(() => {
+  const msgs = pipeline.value.history_messages ?? []
+  let processedChunks = 0
+  let totalChunks = 0
+  let entities = 0
+  let relations = 0
+  for (const msg of msgs) {
+    // 形如 "Chunk 5 of 316 extracted 17 Ent + 7 Rel doc-..."
+    const m = msg.match(/Chunk\s+(\d+)\s+of\s+(\d+)\s+extracted\s+(\d+)\s+Ent\s+\+\s+(\d+)\s+Rel/)
+    if (m) {
+      processedChunks = Math.max(processedChunks, Number(m[1]))
+      totalChunks = Number(m[2])
+      entities += Number(m[3])
+      relations += Number(m[4])
+    }
+  }
+  return { processedChunks, totalChunks, entities, relations }
+})
+
+const extractionPercent = computed<number>(() => {
+  const { processedChunks, totalChunks } = extractionStats.value
+  if (!totalChunks) {
+    return 0
+  }
+  return Math.round((processedChunks / totalChunks) * 100)
+})
+
+/** 运行日志（倒序，最新在前） */
+const recentMessages = computed<string[]>(() => [...(pipeline.value.history_messages ?? [])].reverse())
+
+/** 运行日志错误行标记 */
+function isErrorMsg(msg: string): boolean {
+  return /^(Failed|Traceback|Error|\[purge\])/i.test(msg) || /RateLimit|error|exception/i.test(msg)
+}
+
+/** 任务已运行时长（秒级刷新） */
+const jobDuration = ref('')
+
+function formatDuration(ms: number): string {
+  const s = Math.floor(ms / 1000)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = s % 60
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`
+}
+
+function refreshDuration(): void {
+  const start = pipeline.value.job_start
+  if (!start) {
+    jobDuration.value = ''
+    return
+  }
+  const diff = Math.max(0, Date.now() - new Date(start).getTime())
+  jobDuration.value = formatDuration(diff)
+}
+
 function statusOrder(status: string): number {
-  const order: Record<string, number> = { PENDING: 0, PREPROCESSED: 1, PROCESSING: 2, PROCESSED: 3, FAILED: 4 }
-  return order[status] ?? 99
+  const order: Record<string, number> = {
+    pending: 0,
+    parsing: 1,
+    analyzing: 2,
+    preprocessed: 3,
+    processing: 4,
+    processed: 5,
+    failed: 6
+  }
+  return order[status.toLowerCase()] ?? 99
 }
 
 function statusColor(status: string): string {
-  switch (status) {
-    case 'PROCESSED':
+  switch (status.toLowerCase()) {
+    case 'processed':
       return 'green'
-    case 'FAILED':
+    case 'failed':
       return 'red'
-    case 'PROCESSING':
+    case 'processing':
+    case 'analyzing':
       return 'blue'
-    case 'PENDING':
+    case 'pending':
+    case 'parsing':
+    case 'preprocessed':
       return 'orange'
     default:
       return 'default'
@@ -251,6 +369,8 @@ onMounted(() => {
   load()
   // 面板数据由后端带短缓存，自动轮询保持最新
   useIntervalFn(() => load(), 10000)
+  // 任务耗时秒级刷新
+  useIntervalFn(refreshDuration, 1000)
 })
 </script>
 
@@ -259,6 +379,11 @@ onMounted(() => {
   font-size: 12px;
   color: #86909c;
 }
+.metric-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1f2329;
+}
 .label-chip {
   margin: 2px;
 }
@@ -266,5 +391,23 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+.log-console {
+  max-height: 320px;
+  overflow-y: auto;
+  background: #1f2329;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.log-line {
+  color: #c9cdd4;
+}
+.log-line.log-error {
+  color: #ff7875;
 }
 </style>

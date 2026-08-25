@@ -17,9 +17,12 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Enumeration;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * LightRAG WebUI 反向代理过滤器。
@@ -34,6 +37,18 @@ public class LightRagWebuiProxyFilter extends OncePerRequestFilter {
 
     private static final String WEBUI_PREFIX = "/lightrag-webui/";
     private static final String SESSION_COOKIE = "tq_webui";
+
+    /**
+     * 匹配 HTML 中的根相对资源引用（href/src/action 属性与 JS 的 url: 键）。
+     * 用于把 LightRAG 生成的根绝对路径（如 {@code /static/swagger-ui/...}、{@code /openapi.json}）
+     * 加上反向代理前缀，使其能经 {@code /lightrag-webui/**} 正确转发，修复 WebUI 的
+     * Swagger 文档（FastAPI /docs）静态资源 404 / MIME 拒绝问题。
+     */
+    private static final Pattern ROOT_RESOURCE_REF = Pattern.compile(
+            "(?i)(href|src|action|url)\\s*(=|:)\\s*[\"']");
+
+    /** 根绝对路径前缀（用于判断资源是否已被加前缀，避免重复前缀） */
+    private static final String PREFIXED_ROOT = WEBUI_PREFIX;
 
     /** 不透传到上游的头（host/长度/连接/流式/我们的鉴权 cookie） */
     private static final Set<String> SKIP_REQUEST_HEADERS = Set.of(
@@ -114,14 +129,23 @@ public class LightRagWebuiProxyFilter extends OncePerRequestFilter {
                 }
                 values.forEach(v -> response.addHeader(name, v));
             });
-            response.flushBuffer();
 
-            try (InputStream in = upstream.body(); OutputStream out = response.getOutputStream()) {
-                byte[] buf = new byte[8192];
-                int n;
-                while ((n = in.read(buf)) != -1) {
-                    out.write(buf, 0, n);
-                    out.flush();
+            String contentType = upstream.headers().firstValue("content-type").orElse("");
+            if (contentType.toLowerCase().contains("text/html")) {
+                // HTML 需要改写根相对资源引用，故整体缓冲后再回写
+                byte[] body = upstream.body().readAllBytes();
+                String html = new String(body, StandardCharsets.ISO_8859_1);
+                String rewritten = rewriteRootRelativeUrls(html);
+                response.getOutputStream().write(rewritten.getBytes(StandardCharsets.ISO_8859_1));
+                response.getOutputStream().flush();
+            } else {
+                try (InputStream in = upstream.body(); OutputStream out = response.getOutputStream()) {
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = in.read(buf)) != -1) {
+                        out.write(buf, 0, n);
+                        out.flush();
+                    }
                 }
             }
         } catch (Exception e) {
@@ -136,6 +160,29 @@ public class LightRagWebuiProxyFilter extends OncePerRequestFilter {
                 }
             }
         }
+    }
+
+    /**
+     * 改写 HTML 中根相对（以单个 {@code /} 开头）的资源引用，为其加上 {@code /lightrag-webui}
+     * 前缀，使其经反向代理转发到 LightRAG；已带前缀或协议相对（{@code //}）的引用保持不变。
+     */
+    private String rewriteRootRelativeUrls(String html) {
+        Matcher matcher = ROOT_RESOURCE_REF.matcher(html);
+        StringBuffer sb = new StringBuffer(html.length() + 64);
+        while (matcher.find()) {
+            int pathStart = matcher.end();
+            boolean rootRelative = pathStart < html.length()
+                    && html.charAt(pathStart) == '/'
+                    && (pathStart + 1 >= html.length() || html.charAt(pathStart + 1) != '/');
+            boolean alreadyPrefixed = html.regionMatches(pathStart, PREFIXED_ROOT, 0, PREFIXED_ROOT.length());
+            if (rootRelative && !alreadyPrefixed) {
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group() + WEBUI_PREFIX));
+            } else {
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group()));
+            }
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
     }
 
     /** 组装请求体：GET/HEAD/DELETE 无体，其余读取原始字节转发 */

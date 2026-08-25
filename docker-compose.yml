@@ -66,12 +66,10 @@ services:
       OPENAI_API_KEY: ${LLM_API_KEY:-}
       OPENAI_BASE_URL: ${LIGHTRAG_LLM_BASE_URL:-https://api.siliconflow.cn/v1}
       LLM_MODEL: ${LIGHTRAG_LLM_MODEL:-Qwen/Qwen3.5-4B}
-      # 抽取并发优化：按硅基流动配额（1000 RPM / 80K TPM）调优
-      # TPM 是瓶颈 → 并发 4 匹配 80K TPM；RPM 充足无需担心调用次数
-      MAX_ASYNC_LLM: ${LIGHTRAG_MAX_ASYNC_LLM:-4}
-      MAX_ASYNC_EMBEDDING: 8
+      MAX_ASYNC_LLM: ${LIGHTRAG_MAX_ASYNC_LLM:-2}
+      MAX_ASYNC_EMBEDDING: ${LIGHTRAG_MAX_ASYNC_EMBEDDING:-4}
       # 单次抽取可并行提交的文档数（大文档多块时生效，避免瞬时打爆限流）
-      MAX_PARALLEL_INSERT: ${LIGHTRAG_MAX_PARALLEL_INSERT:-2}
+      MAX_PARALLEL_INSERT: ${LIGHTRAG_MAX_PARALLEL_INSERT:-1}
       LLM_MAX_RETRIES: 8
       # LLM 请求超时（秒）：硅基流动免费额度的 4B 小模型生成较慢，
       # 默认 480s 太紧容易在抽取中途被判定超时导致整篇失败，放宽到 900s

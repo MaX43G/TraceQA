@@ -31,20 +31,9 @@
         </a-col>
       </a-row>
 
-      <!-- 队列 + 会话 -->
+      <!-- 缓存 + 会话 -->
       <a-row :gutter="16" style="margin-top: 16px">
-        <a-col :span="8">
-          <a-card size="small" title="解析队列">
-            <a-descriptions :column="1" size="small">
-              <a-descriptions-item label="待处理">{{ data.queue?.pending }}</a-descriptions-item>
-              <a-descriptions-item label="处理中">{{ data.queue?.processing }}</a-descriptions-item>
-              <a-descriptions-item label="死信">
-                <a-tag :color="(data.queue?.dead ?? 0) > 0 ? 'red' : 'default'">{{ data.queue?.dead }}</a-tag>
-              </a-descriptions-item>
-            </a-descriptions>
-          </a-card>
-        </a-col>
-        <a-col :span="8">
+        <a-col :span="12">
           <a-card size="small" title="缓存统计">
             <a-descriptions :column="1" size="small">
               <a-descriptions-item label="命中">{{ data.cacheHits }}</a-descriptions-item>
@@ -52,7 +41,7 @@
             </a-descriptions>
           </a-card>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="12">
           <a-card size="small" title="在线会话（约）">
             <div class="metric-value">{{ data.activeSessions }}</div>
           </a-card>
@@ -85,7 +74,7 @@
 
 <script setup lang="ts">
 /**
- * 系统监控面板：展示请求量/延迟/缓存命中/熔断/队列/异常等后端运行指标（管理员）。
+ * 系统监控面板：展示请求量/延迟/缓存命中/熔断/会话/异常等后端运行指标（管理员）。
  * LightRAG 引擎相关信息见独立的「LightRAG 管理」页（LightRagManager）。
  * 每 5 秒自动刷新。
  */
@@ -99,7 +88,6 @@ interface MonitorData {
   cacheHitRate?: number
   circuitBreaker?: string
   activeSessions?: number
-  queue?: { pending?: number; processing?: number; dead?: number }
   recentErrors?: string[]
 }
 
