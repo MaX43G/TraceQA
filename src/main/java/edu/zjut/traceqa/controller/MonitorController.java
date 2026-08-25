@@ -84,7 +84,7 @@ public class MonitorController {
         Cookie cookie = new Cookie("tq_webui", token);
         cookie.setHttpOnly(true);
         cookie.setSecure(false);
-        cookie.setPath("/lightrag-webui");
+        cookie.setPath("/");
         cookie.setMaxAge(60 * 60);
         cookie.setAttribute("SameSite", "Lax");
         response.addCookie(cookie);

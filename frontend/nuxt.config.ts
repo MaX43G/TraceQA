@@ -91,6 +91,17 @@ export default defineNuxtConfig({
     '/lightrag-webui/**': {
       proxy: `${process.env.API_PROXY_TARGET || 'http://localhost:8080'}/lightrag-webui/**`
     },
+    // LightRAG WebUI 内对 API 文档的链接常指向根路径（/docs、/redoc、/openapi.json），
+    // 这些路径同样经后端反向代理（管理员 Cookie 鉴权）转发到 LightRAG
+    '/docs': {
+      proxy: `${process.env.API_PROXY_TARGET || 'http://localhost:8080'}/lightrag-webui/docs`
+    },
+    '/redoc': {
+      proxy: `${process.env.API_PROXY_TARGET || 'http://localhost:8080'}/lightrag-webui/redoc`
+    },
+    '/openapi.json': {
+      proxy: `${process.env.API_PROXY_TARGET || 'http://localhost:8080'}/lightrag-webui/openapi.json`
+    },
     // 页面 HTML 不缓存，避免浏览器加载旧版 JS（新版部署后状态图等失效）
     '/': { headers: { 'Cache-Control': 'no-store' } },
     '/chat': { headers: { 'Cache-Control': 'no-store' } },
