@@ -1,0 +1,113 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "JVM 堆内存 (bytes)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PROM" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(jvm_memory_used_bytes{area=\"heap\"}) by (pod, instance)",
+          "legendFormat": "heap used"
+        },
+        {
+          "expr": "sum(jvm_memory_max_bytes{area=\"heap\"}) by (pod, instance)",
+          "legendFormat": "heap max"
+        }
+      ]
+    },
+    {
+      "title": "HTTP 请求速率 (rps)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PROM" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count[1m])) by (uri)",
+          "legendFormat": "{{uri}}"
+        }
+      ]
+    },
+    {
+      "title": "JVM 非堆内存 (bytes)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PROM" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(jvm_memory_used_bytes{area=\"nonheap\"}) by (pod, instance)",
+          "legendFormat": "nonheap used"
+        }
+      ]
+    },
+    {
+      "title": "活跃线程数",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PROM" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "jvm_threads_live_threads",
+          "legendFormat": "live threads"
+        }
+      ]
+    },
+    {
+      "title": "CPU 使用率",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PROM" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "system_cpu_usage",
+          "legendFormat": "system cpu"
+        },
+        {
+          "expr": "process_cpu_usage",
+          "legendFormat": "process cpu"
+        }
+      ]
+    },
+    {
+      "title": "HTTP 延迟 P95 (ms)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PROM" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket[1m])) by (le, uri)) * 1000",
+          "legendFormat": "p95 {{uri}}"
+        }
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["traceqa"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "TraceQA 运行大盘",
+  "uid": "traceqa",
+  "version": 1,
+  "weekStart": ""
+}

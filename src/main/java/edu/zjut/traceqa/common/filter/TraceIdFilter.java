@@ -43,14 +43,15 @@ public class TraceIdFilter extends OncePerRequestFilter {
         response.setHeader(TRACE_HEADER, traceId);
         long start = System.currentTimeMillis();
         String path = request.getRequestURI();
-        monitorService.startRequest(path);
+        String method = request.getMethod();
+        monitorService.startRequest(path, method);
         try {
             filterChain.doFilter(request, response);
         } finally {
-            monitorService.endRequest();
-            log.info("请求结束，traceId={}, method={}, path={}, cost={}ms",
-                    traceId, request.getMethod(), path,
-                    System.currentTimeMillis() - start);
+            long costMs = System.currentTimeMillis() - start;
+            monitorService.endRequest(path, method, response.getStatus(), costMs);
+            log.info("请求结束，traceId={}, method={}, path={}, status={}, cost={}ms",
+                    traceId, method, path, response.getStatus(), costMs);
             TraceIdHolder.clear();
         }
     }

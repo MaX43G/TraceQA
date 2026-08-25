@@ -33,12 +33,14 @@ public class GlobalExceptionHandler {
     @Resource
     private MonitorService monitorService;
 
-    /** 业务异常：按自身错误码返回 */
+    /** 业务异常：按自身错误码返回，附带根因详情 */
     @ExceptionHandler(BizException.class)
     public ApiResponse<Void> handleBiz(BizException e) {
         log.warn("业务异常，traceId={}, code={}, msg={}",
                 TraceIdHolder.get(), e.getErrorCode().getCode(), e.getMessage());
-        return ApiResponse.fail(e.getErrorCode(), e.getMessage());
+        // 业务异常的底层根因（如 zip 解压失败的具体原因）作为 detail 下发展示
+        String detail = e.getCause() == null ? null : extractDetail(e.getCause());
+        return ApiResponse.fail(e.getErrorCode(), e.getMessage(), detail);
     }
 
     /** sa-token 未登录/登录失效：统一返回 40100 */
@@ -98,15 +100,26 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ApiResponse<Void> handleMaxUpload(MaxUploadSizeExceededException e) {
         log.warn("上传文件超出大小限制，traceId={}", TraceIdHolder.get());
-        return ApiResponse.fail(ErrorCode.FILE_ERROR, "上传文件超出大小限制");
+        return ApiResponse.fail(ErrorCode.FILE_ERROR, "上传文件超出大小限制", extractDetail(e));
     }
 
-    /** 兜底异常：捕获所有未预期异常，统一转内部错误码，绝不下发堆栈 */
+    /** 兜底异常：捕获所有未预期异常，统一转内部错误码，附带根因详情（不下发完整堆栈） */
     @ExceptionHandler(Exception.class)
     public ApiResponse<Void> handleUnexpected(Exception e) {
         log.error("未预期异常，traceId={}", TraceIdHolder.get(), e);
         monitorService.recordError(e.getClass().getSimpleName() + ": " + e.getMessage());
-        return ApiResponse.fail(ErrorCode.INTERNAL_ERROR);
+        return ApiResponse.fail(ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.getMsg(), extractDetail(e));
+    }
+
+    /** 提取根因的紧凑描述（异常类型 + 关键信息），便于直接在下发响应中定位问题 */
+    private String extractDetail(Throwable e) {
+        Throwable root = e;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String msg = root.getMessage();
+        String name = root.getClass().getSimpleName();
+        return (msg == null || msg.isBlank()) ? name : name + ": " + msg;
     }
 
     /** 提取校验异常中的第一个字段错误信息 */

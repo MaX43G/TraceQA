@@ -20,6 +20,8 @@ export interface ApiResponse<T = unknown> {
   data: T
   /** 链路追踪 ID */
   traceId: string
+  /** 诊断详情：后端附带的根因信息（排障用，可空） */
+  detail?: string
 }
 
 /** 请求选项（兼容 umijs/openapi 生成的调用签名） */
@@ -42,12 +44,15 @@ export class ApiError extends Error {
   code: number
   /** 链路追踪 ID */
   traceId: string
+  /** 诊断详情（根因信息） */
+  detail?: string
 
-  constructor(msg: string, code: number, traceId = '-') {
-    super(msg)
+  constructor(msg: string, code: number, traceId = '-', detail?: string) {
+    super(detail ? `${msg}（${detail}）` : msg)
     this.name = 'ApiError'
     this.code = code
     this.traceId = traceId
+    this.detail = detail
   }
 }
 
@@ -89,7 +94,7 @@ async function unwrapResponse<T>(res: Response): Promise<T> {
   if (contentType.includes('application/json')) {
     const json = (await res.json()) as ApiResponse<T>
     if (json.code !== 200) {
-      throw new ApiError(json.msg || '请求失败', json.code, json.traceId)
+      throw new ApiError(json.msg || '请求失败', json.code, json.traceId, json.detail)
     }
     return json as T
   }
@@ -139,7 +144,7 @@ export default async function request<T>(url: string, options: RequestOptions = 
       // 后端全局异常已返回统一结构，尝试解包
       try {
         const json = (await res.json()) as ApiResponse<unknown>
-        throw new ApiError(json.msg || `请求失败(${res.status})`, json.code || res.status, json.traceId)
+        throw new ApiError(json.msg || `请求失败(${res.status})`, json.code || res.status, json.traceId, json.detail)
       } catch (e) {
         if (e instanceof ApiError) {
           throw e

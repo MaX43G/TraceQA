@@ -4,7 +4,7 @@
 # ============================================================
 
 # ---- 构建阶段 ----
-FROM eclipse-temurin:25-jdk AS build
+FROM eclipse-temurin:25-jdk-noble AS build
 WORKDIR /app
 
 # 利用 Maven Wrapper 下载依赖（only-script 分发，自动拉取 Maven）
@@ -29,7 +29,7 @@ COPY src src
 RUN ./mvnw -q -DskipTests package
 
 # ---- 运行阶段 ----
-FROM eclipse-temurin:25-jre
+FROM eclipse-temurin:25-jre-noble
 WORKDIR /app
 
 # 健康检查所需工具

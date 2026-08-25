@@ -13,7 +13,8 @@
 | 数据库 | MySQL 8（单库），本地文件系统存储文件 |
 | 缓存/队列 | Redis（查询与 Agent 决策缓存、文档解析任务队列 Redis Stream） |
 | 检索 | LightRAG（图谱 + 向量 + 关键词），查询重写 / HyDE / 查询分解 / 三路检索 / RRF 融合 / ReRead / LLM 精排 |
-| 部署 | Docker Compose（mysql + redis + lightrag + backend + frontend） |
+| 可观测性 | Spring Boot Actuator + Micrometer/Prometheus + Prometheus + Grafana（管理员专属） |
+| 部署 | Docker Compose（mysql + redis + lightrag + backend + frontend + prometheus + grafana） |
 
 ## 2. 目录结构
 
@@ -41,6 +42,7 @@ TraceQA/
 │   │   └── api/         # OpenAPI 自动生成的 TS 客户端
 │   └── scripts/         # gen-api 脚本
 ├── docs/                # 文档
+├── docker/              # Prometheus / Grafana 可观测性配置
 ├── docker-compose.yml   # 一键部署
 └── README.md
 ```
@@ -124,7 +126,7 @@ cd frontend && pnpm gen:api   # 依据 http://localhost:8080/v3/api-docs 生成 
 
 ## 7. 统一响应与错误码
 
-所有 REST 接口返回 `{code, msg, data, traceId}`；前端仅按 `code` 判断。
+所有 REST 接口返回 `{code, msg, data, traceId, detail?}`；前端仅按 `code` 判断，`detail` 为排障根因（仅出错时存在，不含堆栈）。
 
 | code | 含义 |
 | --- | --- |
@@ -166,3 +168,50 @@ t_system_prompt (各 Agent 场景提示词，管理员可编辑)
 - **中断**：生成中可点「停止」，前端 abort + 后端取消标志（takeWhile）即时终止。
 - **多轮上下文**：最近 6 轮历史注入意图识别、查询重写与总结 prompt。
 - **移动端**：≤768px 会话列表抽屉化，消息/工具栏自适应。
+
+## 10. 可观测性（Actuator + Prometheus + Grafana，仅管理员）
+
+后端基于 **Spring Boot Actuator + Micrometer/Prometheus** 暴露指标，配合 **Prometheus + Grafana** 实现时间序列可视化管理员大盘；所有指标与大屏均经**后端反向代理统一鉴权**访问。
+
+### 10.1 组件与路径
+
+| 组件 | 内部地址 | 对外路径 | 鉴权 |
+| --- | --- | --- | --- |
+| Actuator | `backend:8080/actuator/*` | 宿主 `:6114/actuator/*` | ADMIN 角色；`/actuator/prometheus` 另接受 `X-Scrape-Token` |
+| Prometheus | `prometheus:9090`（子路径 `/prometheus`） | 宿主 `:6112/prometheus`、代理 `/prometheus/**` | 无（代理层需管理员 Cookie，直连靠防火墙） |
+| Grafana | `grafana:3000`（子路径 `/grafana`） | 宿主 `:6113`、代理 `/grafana/**` | 匿名 Admin（免登录）+ 代理层管理员 Cookie |
+
+- **代理过滤**：`ObservabilityProxyFilter` 拦截 `/grafana/**`、`/prometheus/**`，校验 `tq_obs` 管理员 Cookie 后转发内网；`POST /api/monitor/observability/session` 签发该 Cookie（仅 ADMIN）。
+- **前端入口**：管理后台 → 系统监控，点「打开 Grafana / Prometheus」先取会话 Cookie 再打开代理路径。
+- **子路径部署**：Prometheus 用 `--web.external-url=/prometheus --web.route-prefix=/prometheus`；Grafana 用 `GF_SERVER_SERVE_FROM_SUB_PATH=true` + `GF_SERVER_ROOT_URL=/grafana`，二者自行生成子路径资源引用，代理即可透传。
+- **Actuator 鉴权**：`WebConfig` 的 SaInterceptor 对 `/actuator/**` 要求 `ADMIN`；`/actuator/prometheus` 若带合法 `X-Scrape-Token`（`app.observability.scrape-token`）则放行供 Prometheus 抓取。
+
+### 10.2 关键配置
+
+```yaml
+# application.yaml
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers
+      base-path: /actuator
+  endpoint:
+    health: { show-details: always }
+app:
+  observability:
+    scrape-token: ${APP_OBSERVABILITY_SCRAPE_TOKEN:}
+    grafana-base-url: ${OBSERVABILITY_GRAFANA_BASE_URL:http://grafana:3000}
+    prometheus-base-url: ${OBSERVABILITY_PROMETHEUS_BASE_URL:http://prometheus:9090}
+```
+
+Prometheus 抓取令牌经 `docker-compose` 的 `sed` 注入 `docker/prometheus.yml` 的 `__SCRAPE_TOKEN__` 占位符（`OBSERVABILITY_SCRAPE_TOKEN`）。
+
+### 10.3 自定义监控指标
+
+除 Actuator/Micrometer 自动指标外，`MonitorService` 额外采集：请求量、延迟分位（P50/P95/P99）、HTTP 状态分布、慢请求（≥2000ms）、路径错误率、JVM 运行时、最近异常日志，经 `/api/monitor` 供前端「系统监控」页展示。
+
+### 10.4 安全提示
+
+- Grafana 为**匿名管理员**、Prometheus **无鉴权**，二者均对外暴露端口（`:6113`、`:6112`）。**务必配置服务器防火墙仅放行可信来源**；管理端主入口一律走经后端代理的 `/grafana/`、`/prometheus/`。
+- `OBSERVABILITY_SCRAPE_TOKEN` 与 `GRAFANA_ADMIN_PASSWORD` 部署前请改为强随机值。

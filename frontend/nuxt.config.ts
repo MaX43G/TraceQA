@@ -102,6 +102,13 @@ export default defineNuxtConfig({
     '/openapi.json': {
       proxy: `${process.env.API_PROXY_TARGET || 'http://localhost:8080'}/lightrag-webui/openapi.json`
     },
+    // 可观测性工具：Grafana / Prometheus 经后端反向代理（管理员 Cookie 鉴权）访问
+    '/grafana/**': {
+      proxy: `${process.env.API_PROXY_TARGET || 'http://localhost:8080'}/grafana/**`
+    },
+    '/prometheus/**': {
+      proxy: `${process.env.API_PROXY_TARGET || 'http://localhost:8080'}/prometheus/**`
+    },
     // 页面 HTML 不缓存，避免浏览器加载旧版 JS（新版部署后状态图等失效）
     '/': { headers: { 'Cache-Control': 'no-store' } },
     '/chat': { headers: { 'Cache-Control': 'no-store' } },

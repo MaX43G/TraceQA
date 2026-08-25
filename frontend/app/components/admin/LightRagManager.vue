@@ -64,9 +64,9 @@
         </a-col>
       </a-row>
 
-      <!-- 可观测性：抽取进度 + 任务耗时 -->
+      <!-- 可观测性：抽取进度 -->
       <a-row :gutter="16" style="margin-top: 16px">
-        <a-col :span="12">
+        <a-col :span="24">
           <a-card size="small" title="抽取进度">
             <template v-if="extractionStats.totalChunks">
               <a-progress
@@ -80,15 +80,6 @@
               </span>
             </template>
             <a-empty v-else description="暂无抽取任务" :image="false" />
-          </a-card>
-        </a-col>
-        <a-col :span="12">
-          <a-card size="small" title="任务耗时">
-            <div class="metric-value">{{ jobDuration || '-' }}</div>
-            <div class="lightrag-sub" style="margin-top: 4px">
-              开始时间：{{ pipeline?.job_start ? new Date(pipeline.job_start).toLocaleString() : '-' }}
-            </div>
-            <div class="lightrag-sub">最近消息：{{ pipeline?.latest_message || '-' }}</div>
           </a-card>
         </a-col>
       </a-row>
@@ -251,28 +242,6 @@ function isErrorMsg(msg: string): boolean {
   return /^(Failed|Traceback|Error|\[purge\])/i.test(msg) || /RateLimit|error|exception/i.test(msg)
 }
 
-/** 任务已运行时长（秒级刷新） */
-const jobDuration = ref('')
-
-function formatDuration(ms: number): string {
-  const s = Math.floor(ms / 1000)
-  const h = Math.floor(s / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  const sec = s % 60
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`
-}
-
-function refreshDuration(): void {
-  const start = pipeline.value.job_start
-  if (!start) {
-    jobDuration.value = ''
-    return
-  }
-  const diff = Math.max(0, Date.now() - new Date(start).getTime())
-  jobDuration.value = formatDuration(diff)
-}
-
 function statusOrder(status: string): number {
   const order: Record<string, number> = {
     pending: 0,
@@ -369,8 +338,6 @@ onMounted(() => {
   load()
   // 面板数据由后端带短缓存，自动轮询保持最新
   useIntervalFn(() => load(), 10000)
-  // 任务耗时秒级刷新
-  useIntervalFn(refreshDuration, 1000)
 })
 </script>
 
@@ -378,11 +345,6 @@ onMounted(() => {
 .lightrag-sub {
   font-size: 12px;
   color: #86909c;
-}
-.metric-value {
-  font-size: 24px;
-  font-weight: 600;
-  color: #1f2329;
 }
 .label-chip {
   margin: 2px;

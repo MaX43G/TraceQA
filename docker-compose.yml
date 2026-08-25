@@ -36,7 +36,7 @@ services:
   # Redis：查询/Agent 决策缓存 + 文档处理异步队列
   # 轻量配置：内存上限 256MB、不落盘（缓存可重建），适配小内存服务器
   redis:
-    image: redis:7-alpine
+    image: redis:latest
     container_name: traceqa-redis
     restart: unless-stopped
     command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--appendonly", "no", "--save", ""]
@@ -133,6 +133,7 @@ services:
       LLM_MODEL: ${LLM_MODEL:-THUDM/GLM-4-9B-0414}
       APP_JWT_SECRET: ${APP_JWT_SECRET:-traceqa-prod-secret-change-me-please-2026}
       APP_STORAGE_ROOT: /app/data/files
+      APP_OBSERVABILITY_SCRAPE_TOKEN: ${OBSERVABILITY_SCRAPE_TOKEN:-traceqa-prometheus-scrape-change-me}
       TZ: Asia/Shanghai
     volumes:
       - traceqa-backend-data:/app/data
@@ -160,8 +161,64 @@ services:
     depends_on:
       - backend
 
+  # Prometheus：抓取后端 /actuator/prometheus 指标，并挂载在 /prometheus 子路径下供代理访问
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: traceqa-prometheus
+    restart: unless-stopped
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        sed "s/__SCRAPE_TOKEN__/$${OBSERVABILITY_SCRAPE_TOKEN}/g" /etc/prometheus/prometheus.yml > /tmp/prometheus.yml
+        exec prometheus --config.file=/tmp/prometheus.yml \
+          --web.external-url=/prometheus \
+          --web.route-prefix=/prometheus
+    environment:
+      OBSERVABILITY_SCRAPE_TOKEN: ${OBSERVABILITY_SCRAPE_TOKEN:-traceqa-prometheus-scrape-change-me}
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - backend
+    ports:
+      # 对外暴露（请用防火墙限制来源）；管理端走 /prometheus/** 代理
+      - "6112:9090"
+
+  # Grafana：可观测性可视化大盘（管理员鉴权），挂载在 /grafana 子路径下供代理访问
+  grafana:
+    image: grafana/grafana:latest
+    container_name: traceqa-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      # 免登录：项目已通过后端代理（管理员 Cookie）鉴权，Grafana 以匿名管理员身份进入
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_AUTH_DISABLE_SIGNOUT_MENU: "true"
+      GF_AUTH_BASIC_ENABLED: "false"
+      # 子路径部署：使 Grafana 生成 /grafana/... 资源引用，经后端反向代理正常访问
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SERVER_ROOT_URL: /grafana
+      GF_SERVER_ENABLE_GZIP: "true"
+      TZ: Asia/Shanghai
+    volumes:
+      - ./docker/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./docker/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./docker/grafana/dashboard-traceqa.json:/var/lib/grafana/dashboards/traceqa.json:ro
+      - traceqa-grafana-data:/var/lib/grafana
+    ports:
+      # 对外暴露（请用防火墙限制来源）；管理端走 /grafana/** 代理
+      - "6113:3000"
+    depends_on:
+      - prometheus
+
 volumes:
   traceqa-mysql-data:
   traceqa-redis-data:
   traceqa-lightrag-data:
   traceqa-backend-data:
+  traceqa-grafana-data:

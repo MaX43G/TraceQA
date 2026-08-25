@@ -28,6 +28,9 @@ public class AppProperties {
     /** 熔断降级配置 */
     private CircuitBreaker circuitBreaker = new CircuitBreaker();
 
+    /** 可观测性配置 */
+    private Observability observability = new Observability();
+
     /** 可用模型列表（供前端模型选择，后续可扩展多个模型） */
     private List<ModelItem> models = List.of(
             new ModelItem("默认模型", "", ""));
@@ -72,6 +75,17 @@ public class AppProperties {
         private long openMillis = 30000;
         /** 半开状态允许的最大试探调用数 */
         private int halfOpenMaxCalls = 1;
+    }
+
+    /** 可观测性（Actuator / Prometheus） */
+    @Data
+    public static class Observability {
+        /** Prometheus 抓取令牌（需与抓取方配置一致；为空则不开放 /actuator/prometheus 抓取） */
+        private String scrapeToken = "";
+        /** Grafana 内网地址（经后端 /grafana/** 反向代理） */
+        private String grafanaBaseUrl = "http://grafana:3000";
+        /** Prometheus 内网地址（经后端 /prometheus/** 反向代理） */
+        private String prometheusBaseUrl = "http://prometheus:9090";
     }
 
     /** 模型条目（模型选择功能） */

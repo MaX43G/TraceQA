@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -75,10 +76,21 @@ public class DocumentService {
     /** 批量导入：解压 zip 内所有 .md/.txt，逐个入库解析 */
     public BatchUploadVO batchUpload(MultipartFile zipFile, Long knowledgeBaseId) {
         knowledgeBaseService.requireById(knowledgeBaseId);
+        byte[] archive;
+        try {
+            archive = zipFile.getBytes();
+        } catch (IOException e) {
+            log.error("批量导入压缩包读取失败：{}", e.getMessage());
+            throw new BizException(ErrorCode.FILE_ERROR, "压缩包读取失败");
+        }
+        if (!isZipArchive(archive)) {
+            throw new BizException(ErrorCode.FILE_ERROR,
+                    "不是有效的 zip 压缩包（应为 .zip，内含 .md/.txt 文档）。请勿上传 md/txt/7z/rar 或重命名文件冒充 zip");
+        }
         int success = 0;
         int failed = 0;
         List<String> errors = new ArrayList<>();
-        try (ZipInputStream zis = new ZipInputStream(zipFile.getInputStream())) {
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(archive), StandardCharsets.UTF_8)) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
                 if (entry.isDirectory()) {
@@ -99,10 +111,25 @@ public class DocumentService {
             }
         } catch (IOException e) {
             log.error("批量导入压缩包解析失败：{}", e.getMessage());
-            throw new BizException(ErrorCode.FILE_ERROR, "压缩包解析失败");
+            throw new BizException(ErrorCode.FILE_ERROR, "压缩包解析失败：" + e.getMessage());
+        }
+        if (success == 0 && failed == 0) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "压缩包内没有可导入的 .md/.txt 文件");
         }
         log.info("批量导入完成：成功 {}，失败 {}", success, failed);
         return new BatchUploadVO(success, failed, errors);
+    }
+
+    /** 校验是否标准 zip 归档：本地文件头 PK\x03\x04，或空压缩包 PK\x05\x06 */
+    private boolean isZipArchive(byte[] data) {
+        if (data == null || data.length < 4) {
+            return false;
+        }
+        boolean localHeader = (data[0] & 0xFF) == 0x50 && (data[1] & 0xFF) == 0x4B
+                && (data[2] & 0xFF) == 0x03 && (data[3] & 0xFF) == 0x04;
+        boolean emptyArchive = (data[0] & 0xFF) == 0x50 && (data[1] & 0xFF) == 0x4B
+                && (data[2] & 0xFF) == 0x05 && (data[3] & 0xFF) == 0x06;
+        return localHeader || emptyArchive;
     }
 
     /** 核心上传逻辑（单文件/批量共用）：校验 -> 指纹去重 -> 落盘 -> 入库 -> 异步解析 */

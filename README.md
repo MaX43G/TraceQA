@@ -48,9 +48,12 @@
                     └────────────────┘  │  关键词）          │
                                        └────────┬─────────┘
                                                │ 本地文件系统/图谱
-                       ┌──────────────────────────────────┐
-                       │ Redis（查询/决策缓存 · 文档任务队列） │
-                       └──────────────────────────────────┘
+┌──────────────────────────────────┐
+                        │ Redis（查询/决策缓存 · 文档任务队列） │
+                        └──────────────────────────────────┘
+        ┌────────────────────────── 可观测性（仅管理员）──────────────────────────┐
+        │ 后端 Actuator(/actuator) ──Prometheus──▶ Grafana ── 经后端代理访问      │
+        └────────────────────────────────────────────────────────────────────┘
 ```
 
 **多 Agent 工作流（SSE 实时推送，前端状态图可视化）：**
@@ -77,6 +80,7 @@
 - **知识库**：聊天默认检索**全部知识库**（不区分/不隔离），管理员在后台统一管理知识库与文档
 - **用户禁用即时生效**：禁用账号立即踢出所有会话，再次登录被拒
 - **RBAC 管理后台**：用户/角色/知识库/文档/系统提示词
+- **可观测性（管理员专属）**：后端 Actuator 指标 + Prometheus 采集 + Grafana 大盘，经后端反向代理统一鉴权访问；管理页实时展示延迟分位/慢请求/错误率/JVM/运行日志
 - **移动端适配** + SSR/SEO 首页
 
 ## 模型体系
@@ -103,7 +107,7 @@
 cp .env.example .env
 #    填入 LLM_API_KEY（硅基流动）；可调整 LLM_MODEL 等
 
-# 2. 一键拉起（mysql + redis + lightrag + backend + frontend）
+# 2. 一键拉起（mysql + redis + lightrag + backend + frontend + prometheus + grafana）
 docker compose up -d --build
 ```
 
@@ -111,12 +115,14 @@ docker compose up -d --build
 
 | 服务 | 地址 |
 | --- | --- |
-| 前端 | http://localhost:3000 |
-| 后端 API / Swagger | http://localhost:8080 / `/swagger-ui.html` |
-| OpenAPI 规范 | http://localhost:8080/v3/api-docs |
-| LightRAG Server | http://localhost:9621/docs |
-| MySQL | localhost:3306 |
-| Redis | localhost:6379 |
+| 前端 | http://localhost:6115 |
+| 后端 API | http://localhost:6114 |
+| OpenAPI 规范 | http://localhost:6114/v3/api-docs |
+| LightRAG WebUI | 经前端「LightRAG 管理 → 打开 WebUI」代理访问（`/lightrag-webui/`，不对外直连） |
+| Prometheus | 经前端「系统监控 → 打开 Prometheus」代理访问（`/prometheus/`）；或直连 `:6112/prometheus` |
+| Grafana 大盘 | 经前端「系统监控 → 打开 Grafana」代理访问（`/grafana/`）；或直连 `:6113` |
+| MySQL | localhost:6118 |
+| Redis | localhost:6117 |
 
 **默认账号**：`admin/admin123456`（管理员）、`user/user123456`（生产环境务必修改）。
 
@@ -126,6 +132,16 @@ docker compose up -d --build
 > **LightRAG 说明**：Docker 部署中 LightRAG 使用 `Qwen/Qwen3.5-4B` + `BAAI/bge-m3`（硅基流动），并已开启**低并发 + 重试退避 + 超时调优**以缓解免费额度限流。相关可调参数见 `.env.example`：`LIGHTRAG_MAX_ASYNC_LLM`（抽取并发）、`LIGHTRAG_LLM_TIMEOUT`（LLM 超时，默认 900s）、`LIGHTRAG_EMBEDDING_TIMEOUT`（嵌入超时）、`LIGHTRAG_LLM_MAX_OUTPUT_TOKENS`（抽取输出上限）。若仍遇限流，可在 `.env` 调整 `LLM_MODEL`，或改用本地 Ollama 模型实现无限流。
 
 > **知识库与文档**：系统使用**全部知识库**检索，不做按库选择或隔离；上传文档时需指定所属知识库（仅用于归档与管理）。删除知识库仅逻辑删除数据库记录，**不会清除 LightRAG 图谱索引中的旧内容**。
+
+## 可观测性（Prometheus + Grafana，仅管理员可见）
+
+项目内置一套**管理员专属**的可观测性栈，所有指标与大盘均经后端反向代理统一鉴权（管理员会话）访问，不对外直连数据库或暴露弱口令服务：
+
+- **后端 Actuator**：`/actuator/*` 端点（`health/info/metrics/prometheus/loggers`），全部要求 **ADMIN 角色**；`/actuator/prometheus` 额外接受抓取令牌 `X-Scrape-Token`。
+- **Prometheus**：抓取后端指标，挂载在 `/prometheus/` 子路径，管理端经代理访问。
+- **Grafana**：自带「TraceQA 运行大盘」（JVM 堆/非堆、HTTP 速率与 P95、线程、CPU 等），**免登录（匿名 Admin）**，挂载在 `/grafana/` 子路径，经代理访问。
+- **系统监控页**：管理后台 → 系统监控，展示延迟分位（P50/P95/P99）、HTTP 状态分布、慢请求、接口错误率、JVM 运行时、最近异常日志，并可直接点按钮打开 Grafana / Prometheus。
+> ⚠️ **安全提示**：Prometheus（`:6112`）与 Grafana（`:6113`）已对外暴露端口。Grafana 为匿名管理员、Prometheus 无鉴权，**请务必在部署服务器配置防火墙，仅放行可信 IP/内网**；否则任何人可直连获取全部运行指标乃至 Grafana 管理权。管理端主入口建议一律走经后端代理的 `/prometheus/`、`/grafana/`。
 
 ## 本地开发
 
@@ -140,8 +156,9 @@ cd frontend && pnpm gen:api         # 依据 /v3/api-docs 重新生成 TS API �
 ## API 契约
 
 - 后端基于 springdoc 自动生成 **OpenAPI 3**（`/v3/api-docs`），前端 `@umijs/openapi` 自动生成 TS 客户端（`frontend/app/api/`），禁止手写魔法字符串。
-- 统一响应：`{ code, msg, data, traceId }`。
+- 统一响应：`{ code, msg, data, traceId, detail? }`（`detail` 为排障根因，仅在出错时存在）。
 - SSE 事件（`POST /api/chat/stream`）：`thinking` / `delta` / `references` / `done` / `error`。
+- 可观测性端点：`/actuator/*`（仅管理员）、`/grafana/**`、`/prometheus/**`（经后端代理 + 管理员 Cookie）。
 
 主要接口：
 
@@ -162,6 +179,7 @@ TraceQA/
 ├── src/main/java/edu/zjut/traceqa/   # 后端（common/config/entity/mapper/dto/service/retrieval/agent/sse/controller）
 ├── frontend/app/                     # 前端（pages/components/composables/stores/utils/middleware/api）
 ├── frontend/scripts/                 # gen-api 脚本
+├── docker/                           # Prometheus / Grafana 可观测性配置
 ├── docs/DEVELOP.md                   # 开发文档
 ├── Dockerfile / docker-compose.yml / .env.example
 └── README.md
@@ -173,3 +191,5 @@ TraceQA/
 - **删除知识库后还能检索到旧内容？** 删除仅逻辑删除数据库记录，不清理 LightRAG 图谱索引，旧内容仍可能被检索到（系统本身不区分知识库）。如需彻底下线，需在 LightRAG 侧清理对应文档。
 - **禁用用户还能继续对话？** 禁用即踢下线并阻止再次登录；若会话已建立，服务端每个请求也会校验用户状态。
 - **修改了后端接口？** `cd frontend && pnpm gen:api` 重新生成客户端。
+- **如何查看运行指标 / 打开监控大盘？** 管理员在「管理后台 → 系统监控」点「打开 Grafana / Prometheus」，经后端代理鉴权访问；也可直连 `:6113`（Grafana）/ `:6112/prometheus`（Prometheus），但需用防火墙限制来源（二者均为匿名/无鉴权）。
+- **上传 zip 批量导入报「压缩包解析失败」？** 通常是文件不是标准 zip（如改名/7z/rar/tar.gz），`invalid LOC header` 即为此；请用标准方式重新压缩为 .zip（内含 .md/.txt）。

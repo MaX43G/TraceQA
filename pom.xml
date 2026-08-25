@@ -145,6 +145,17 @@
             <artifactId>pdfbox</artifactId>
             <version>3.0.5</version>
         </dependency>
+
+        <!-- 可观测性：Actuator 端点（health/metrics/loggers 等） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <!-- 可观测性：Prometheus 指标导出（供 Prometheus 抓取，Grafana 可视化） -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
     </dependencies>
 
     <dependencyManagement>

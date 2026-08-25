@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # 后端 TraceQA（Spring Boot Actuator / Micrometer / Prometheus 指标）
+  - job_name: traceqa-backend
+    metrics_path: /actuator/prometheus
+    authorization:
+      type: Bearer
+      # 启动时由容器命令将 __SCRAPE_TOKEN__ 替换为 OBSERVABILITY_SCRAPE_TOKEN
+      credentials: '__SCRAPE_TOKEN__'
+    static_configs:
+      - targets: ['backend:8080']
+        labels:
+          app: traceqa-backend

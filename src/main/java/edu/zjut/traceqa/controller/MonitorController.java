@@ -3,6 +3,7 @@ package edu.zjut.traceqa.controller;
 import cn.dev33.satoken.annotation.SaCheckRole;
 import edu.zjut.traceqa.common.api.ApiResponse;
 import edu.zjut.traceqa.common.config.LightRagWebuiSessionStore;
+import edu.zjut.traceqa.common.config.ObservabilitySessionStore;
 import edu.zjut.traceqa.service.LightRagMonitorService;
 import edu.zjut.traceqa.service.MonitorService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,6 +34,9 @@ public class MonitorController {
 
     @Resource
     private LightRagWebuiSessionStore webuiSessionStore;
+
+    @Resource
+    private ObservabilitySessionStore observabilitySessionStore;
 
     @Operation(summary = "查询系统运行指标")
     @SaCheckRole("ADMIN")
@@ -76,12 +80,29 @@ public class MonitorController {
         return ApiResponse.ok(lightRagMonitorService.scanDocuments());
     }
 
-    @Operation(summary = "获取 LightRAG WebUI 访问会话（签发短期 HttpOnly Cookie，供反向代理鉴权）")
+@Operation(summary = "获取 LightRAG WebUI 访问会话（签发短期 HttpOnly Cookie，供反向代理鉴权）")
     @SaCheckRole("ADMIN")
     @PostMapping("/lightrag/webui-session")
     public ApiResponse<Void> webuiSession(HttpServletResponse response) {
         String token = webuiSessionStore.create();
         Cookie cookie = new Cookie("tq_webui", token);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(false);
+        // 路径设为 /：LightRAG WebUI 内部的 API 文档链接可能使用根路径（如 /docs），
+        // 需保证该 Cookie 能随根路径请求一起发送，从而通过反向代理鉴权
+        cookie.setPath("/");
+        cookie.setMaxAge(60 * 60);
+        cookie.setAttribute("SameSite", "Lax");
+        response.addCookie(cookie);
+        return ApiResponse.ok();
+    }
+
+    @Operation(summary = "获取可观测性工具（Grafana/Prometheus）访问会话（签发短期 HttpOnly Cookie，供反向代理鉴权）")
+    @SaCheckRole("ADMIN")
+    @PostMapping("/observability/session")
+    public ApiResponse<Void> observabilitySession(HttpServletResponse response) {
+        String token = observabilitySessionStore.create();
+        Cookie cookie = new Cookie("tq_obs", token);
         cookie.setHttpOnly(true);
         cookie.setSecure(false);
         cookie.setPath("/");
