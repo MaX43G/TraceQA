@@ -29,7 +29,7 @@ COPY src src
 RUN ./mvnw -q -DskipTests package
 
 # ---- 运行阶段 ----
-FROM eclipse-temurin:25-jre-noble
+FROM eclipse-temurin:25-jdk-noble
 WORKDIR /app
 
 # 健康检查所需工具
