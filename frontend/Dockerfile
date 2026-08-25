@@ -4,20 +4,19 @@
 # ============================================================
 
 # ---- 构建阶段 ----
-FROM node:latest AS build
+FROM node:26 AS build
 WORKDIR /app
 
+# 使用国内 npm 镜像源
 RUN npm config set registry https://registry.npmmirror.com
 
-# 启用 corepack 以使用 pnpm
+# 启用 corepack 并指定 pnpm 版本（避免 corepack 去 npmjs.org 查询）
 RUN npm install -g corepack && corepack enable
+ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
+RUN corepack prepare pnpm@latest --activate
 
-# 使用国内镜像源（必须在 pnpm 可用之后）
+# 使用国内 pnpm 镜像源
 RUN pnpm config set registry https://registry.npmmirror.com
-
-# 先安装依赖（利用层缓存）
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
 
 # 拷贝源码并构建（API 代理目标在构建期注入，指向后端容器）
 COPY . .
