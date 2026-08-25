@@ -31,7 +31,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
-import edu.zjut.traceqa.common.convert.DtoMapper;
 
 /**
  * 文档服务。
@@ -144,7 +143,7 @@ public class DocumentService {
                 .eq(knowledgeBaseId != null, Document::getKnowledgeBaseId, knowledgeBaseId)
                 .orderByDesc(Document::getId);
         IPage<Document> result = documentMapper.selectPage(new Page<>(page, size), wrapper);
-        List<DocumentVO> records = result.getRecords().stream().map(this::refreshStatusIfNeeded).toList();
+        List<DocumentVO> records = result.getRecords().stream().map(parseWorker::refresh).toList();
         return new PageResult<>(result.getCurrent(), result.getSize(), result.getTotal(), records);
     }
 
@@ -154,21 +153,7 @@ public class DocumentService {
                         new LambdaQueryWrapper<Document>()
                                 .eq(Document::getKnowledgeBaseId, knowledgeBaseId)
                                 .orderByDesc(Document::getId))
-                .stream().map(this::refreshStatusIfNeeded).toList();
-    }
-
-    /**
-     * 按需从 LightRAG 刷新单个文档状态并回写数据库，返回最新 VO。
-     *
-     * <p>LightRAG 是解析状态的唯一权威来源：文档解析完成、或管理员通过 LightRAG
-     * 重启失败的解析后，MySQL 不会自动更新。因此在查询文档列表时对非终态（非 DONE）
-     * 文档发起一次状态查询并回写，保证返回给前端的状态与 LightRAG 一致</p>
-     */
-    private DocumentVO refreshStatusIfNeeded(Document doc) {
-        if (DocumentStatus.DONE.name().equals(doc.getStatus())) {
-            return DtoMapper.INSTANCE.toDocumentVO(doc);
-        }
-        return parseWorker.refresh(doc);
+                .stream().map(parseWorker::refresh).toList();
     }
 
     /** 逻辑删除文档并清理本地文件 */
