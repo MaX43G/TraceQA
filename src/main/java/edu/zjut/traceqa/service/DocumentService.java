@@ -132,7 +132,7 @@ public class DocumentService {
                 .build();
         documentMapper.insert(doc);
 
-        // 异步解析：任务入 Redis Stream 队列，由队列消费者在 docExecutor 中执行
+        // 异步解析：任务入 Redis Stream 队列，由队列消费者线程执行
         documentQueueWorker.enqueue(doc.getId());
         log.info("文档上传成功：{}，kbId={}", originalName, knowledgeBaseId);
         return new DocumentUploadVO(doc.getId());

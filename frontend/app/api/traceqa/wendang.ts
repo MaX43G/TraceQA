@@ -2,25 +2,6 @@
 /* eslint-disable */
 import request from "@/utils/request";
 
-/** 分页查询文档列表 GET /api/documents */
-export async function page(
-  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.pageParams,
-  options?: { [key: string]: any }
-) {
-  return request<API.ApiResponsePageResultDocumentVO>("/api/documents", {
-    method: "GET",
-    params: {
-      // page has a default value: 1
-      page: "1",
-      // size has a default value: 10
-      size: "10",
-      ...params,
-    },
-    ...(options || {}),
-  });
-}
-
 /** 上传文档（异步解析，立即返回 202） POST /api/documents */
 export async function upload(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)

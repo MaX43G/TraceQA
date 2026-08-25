@@ -36,13 +36,6 @@
         刷新
       </a-button>
     </div>
-    <div v-if="queueStats" class="queue-stats">
-      <span class="queue-stats__label">解析队列：</span>
-      <a-tag color="blue">待处理 {{ queueStats.pending }}</a-tag>
-      <a-tag color="processing">处理中 {{ queueStats.processing }}</a-tag>
-      <a-tag v-if="(queueStats.dead ?? 0) > 0" color="red">死信 {{ queueStats.dead }}</a-tag>
-      <a-tag v-else color="default">死信 0</a-tag>
-    </div>
 
     <a-table :data-source="docs" :columns="columns" row-key="id" :loading="loading" :pagination="false">
       <template #bodyCell="{ column, record }">
@@ -50,7 +43,7 @@
           <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'stats'">
-          <span class="stats">分块 {{ record.chunkCount ?? 0 }} / 实体 {{ record.entityCount ?? 0 }} / 关系 {{ record.relationCount ?? 0 }}</span>
+          <span class="stats">分块 {{ record.chunkCount ?? 0 }}</span>
         </template>
         <template v-else-if="column.key === 'error'">
           <a-tooltip v-if="record.errorMsg" :title="record.errorMsg">
@@ -93,22 +86,8 @@ const selectedKbId = ref<number | null>(null)
 const docs = ref<DocumentVO[]>([])
 const loading = ref(false)
 const uploading = ref(false)
-/** 解析队列统计 */
-const queueStats = ref<{ pending?: number; processing?: number; dead?: number } | null>(null)
 /** 是否正在批量刷新状态 */
 const refreshing = ref(false)
-
-async function loadQueueStats(): Promise<void> {
-  try {
-    const res = await fetch('/api/documents/queue/stats', { headers: getAuthHeaders() })
-    const json = (await res.json()) as { code?: number; data?: { pending?: number; processing?: number; dead?: number } }
-    if (json.code === 200 && json.data) {
-      queueStats.value = json.data
-    }
-  } catch {
-    // 忽略：队列统计不可用时静默
-  }
-}
 
 async function load(): Promise<void> {
   const res = await apiListKbs()
@@ -258,7 +237,6 @@ function statusLabel(status?: string): string {
 
 onMounted(() => {
   load()
-  loadQueueStats()
 })
 </script>
 
@@ -267,19 +245,6 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   margin-bottom: 8px;
-}
-
-.queue-stats {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.queue-stats__label {
-  font-size: 13px;
-  color: #4e5969;
 }
 
 .stats {

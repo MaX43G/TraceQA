@@ -3,7 +3,6 @@ package edu.zjut.traceqa.controller;
 import jakarta.annotation.Resource;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import edu.zjut.traceqa.common.api.ApiResponse;
-import edu.zjut.traceqa.common.api.PageResult;
 import edu.zjut.traceqa.model.vo.KnowledgeBaseDTO;
 import edu.zjut.traceqa.service.KnowledgeBaseService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,11 +15,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 知识库接口。
@@ -39,20 +36,6 @@ public class KnowledgeBaseController {
     @GetMapping
     public ApiResponse<List<KnowledgeBaseDTO>> list() {
         return ApiResponse.ok(knowledgeBaseService.list());
-    }
-
-    @Operation(summary = "分页查询知识库")
-    @GetMapping("/page")
-    public ApiResponse<PageResult<KnowledgeBaseDTO>> page(
-            @RequestParam(defaultValue = "1") long page,
-            @RequestParam(defaultValue = "10") long size) {
-        return ApiResponse.ok(knowledgeBaseService.page(page, size));
-    }
-
-    @Operation(summary = "统计知识库文档数量")
-    @GetMapping("/{id}/doc-count")
-    public ApiResponse<Map<String, Long>> docCount(@PathVariable Long id) {
-        return ApiResponse.ok(Map.of("count", knowledgeBaseService.countDocuments(id)));
     }
 
     @Operation(summary = "创建知识库")

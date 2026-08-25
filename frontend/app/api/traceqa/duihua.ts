@@ -99,18 +99,3 @@ export async function togglePin(
     ...(options || {}),
   });
 }
-
-/** 流式对话（SSE：thinking/delta/references/done/error 事件） POST /api/chat/stream */
-export async function stream(
-  body: API.ChatStreamRequest,
-  options?: { [key: string]: any }
-) {
-  return request<API.SseEmitter>("/api/chat/stream", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    data: body,
-    ...(options || {}),
-  });
-}

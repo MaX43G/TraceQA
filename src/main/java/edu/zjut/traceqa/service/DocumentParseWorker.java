@@ -4,7 +4,6 @@ import jakarta.annotation.Resource;
 import edu.zjut.traceqa.common.enums.DocumentStatus;
 import edu.zjut.traceqa.common.exception.BizException;
 import edu.zjut.traceqa.config.LightRagClient;
-import edu.zjut.traceqa.model.vo.DocumentProgressVO;
 import edu.zjut.traceqa.model.vo.DocumentVO;
 import edu.zjut.traceqa.model.po.Document;
 import edu.zjut.traceqa.mapper.DocumentMapper;
@@ -83,6 +82,7 @@ public class DocumentParseWorker {
             int total = parts.size();
             doc.setPartTotal(total);
             doc.setPartDone(0);
+            doc.setStatus(DocumentStatus.PROCESSING.name());
             documentMapper.updateById(doc);
             log.info("文档开始提交：{}，切分为 {} 块", doc.getOriginalName(), total);
 
@@ -96,15 +96,11 @@ public class DocumentParseWorker {
                 doc.setTrackId(trackId);
                 doc.setPartDone(i + 1);
                 documentMapper.updateById(doc);
-                updateStatus(doc, DocumentStatus.PROCESSING, uploadProgress(total, i + 1),
-                        "已上传第 " + (i + 1) + "/" + total + " 块");
                 if (i < total - 1) {
                     sleepQuietly(PART_INTERVAL_MS);
                 }
             }
             progressStore.putTrackIds(doc.getId(), trackIds);
-            updateStatus(doc, DocumentStatus.PROCESSING, uploadProgress(total, total),
-                    "全部 " + total + " 块已提交，等待 LightRAG 抽取（可点击刷新查看进度）");
             return true;
         } catch (BizException e) {
             failDocument(doc, e.getMessage());
@@ -159,29 +155,22 @@ public class DocumentParseWorker {
             }
         }
 
-        String message;
         if (failed > 0) {
             doc.setStatus(DocumentStatus.FAILED.name());
             doc.setErrorMsg("LightRAG 解析失败（" + failed + "/" + total + " 块）");
-            message = doc.getErrorMsg();
         } else if (done == total) {
             doc.setStatus(DocumentStatus.DONE.name());
             doc.setErrorMsg(null);
-            message = "解析完成";
         } else {
             doc.setStatus(DocumentStatus.PROCESSING.name());
-            message = "图谱构建中（向量检索已可用），已完成 " + done + "/" + total + " 块";
+            // 文档已重新进入解析（例如管理员在 LightRAG 重启失败文档后），清除遗留的错误信息
+            doc.setErrorMsg(null);
         }
         doc.setPartDone(done);
         doc.setChunkCount(chunk);
         doc.setEntityCount(entity);
         doc.setRelationCount(relation);
         documentMapper.updateById(doc);
-        progressStore.update(new DocumentProgressVO(
-                doc.getId(), doc.getTrackId(), doc.getStatus(),
-                (int) Math.min(100, done * 100.0 / total),
-                doc.getPartTotal(), doc.getPartDone(),
-                chunk, entity, relation, message));
         log.info("文档状态刷新：{}，status={}，done={}/{}", doc.getOriginalName(), doc.getStatus(), done, total);
         return DocumentVO.of(doc);
     }
@@ -203,11 +192,6 @@ public class DocumentParseWorker {
         } catch (Exception e) {
             log.debug("清理 LightRAG 失败记录异常：{}", e.getMessage());
         }
-    }
-
-    /** 计算上传进度（已提交成功的块数占比，0-100） */
-    private int uploadProgress(int total, int uploaded) {
-        return (int) Math.min(100, uploaded * 100.0 / Math.max(1, total));
     }
 
     /** 切分文件为多个子块；md/txt 仅超大时切分，PDF 仅超大时切分 */
@@ -328,25 +312,11 @@ public class DocumentParseWorker {
         return "failed".equalsIgnoreCase(state) || "error".equalsIgnoreCase(state);
     }
 
-    /** 更新文档状态与进度 */
-    private void updateStatus(Document doc, DocumentStatus status, int progress, String message) {
-        doc.setStatus(status.name());
-        documentMapper.updateById(doc);
-        progressStore.update(new DocumentProgressVO(
-                doc.getId(), doc.getTrackId(), doc.getStatus(), progress,
-                doc.getPartTotal(), doc.getPartDone(),
-                doc.getChunkCount(), doc.getEntityCount(), doc.getRelationCount(), message));
-    }
-
     /** 标记解析失败 */
     private void failDocument(Document doc, String message) {
         doc.setStatus(DocumentStatus.FAILED.name());
         doc.setErrorMsg(message);
         documentMapper.updateById(doc);
-        progressStore.update(new DocumentProgressVO(
-                doc.getId(), doc.getTrackId(), doc.getStatus(), 100,
-                doc.getPartTotal(), doc.getPartDone(),
-                doc.getChunkCount(), doc.getEntityCount(), doc.getRelationCount(), message));
         log.warn("文档解析失败：{}，原因：{}", doc.getOriginalName(), message);
     }
 

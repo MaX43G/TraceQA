@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 文档接口。
@@ -69,12 +68,6 @@ public class DocumentController {
     @GetMapping("/by-kb")
     public ApiResponse<List<DocumentVO>> listByKb(@RequestParam Long knowledgeBaseId) {
         return ApiResponse.ok(documentService.listByKnowledgeBase(knowledgeBaseId));
-    }
-
-    @Operation(summary = "解析队列统计（待处理/处理中/死信）")
-    @GetMapping("/queue/stats")
-    public ApiResponse<Map<String, Object>> queueStats() {
-        return ApiResponse.ok(documentService.queueStats());
     }
 
     @Operation(summary = "按需刷新文档解析状态（后端不轮询，由用户触发时查询 LightRAG）")

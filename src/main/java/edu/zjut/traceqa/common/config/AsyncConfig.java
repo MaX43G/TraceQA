@@ -10,28 +10,12 @@ import java.util.concurrent.Executor;
 /**
  * 异步任务配置。
  *
- * <p>提供两个线程池：</p>
- * <ul>
- *   <li>{@code ragExecutor} —— 聊天 RAG 编排（阻塞式 SSE 生成），核心线程适中；</li>
- *   <li>{@code docExecutor}  —— 文档异步解析队列，支持长耗时抽取任务。</li>
- * </ul>
+ * <p>提供聊天 RAG 编排线程池 {@code ragExecutor}（阻塞式 SSE 生成）。
+ * 文档解析走 {@code DocumentQueueWorker} 独立守护线程 + Redis Stream 队列，不依赖 @Async。</p>
  */
 @EnableAsync
 @Configuration
 public class AsyncConfig {
-
-    /** 文档解析专用线程池，丢弃策略保证不阻塞主线程 */
-    @Bean("docExecutor")
-    public Executor docExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(2);
-        executor.setMaxPoolSize(4);
-        executor.setQueueCapacity(50);
-        executor.setThreadNamePrefix("doc-parser-");
-        executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
-        executor.initialize();
-        return executor;
-    }
 
     /** 聊天 RAG 编排线程池 */
     @Bean("ragExecutor")

@@ -2,9 +2,6 @@ package edu.zjut.traceqa.service;
 
 import jakarta.annotation.Resource;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import edu.zjut.traceqa.common.api.PageResult;
 import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.exception.BizException;
 import edu.zjut.traceqa.model.vo.KnowledgeBaseDTO;
@@ -42,14 +39,6 @@ public class KnowledgeBaseService {
                 .stream().map(KnowledgeBaseDTO::of).toList();
     }
 
-    /** 分页查询知识库 */
-    public PageResult<KnowledgeBaseDTO> page(long page, long size) {
-        IPage<KnowledgeBase> result = knowledgeBaseMapper.selectPage(
-                new Page<>(page, size),
-                new LambdaQueryWrapper<KnowledgeBase>().orderByDesc(KnowledgeBase::getId));
-        return PageResult.of(result, KnowledgeBaseDTO::of);
-    }
-
     /** 创建知识库 */
     public KnowledgeBaseDTO create(KnowledgeBaseDTO dto) {
         KnowledgeBase kb = new KnowledgeBase();
@@ -79,12 +68,6 @@ public class KnowledgeBaseService {
                 .eq(Document::getKnowledgeBaseId, id));
         knowledgeBaseMapper.deleteById(id);
         log.info("删除知识库：{}", id);
-    }
-
-    /** 统计知识库下文档数量 */
-    public long countDocuments(Long knowledgeBaseId) {
-        return documentMapper.selectCount(new LambdaQueryWrapper<Document>()
-                .eq(Document::getKnowledgeBaseId, knowledgeBaseId));
     }
 
     /** 校验知识库存在 */

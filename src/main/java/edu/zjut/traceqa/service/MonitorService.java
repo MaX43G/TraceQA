@@ -1,7 +1,5 @@
 package edu.zjut.traceqa.service;
 
-import edu.zjut.traceqa.common.auth.UserContext;
-import edu.zjut.traceqa.common.exception.BizException;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -39,9 +37,6 @@ public class MonitorService {
 
     @Resource
     private DocumentQueueWorker documentQueueWorker;
-
-    @Resource
-    private DocumentProgressStore progressStore;
 
     /** 请求开始时间（ThreadLocal） */
     private static final ThreadLocal<Long> REQUEST_START = new ThreadLocal<>();

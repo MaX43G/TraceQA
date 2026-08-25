@@ -57,36 +57,3 @@ export async function delete1(
     ...(options || {}),
   });
 }
-
-/** 统计知识库文档数量 GET /api/kbs/${param0}/doc-count */
-export async function docCount(
-  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.docCountParams,
-  options?: { [key: string]: any }
-) {
-  const { id: param0, ...queryParams } = params;
-  return request<API.ApiResponseMapStringLong>(`/api/kbs/${param0}/doc-count`, {
-    method: "GET",
-    params: { ...queryParams },
-    ...(options || {}),
-  });
-}
-
-/** 分页查询知识库 GET /api/kbs/page */
-export async function page1(
-  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.page1Params,
-  options?: { [key: string]: any }
-) {
-  return request<API.ApiResponsePageResultKnowledgeBaseDTO>("/api/kbs/page", {
-    method: "GET",
-    params: {
-      // page has a default value: 1
-      page: "1",
-      // size has a default value: 10
-      size: "10",
-      ...params,
-    },
-    ...(options || {}),
-  });
-}
