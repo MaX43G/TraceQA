@@ -138,22 +138,37 @@ public class DocumentService {
         return new DocumentUploadVO(doc.getId());
     }
 
-    /** 分页查询文档列表 */
+    /** 分页查询文档列表（查询时同步 LightRAG 刷新解析状态并回写数据库） */
     public PageResult<DocumentVO> page(Long knowledgeBaseId, long page, long size) {
         LambdaQueryWrapper<Document> wrapper = new LambdaQueryWrapper<Document>()
                 .eq(knowledgeBaseId != null, Document::getKnowledgeBaseId, knowledgeBaseId)
                 .orderByDesc(Document::getId);
         IPage<Document> result = documentMapper.selectPage(new Page<>(page, size), wrapper);
-        return PageResult.of(result, DtoMapper.INSTANCE::toDocumentVO);
+        List<DocumentVO> records = result.getRecords().stream().map(this::refreshStatusIfNeeded).toList();
+        return new PageResult<>(result.getCurrent(), result.getSize(), result.getTotal(), records);
     }
 
-    /** 查询某知识库下的全部文档 */
+    /** 查询某知识库下的全部文档（查询时同步 LightRAG 刷新解析状态并回写数据库） */
     public List<DocumentVO> listByKnowledgeBase(Long knowledgeBaseId) {
         return documentMapper.selectList(
                         new LambdaQueryWrapper<Document>()
                                 .eq(Document::getKnowledgeBaseId, knowledgeBaseId)
                                 .orderByDesc(Document::getId))
-                .stream().map(DtoMapper.INSTANCE::toDocumentVO).toList();
+                .stream().map(this::refreshStatusIfNeeded).toList();
+    }
+
+    /**
+     * 按需从 LightRAG 刷新单个文档状态并回写数据库，返回最新 VO。
+     *
+     * <p>LightRAG 是解析状态的唯一权威来源：文档解析完成、或管理员通过 LightRAG
+     * 重启失败的解析后，MySQL 不会自动更新。因此在查询文档列表时对非终态（非 DONE）
+     * 文档发起一次状态查询并回写，保证返回给前端的状态与 LightRAG 一致</p>
+     */
+    private DocumentVO refreshStatusIfNeeded(Document doc) {
+        if (DocumentStatus.DONE.name().equals(doc.getStatus())) {
+            return DtoMapper.INSTANCE.toDocumentVO(doc);
+        }
+        return parseWorker.refresh(doc);
     }
 
     /** 逻辑删除文档并清理本地文件 */

@@ -179,7 +179,7 @@ public class DocumentParseWorker {
         documentMapper.updateById(doc);
         progressStore.update(new DocumentProgressVO(
                 doc.getId(), doc.getTrackId(), doc.getStatus(),
-                (int) Math.min(100, done * 100.0 / Math.max(1, total)),
+                (int) Math.min(100, done * 100.0 / total),
                 doc.getPartTotal(), doc.getPartDone(),
                 chunk, entity, relation, message));
         log.info("文档状态刷新：{}，status={}，done={}/{}", doc.getOriginalName(), doc.getStatus(), done, total);
@@ -195,7 +195,7 @@ public class DocumentParseWorker {
             Map<String, Object> status = lightRagClient.queryTrackStatus(doc.getTrackId());
             Object docs = status.get("documents");
             if (docs instanceof List<?> documentList && !documentList.isEmpty()) {
-                Object first = documentList.get(0);
+                Object first = documentList.getFirst();
                 if (first instanceof Map<?, ?> docMap && docMap.get("id") != null) {
                     lightRagClient.deleteDocument(String.valueOf(docMap.get("id")));
                 }
@@ -296,7 +296,7 @@ public class DocumentParseWorker {
     private String resolveDocState(Map<String, Object> status) {
         Object docs = status.get("documents");
         if (docs instanceof List<?> documentList && !documentList.isEmpty()) {
-            Object first = documentList.get(0);
+            Object first = documentList.getFirst();
             if (first instanceof Map<?, ?> docMap && docMap.get("status") != null) {
                 return String.valueOf(docMap.get("status"));
             }
@@ -309,7 +309,7 @@ public class DocumentParseWorker {
     private Map<?, ?> firstDocMap(Map<String, Object> status) {
         Object docs = status.get("documents");
         if (docs instanceof List<?> documentList && !documentList.isEmpty()) {
-            Object first = documentList.get(0);
+            Object first = documentList.getFirst();
             if (first instanceof Map<?, ?> docMap) {
                 return docMap;
             }
