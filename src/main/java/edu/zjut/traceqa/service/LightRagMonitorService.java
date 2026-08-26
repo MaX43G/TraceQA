@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
@@ -42,7 +43,7 @@ public class LightRagMonitorService {
         data.put("statusCounts", safeGet(lightRagClient::getStatusCounts));
         data.put("models", safeGet(lightRagClient::getModels));
         data.put("runningModels", safeGet(lightRagClient::getRunningModels));
-        data.put("popularLabels", safeGet(() -> lightRagClient.getPopularLabels(POPULAR_LABELS_LIMIT)));
+        data.put("popularLabels", safeGetList(() -> lightRagClient.getPopularLabels(POPULAR_LABELS_LIMIT)));
         cached = data;
         cacheExpireAt = now + CACHE_TTL_MS;
         return data;
@@ -76,6 +77,17 @@ public class LightRagMonitorService {
         } catch (Exception e) {
             log.debug("LightRAG 面板单项查询失败：{}", e.getMessage());
             return Map.of();
+        }
+    }
+
+    /** 列表型查询失败时降级为空列表 */
+    private List<String> safeGetList(Supplier<List<String>> supplier) {
+        try {
+            List<String> result = supplier.get();
+            return result == null ? List.of() : result;
+        } catch (Exception e) {
+            log.debug("LightRAG 面板单项查询失败：{}", e.getMessage());
+            return List.of();
         }
     }
 }

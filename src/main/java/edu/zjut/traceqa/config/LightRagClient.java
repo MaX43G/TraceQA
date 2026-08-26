@@ -17,6 +17,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
@@ -62,10 +63,15 @@ public class LightRagClient {
         this.webClient = WebClient.builder()
                 .baseUrl(cfg.getBaseUrl())
                 .defaultHeader("X-API-Key", cfg.getApiKey())
+                .exchangeStrategies(ExchangeStrategies.builder()
+                        .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(1024 * 1024 * 1024))
+                        .build())
                 .build();
     }
 
-    /** 上传文件至 LightRAG 异步解析，返回 track_id */
+    /**
+     * 上传文件至 LightRAG 异步解析，返回 track_id
+     */
     public String uploadDocument(byte[] content, String filename) {
         try {
             String body = restClient.post()
@@ -92,7 +98,9 @@ public class LightRagClient {
         }
     }
 
-    /** 健康探测：LightRAG /health 是否可达 */
+    /**
+     * 健康探测：LightRAG /health 是否可达
+     */
     public boolean ping() {
         try {
             restClient.get().uri("/health").retrieve().toBodilessEntity();
@@ -103,7 +111,9 @@ public class LightRagClient {
         }
     }
 
-    /** 查询文档解析状态（LightRAG 该版本路径为 /documents/track_status/{trackId}） */
+    /**
+     * 查询文档解析状态（LightRAG 该版本路径为 /documents/track_status/{trackId}）
+     */
     public Map<String, Object> queryTrackStatus(String trackId) {
         try {
             String body = restClient.get()
@@ -121,7 +131,9 @@ public class LightRagClient {
         }
     }
 
-    /** 删除 LightRAG 中的文档记录（解析失败重试前清理，避免内容去重拦截） */
+    /**
+     * 删除 LightRAG 中的文档记录（解析失败重试前清理，避免内容去重拦截）
+     */
     public void deleteDocument(String docId) {
         try {
             restClient.delete().uri("/documents/{docId}", docId).retrieve();
@@ -170,10 +182,10 @@ public class LightRagClient {
     /**
      * 流式检索查询（调用 /query/stream，实时回调检索进度并收集引用）。
      *
-     * @param query       检索文本
-     * @param mode        查询模式（naive/local/hybrid/mix）
-     * @param hlKeywords  关键词检索（高优先级关键词，可空）——用于「关键词路」三路混合检索
-     * @param progress    检索进度回调（LightRAG 流水线步骤，可空）
+     * @param query      检索文本
+     * @param mode       查询模式（naive/local/hybrid/mix）
+     * @param hlKeywords 关键词检索（高优先级关键词，可空）——用于「关键词路」三路混合检索
+     * @param progress   检索进度回调（LightRAG 流水线步骤，可空）
      * @return 引用的原始列表（每个元素为 {reference_id,file_path,content:[...]}）
      */
     public List<Map<String, Object>> queryStream(String query, String mode, List<String> hlKeywords,
@@ -213,7 +225,9 @@ public class LightRagClient {
         return references;
     }
 
-    /** 解析 /query/stream 的 NDJSON 行：progress 回调、references 收集 */
+    /**
+     * 解析 /query/stream 的 NDJSON 行：progress 回调、references 收集
+     */
     private void handleStreamLine(String line, Consumer<String> progress, List<Map<String, Object>> references) {
         if (line == null || line.isBlank()) {
             return;
@@ -229,7 +243,7 @@ public class LightRagClient {
             JsonNode refs = node.path("references");
             if (refs.isArray()) {
                 refs.forEach(r -> references.add(
-                        objectMapper.convertValue(r, new TypeReference<Map<String, Object>>() {
+                        objectMapper.convertValue(r, new TypeReference<>() {
                         })));
             }
         } catch (Exception e) {
@@ -237,52 +251,88 @@ public class LightRagClient {
         }
     }
 
-    /** 查询文档索引流水线状态（是否繁忙、批次进度、是否需恢复等） */
+    /**
+     * 查询文档索引流水线状态（是否繁忙、批次进度、是否需恢复等）
+     */
     public Map<String, Object> getPipelineStatus() {
         return getJson("/documents/pipeline_status");
     }
 
-    /** 查询文档按状态统计（PENDING/PROCESSING/PREPROCESSED/PROCESSED/FAILED） */
+    /**
+     * 查询文档按状态统计（PENDING/PROCESSING/PREPROCESSED/PROCESSED/FAILED）
+     */
     public Map<String, Object> getStatusCounts() {
         return getJson("/documents/status_counts");
     }
 
-    /** 查询图谱热门标签（按节点度排序，最连通的实体） */
-    public Map<String, Object> getPopularLabels(int limit) {
-        return getJson("/graph/label/popular?limit=" + limit);
+    /**
+     * 查询图谱热门标签（按节点度排序，最连通的实体）。LightRAG 返回 JSON 数组，如 ["MySQL","Person",...]
+     */
+    public List<String> getPopularLabels(int limit) {
+        try {
+            String resp = restClient.get()
+                    .uri("/graph/label/popular?limit=" + limit)
+                    .retrieve()
+                    .body(String.class);
+            if (resp == null || resp.isBlank()) {
+                return List.of();
+            }
+            return objectMapper.readValue(resp, new TypeReference<>() {
+            });
+        } catch (RestClientResponseException e) {
+            log.warn("LightRAG 热门标签查询失败：status={}", e.getStatusCode());
+            throw new BizException(ErrorCode.LLM_UNAVAILABLE, "知识图谱服务暂时不可用，请稍后再试");
+        } catch (Exception e) {
+            log.warn("LightRAG 热门标签查询异常：uri=/graph/label/popular, err={}", e.getMessage());
+            throw new BizException(ErrorCode.LLM_UNAVAILABLE, "知识图谱服务暂时不可用，请稍后再试");
+        }
     }
 
-    /** 查询 LightRAG 可用模型（Ollama 兼容 /api/tags） */
+    /**
+     * 查询 LightRAG 可用模型（Ollama 兼容 /api/tags）
+     */
     public Map<String, Object> getModels() {
         return getJson("/api/tags");
     }
 
-    /** 查询当前加载运行的模型（Ollama 兼容 /api/ps） */
+    /**
+     * 查询当前加载运行的模型（Ollama 兼容 /api/ps）
+     */
     public Map<String, Object> getRunningModels() {
         return getJson("/api/ps");
     }
 
-    /** 重试 LightRAG 中解析失败的文档 */
+    /**
+     * 重试 LightRAG 中解析失败的文档
+     */
     public Map<String, Object> reprocessFailed() {
         return postJson("/documents/reprocess_failed", null);
     }
 
-    /** 清空 LightRAG 缓存 */
+    /**
+     * 清空 LightRAG 缓存
+     */
     public Map<String, Object> clearCache() {
         return postJson("/documents/clear_cache", Map.of());
     }
 
-    /** 取消当前运行的索引流水线 */
+    /**
+     * 取消当前运行的索引流水线
+     */
     public Map<String, Object> cancelPipeline() {
         return postJson("/documents/cancel_pipeline", null);
     }
 
-    /** 触发 LightRAG 目录扫描 */
+    /**
+     * 触发 LightRAG 目录扫描
+     */
     public Map<String, Object> scanDocuments() {
         return postJson("/documents/scan", null);
     }
 
-    /** 发送 GET 请求并解析 JSON（失败统一抛 BizException） */
+    /**
+     * 发送 GET 请求并解析 JSON（失败统一抛 BizException）
+     */
     private Map<String, Object> getJson(String uri) {
         try {
             return parseJson(restClient.get().uri(uri).retrieve().body(String.class));
@@ -295,7 +345,9 @@ public class LightRagClient {
         }
     }
 
-    /** 发送 POST 请求并解析 JSON（失败统一抛 BizException） */
+    /**
+     * 发送 POST 请求并解析 JSON（失败统一抛 BizException）
+     */
     private Map<String, Object> postJson(String uri, Object body) {
         try {
             String resp;
@@ -314,7 +366,9 @@ public class LightRagClient {
         }
     }
 
-    /** 组装 multipart 上传体 */
+    /**
+     * 组装 multipart 上传体
+     */
     private MultiValueMap<String, Object> buildUploadBody(byte[] content, String filename) {
         MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
         ByteArrayResource resource = new ByteArrayResource(content) {
@@ -327,7 +381,9 @@ public class LightRagClient {
         return form;
     }
 
-    /** 解析 JSON 响应体，解析失败视为服务异常 */
+    /**
+     * 解析 JSON 响应体，解析失败视为服务异常
+     */
     private Map<String, Object> parseJson(String body) {
         if (body == null || body.isBlank()) {
             throw new BizException(ErrorCode.LLM_UNAVAILABLE, "知识图谱服务返回异常");
