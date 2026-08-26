@@ -92,6 +92,8 @@ app:
     # 经后端反向代理访问的内网地址
     grafana-base-url: ${OBSERVABILITY_GRAFANA_BASE_URL:http://grafana:3000}
     prometheus-base-url: ${OBSERVABILITY_PROMETHEUS_BASE_URL:http://prometheus:9090}
+  # 会话 Cookie 是否标记 Secure（HTTPS 部署建议开启）
+  cookie-secure: ${APP_COOKIE_SECURE:false}
   # 可用模型列表（模型选择功能；默认模型名称取自 spring.ai.openai 配置）
   # 服务端模型共享硅基流动的 API Key / Base URL，可在前端一键切换
   models:

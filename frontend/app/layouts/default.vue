@@ -7,7 +7,7 @@
       </div>
       <div class="app-header__nav">
         <a-button
-          v-for="item in navItems"
+          v-for="item in staticNav"
           :key="item.path"
           type="text"
           class="app-header__nav-btn"
@@ -17,36 +17,52 @@
           <component :is="item.icon" class="app-header__nav-icon" />
           {{ item.label }}
         </a-button>
+        <ClientOnly>
+          <a-button
+            v-if="auth.isAdmin"
+            type="text"
+            class="app-header__nav-btn"
+            :class="{ 'is-active': isActive('/admin') }"
+            @click="navigateTo('/admin')"
+          >
+            <SettingOutlined class="app-header__nav-icon" />
+            管理后台
+          </a-button>
+        </ClientOnly>
       </div>
       <div class="app-header__user">
-        <template v-if="auth.isLoggedIn">
-          <a-dropdown>
-            <a-space class="app-header__user-info">
-              <a-avatar size="small" style="background: linear-gradient(135deg, #1677ff, #06b6d4)">
-                {{ (auth.userInfo?.nickname || 'U').charAt(0) }}
-              </a-avatar>
-              <span>{{ auth.userInfo?.nickname || auth.userInfo?.username }}</span>
-            </a-space>
-            <template #overlay>
-              <a-menu>
-                <a-menu-item key="nickname" @click="showNicknameModal = true">
-                  <EditOutlined />
-                  修改昵称
-                </a-menu-item>
-                <a-menu-item key="password" @click="showPasswordModal = true">
-                  <KeyOutlined />
-                  修改密码
-                </a-menu-item>
-                <a-menu-divider />
-                <a-menu-item key="logout" @click="handleLogout">
-                  <LogoutOutlined />
-                  退出登录
-                </a-menu-item>
-              </a-menu>
-            </template>
-          </a-dropdown>
-        </template>
-        <a-button v-else type="primary" size="small" @click="navigateTo('/login')">登录</a-button>
+        <ClientOnly>
+          <template v-if="auth.isLoggedIn">
+            <a-dropdown>
+              <a-space class="app-header__user-info">
+                <a-avatar size="small" style="background: linear-gradient(135deg, #1677ff, #06b6d4)">
+                  {{ (auth.userInfo?.nickname || 'U').charAt(0) }}
+                </a-avatar>
+                <span>{{ auth.userInfo?.nickname || auth.userInfo?.username }}</span>
+              </a-space>
+              <template #overlay>
+                <a-menu>
+                  <a-menu-item key="nickname" @click="showNicknameModal = true">
+                    <EditOutlined />
+                    修改昵称
+                  </a-menu-item>
+                  <a-menu-item key="password" @click="showPasswordModal = true">
+                    <KeyOutlined />
+                    修改密码
+                  </a-menu-item>
+                  <a-menu-divider />
+                  <a-menu-item key="logout" @click="handleLogout">
+                    <LogoutOutlined />
+                    退出登录
+                  </a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
+          </template>
+          <template v-else>
+            <a-button type="primary" size="small" @click="navigateTo('/login')">登录</a-button>
+          </template>
+        </ClientOnly>
 
         <!-- 移动端：展开导航抽屉 -->
         <a-button class="app-header__menu-btn" type="text" @click="drawerOpen = true">
@@ -104,6 +120,11 @@ const route = useRoute()
 const showPasswordModal = ref(false)
 const showNicknameModal = ref(false)
 const drawerOpen = ref(false)
+
+const staticNav = [
+  { label: '首页', path: '/', icon: HomeOutlined },
+  { label: '智能问答', path: '/chat', icon: MessageOutlined }
+]
 
 const navItems = computed(() =>
   [

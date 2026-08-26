@@ -13,33 +13,46 @@ import hljs from 'highlight.js'
 import katex from 'katex'
 
 /** 引用标记正则：匹配 [citation:1] 形式 */
-const CITATION_RE = /\[citation:(\d+)\]/g
+const CITATION_RE = /\[citation:(\d+)]/g
 
 /** 块级公式 $$...$$（支持跨行） */
 const MATH_BLOCK_RE = /\$\$([\s\S]+?)\$\$/g
 /** 行内公式 $...$（单行） */
 const MATH_INLINE_RE = /\$([^$\n]+?)\$/g
+/** 中文字符（数学公式不应包含中文） */
+const CJK_RE = /[\u4e00-\u9fa5]/
+
+/** 判定是否为真正的数学公式：含中文的 `$...$` 多半是误匹配的正文，跳过以保原文 */
+function isMathCandidate(tex: string): boolean {
+    return !CJK_RE.test(tex)
+}
 
 /**
  * 将文本中的 LaTeX 公式（$$...$$ 块级、$...$ 行内）渲染为 KaTeX HTML。
  * 在 markdown 渲染前执行，故对 markdown 文本与原始 HTML 内的公式均生效；
- * 渲染失败（非法 LaTeX）时保留原文。
+ * 含中文或被误匹配的 `$...$`、非法 LaTeX 均保留原文，避免破坏正文。
  */
 function renderMath(text: string): string {
     if (!text) {
         return text
     }
     let out = text.replace(MATH_BLOCK_RE, (_m, tex: string) => {
+        if (!isMathCandidate(tex)) {
+            return _m
+        }
         try {
-            const html = katex.renderToString(tex.trim(), {displayMode: true, throwOnError: true})
+            const html = katex.renderToString(tex.trim(), { displayMode: true, throwOnError: true })
             return `<div class="katex-block">${html}</div>`
         } catch {
             return _m
         }
     })
     out = out.replace(MATH_INLINE_RE, (_m, tex: string) => {
+        if (!isMathCandidate(tex)) {
+            return _m
+        }
         try {
-            const html = katex.renderToString(tex.trim(), {throwOnError: true})
+            const html = katex.renderToString(tex.trim(), { throwOnError: true })
             return `<span class="katex-inline">${html}</span>`
         } catch {
             return _m

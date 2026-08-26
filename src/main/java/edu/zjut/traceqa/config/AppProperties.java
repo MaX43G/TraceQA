@@ -31,6 +31,9 @@ public class AppProperties {
     /** 可观测性配置 */
     private Observability observability = new Observability();
 
+    /** 会话 Cookie 是否标记 Secure（HTTPS 部署建议开启） */
+    private boolean cookieSecure = false;
+
     /** 可用模型列表（供前端模型选择，后续可扩展多个模型） */
     private List<ModelItem> models = List.of(
             new ModelItem("默认模型", "", ""));
@@ -97,9 +100,6 @@ public class AppProperties {
         private String model;
         /** OpenAI 兼容地址（默认模型为空串表示使用 spring.ai 配置） */
         private String baseUrl;
-
-        public ModelItem() {
-        }
 
         public ModelItem(String name, String model, String baseUrl) {
             this.name = name;

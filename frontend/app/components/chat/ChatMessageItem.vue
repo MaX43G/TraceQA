@@ -109,7 +109,7 @@ const hasReferences = computed<boolean>(() => (props.msg.references?.length ?? 0
 /** 回答中实际引用的序号（[citation:N] ∩ references），用于过滤无内容角标与未引用文献 */
 const usedIndexes = computed<Set<number>>(() => {
   const used = new Set<number>()
-  const re = /\[citation:(\d+)\]/g
+  const re = /\[citation:(\d+)]/g
   const content = displayContent.value || ''
   let match: RegExpExecArray | null
   while ((match = re.exec(content)) !== null) {
@@ -288,11 +288,6 @@ function toggleSpeak(): void {
 
 .chat-msg__actions {
   margin-top: 4px;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.chat-msg:hover .chat-msg__actions {
   opacity: 1;
 }
 

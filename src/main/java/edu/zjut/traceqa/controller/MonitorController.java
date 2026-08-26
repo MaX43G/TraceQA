@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckRole;
 import edu.zjut.traceqa.common.api.ApiResponse;
 import edu.zjut.traceqa.common.config.LightRagWebuiSessionStore;
 import edu.zjut.traceqa.common.config.ObservabilitySessionStore;
+import edu.zjut.traceqa.config.AppProperties;
 import edu.zjut.traceqa.service.LightRagMonitorService;
 import edu.zjut.traceqa.service.MonitorService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,6 +38,9 @@ public class MonitorController {
 
     @Resource
     private ObservabilitySessionStore observabilitySessionStore;
+
+    @Resource
+    private AppProperties appProperties;
 
     @Operation(summary = "查询系统运行指标")
     @SaCheckRole("ADMIN")
@@ -87,9 +91,7 @@ public class MonitorController {
         String token = webuiSessionStore.create();
         Cookie cookie = new Cookie("tq_webui", token);
         cookie.setHttpOnly(true);
-        cookie.setSecure(false);
-        // 路径设为 /：LightRAG WebUI 内部的 API 文档链接可能使用根路径（如 /docs），
-        // 需保证该 Cookie 能随根路径请求一起发送，从而通过反向代理鉴权
+        cookie.setSecure(appProperties.isCookieSecure());
         cookie.setPath("/");
         cookie.setMaxAge(60 * 60);
         cookie.setAttribute("SameSite", "Lax");
@@ -104,7 +106,7 @@ public class MonitorController {
         String token = observabilitySessionStore.create();
         Cookie cookie = new Cookie("tq_obs", token);
         cookie.setHttpOnly(true);
-        cookie.setSecure(false);
+        cookie.setSecure(appProperties.isCookieSecure());
         cookie.setPath("/");
         cookie.setMaxAge(60 * 60);
         cookie.setAttribute("SameSite", "Lax");
