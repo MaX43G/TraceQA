@@ -2,15 +2,17 @@
   <div class="home">
     <!-- Hero 区 -->
     <section class="home__hero">
+      <div class="home__blob home__blob--1" />
+      <div class="home__blob home__blob--2" />
       <div class="home__hero-inner">
-        <div class="home__logo">溯</div>
-        <h1 class="home__title">溯知 · TraceQA</h1>
-        <p class="home__subtitle">《数据挖掘》课程智能问答平台</p>
-        <p class="home__desc">
+        <div class="home__logo tq-slide-up">溯</div>
+        <h1 class="home__title tq-slide-up" style="animation-delay: 80ms">溯知 · TraceQA</h1>
+        <p class="home__subtitle tq-slide-up" style="animation-delay: 140ms">《数据挖掘》课程智能问答平台</p>
+        <p class="home__desc tq-slide-up" style="animation-delay: 200ms">
           基于知识图谱（LightRAG）与向量检索的增强 RAG 引擎，
           多 Agent 协同、流式思考、引用溯源，助你高效学习数据挖掘。
         </p>
-        <a-space :size="16" class="home__cta">
+        <a-space :size="16" class="home__cta tq-slide-up" style="animation-delay: 260ms">
           <a-button type="primary" size="large" @click="goChat">
             <template #icon><MessageOutlined /></template>
             开始问答
@@ -22,10 +24,10 @@
 
     <!-- 功能亮点 -->
     <section class="home__features">
-      <h2 class="home__section-title">核心能力</h2>
+      <h2 class="home__section-title tq-slide-up">核心能力</h2>
       <a-row :gutter="[24, 24]">
-        <a-col v-for="f in features" :key="f.title" :xs="24" :sm="12" :md="8">
-          <a-card :bordered="false" class="home__feature-card">
+        <a-col v-for="(f, idx) in features" :key="f.title" :xs="24" :sm="12" :md="8">
+          <a-card :bordered="false" class="home__feature-card tq-slide-up" :style="{ animationDelay: `${idx * 60}ms` }">
             <div class="home__feature-icon" :style="{ background: f.color }">
               <component :is="f.icon" />
             </div>
@@ -38,16 +40,16 @@
 
     <!-- 课程/工作流说明 -->
     <section class="home__workflow">
-      <h2 class="home__section-title">Agent 工作流</h2>
-      <p class="home__workflow-desc">从意图识别到答案生成，全流程可视化，检索过程实时可见。</p>
+      <h2 class="home__section-title tq-slide-up">Agent 工作流</h2>
+      <p class="home__workflow-desc tq-slide-up">从意图识别到答案生成，全流程可视化，检索过程实时可见。</p>
       <div class="home__workflow-flow">
-        <span>意图识别</span><i>→</i>
-        <span>策略调度</span><i>→</i>
-        <span>图谱检索</span><i>→</i>
-        <span>向量检索</span><i>→</i>
-        <span>关键词检索</span><i>→</i>
-        <span>融合精排</span><i>→</i>
-        <span>总结生成</span>
+        <template v-for="(step, i) in workflow" :key="step.label">
+          <span class="tq-slide-up" :style="{ animationDelay: `${i * 60}ms` }">
+            <component :is="step.icon" />
+            {{ step.label }}
+          </span>
+          <i v-if="i < workflow.length - 1">→</i>
+        </template>
       </div>
     </section>
 
@@ -69,7 +71,11 @@ import {
   FileSearchOutlined,
   ApiOutlined,
   ThunderboltOutlined,
-  SafetyCertificateOutlined
+  SafetyCertificateOutlined,
+  CommentOutlined,
+  BranchesOutlined,
+  SearchOutlined,
+  CompressOutlined
 } from '@ant-design/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -120,6 +126,16 @@ const features = [
   }
 ]
 
+const workflow = [
+  { label: '意图识别', icon: CommentOutlined },
+  { label: '策略调度', icon: BranchesOutlined },
+  { label: '图谱检索', icon: ApartmentOutlined },
+  { label: '向量检索', icon: SearchOutlined },
+  { label: '关键词检索', icon: FileSearchOutlined },
+  { label: '融合精排', icon: CompressOutlined },
+  { label: '总结生成', icon: ThunderboltOutlined }
+]
+
 function goChat(): void {
   navigateTo('/chat')
 }
@@ -136,8 +152,63 @@ function goLogin(): void {
 }
 
 .home__hero {
+  position: relative;
+  overflow: hidden;
   text-align: center;
-  padding: 72px 24px 48px;
+  padding: 72px 24px 64px;
+}
+
+/* 底部渐隐遮罩：让彩色光斑平滑过渡到下方内容区，避免突兀截断 */
+.home__hero::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 140px;
+  background: linear-gradient(to bottom, rgba(245, 247, 251, 0) 0%, #f5f7fb 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.home__blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.35;
+  animation: blobFloat 8s ease-in-out infinite;
+}
+
+.home__blob--1 {
+  width: 360px;
+  height: 360px;
+  background: #69c0ff;
+  top: -80px;
+  left: -60px;
+}
+
+.home__blob--2 {
+  width: 320px;
+  height: 320px;
+  background: #b37feb;
+  bottom: -100px;
+  right: -40px;
+  animation-delay: 3s;
+}
+
+@keyframes blobFloat {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-18px) scale(1.05);
+  }
+}
+
+.home__hero-inner {
+  position: relative;
+  z-index: 1;
 }
 
 .home__logo {
@@ -191,6 +262,16 @@ function goLogin(): void {
   height: 100%;
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.home__feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(22, 119, 255, 0.12);
+}
+
+.home__feature-card:hover .home__feature-icon {
+  transform: scale(1.08);
 }
 
 .home__feature-icon {
@@ -203,6 +284,7 @@ function goLogin(): void {
   color: #fff;
   font-size: 20px;
   margin-bottom: 12px;
+  transition: transform 0.25s ease;
 }
 
 .home__feature-title {
@@ -240,11 +322,20 @@ function goLogin(): void {
 }
 
 .home__workflow-flow span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   background: #fff;
   border: 1px solid #d9e4ff;
   color: #1677ff;
   padding: 6px 12px;
   border-radius: 16px;
+  transition: all 0.2s;
+}
+
+.home__workflow-flow span:hover {
+  background: #e6f4ff;
+  transform: translateY(-2px);
 }
 
 .home__workflow-flow i {

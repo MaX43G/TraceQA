@@ -1,11 +1,16 @@
 <template>
   <div class="admin-page">
-    <a-card :bordered="false">
-      <template #title>管理后台</template>
+    <a-card :bordered="false" class="admin-card">
+      <template #title>
+        <a-space>
+          <ToolOutlined />
+          <span>管理后台</span>
+        </a-space>
+      </template>
       <template #extra>
         <a-tag color="blue">仅管理员可见</a-tag>
       </template>
-      <a-tabs v-model:active-key="activeKey">
+      <a-tabs v-model:active-key="activeKey" class="admin-tabs">
         <a-tab-pane key="kb" tab="知识库管理">
           <KnowledgeBaseManager v-if="activeKey === 'kb'" />
         </a-tab-pane>
@@ -34,6 +39,7 @@
  * 管理后台页面（RBAC：仅 ADMIN 角色可访问）。
  */
 import { useAuthStore } from '@/stores/auth'
+import { ToolOutlined } from '@ant-design/icons-vue'
 import KnowledgeBaseManager from '@/components/admin/KnowledgeBaseManager.vue'
 import DocumentManager from '@/components/admin/DocumentManager.vue'
 import PromptManager from '@/components/admin/PromptManager.vue'
@@ -64,5 +70,17 @@ onMounted(async () => {
   max-width: 1200px;
   margin: 24px auto;
   padding: 0 24px;
+}
+
+.admin-card {
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+@media (max-width: 768px) {
+  .admin-page {
+    padding: 0 8px;
+    margin: 12px auto;
+  }
 }
 </style>

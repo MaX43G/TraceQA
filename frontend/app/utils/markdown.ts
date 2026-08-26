@@ -10,9 +10,43 @@
  */
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
+import katex from 'katex'
 
 /** 引用标记正则：匹配 [citation:1] 形式 */
 const CITATION_RE = /\[citation:(\d+)\]/g
+
+/** 块级公式 $$...$$（支持跨行） */
+const MATH_BLOCK_RE = /\$\$([\s\S]+?)\$\$/g
+/** 行内公式 $...$（单行） */
+const MATH_INLINE_RE = /\$([^$\n]+?)\$/g
+
+/**
+ * 将文本中的 LaTeX 公式（$$...$$ 块级、$...$ 行内）渲染为 KaTeX HTML。
+ * 在 markdown 渲染前执行，故对 markdown 文本与原始 HTML 内的公式均生效；
+ * 渲染失败（非法 LaTeX）时保留原文。
+ */
+function renderMath(text: string): string {
+    if (!text) {
+        return text
+    }
+    let out = text.replace(MATH_BLOCK_RE, (_m, tex: string) => {
+        try {
+            const html = katex.renderToString(tex.trim(), {displayMode: true, throwOnError: true})
+            return `<div class="katex-block">${html}</div>`
+        } catch {
+            return _m
+        }
+    })
+    out = out.replace(MATH_INLINE_RE, (_m, tex: string) => {
+        try {
+            const html = katex.renderToString(tex.trim(), {throwOnError: true})
+            return `<span class="katex-inline">${html}</span>`
+        } catch {
+            return _m
+        }
+    })
+    return out
+}
 
 /**
  * 将回答文本中的引用标记替换为 HTML 角标（在 markdown 渲染前执行）。
@@ -22,33 +56,36 @@ const CITATION_RE = /\[citation:(\d+)\]/g
  *                         其他（如模型误输出的 [citation:0]）保留为普通文本，避免出现无内容角标。
  */
 export function decorateCitations(content: string, availableIndexes?: Set<number>): string {
-  if (!content) {
-    return content
-  }
-  return content.replace(CITATION_RE, (match, idx: string) => {
-    const n = Number(idx)
-    if (availableIndexes && !availableIndexes.has(n)) {
-      // 引用不存在：移除标记，避免渲染无内容角标
-      return ''
+    if (!content) {
+        return content
     }
-    return `<sup class="tq-cite" data-idx="${idx}">[${idx}]</sup>`
-  })
+    return content.replace(CITATION_RE, (_match, idx: string) => {
+        const n = Number(idx)
+        if (availableIndexes && !availableIndexes.has(n)) {
+            // 引用不存在：移除标记，避免渲染无内容角标
+            return ''
+        }
+        return `<sup class="tq-cite" data-idx="${idx}">[${idx}]</sup>`
+    })
 }
 
-const md: MarkdownIt = new MarkdownIt({
-  html: true,
-  linkify: true,
-  breaks: true,
-  highlight(str: string, lang: string): string {
-    if (lang && hljs.getLanguage(lang)) {
-      try {
-        return `<pre class="hljs"><code>${hljs.highlight(str, { language: lang, ignoreIllegals: true }).value}</code></pre>`
-      } catch {
-        // 忽略高亮异常，退回转义展示
-      }
+const md = new MarkdownIt({
+    html: true,
+    linkify: true,
+    breaks: true,
+    highlight(str: string, lang: string): string {
+        if (lang && hljs.getLanguage(lang)) {
+            try {
+                return `<pre class="hljs"><code>${hljs.highlight(str, {
+                    language: lang,
+                    ignoreIllegals: true
+                }).value}</code></pre>`
+            } catch {
+                // 忽略高亮异常，退回转义展示
+            }
+        }
+        return `<pre class="hljs"><code>${md.utils.escapeHtml(str)}</code></pre>`
     }
-    return `<pre class="hljs"><code>${md.utils.escapeHtml(str)}</code></pre>`
-  }
 })
 
 /**
@@ -59,8 +96,8 @@ const md: MarkdownIt = new MarkdownIt({
  * @returns 可直接 v-html 的 HTML
  */
 export function renderMarkdown(content: string, availableIndexes?: Set<number>): string {
-  if (!content) {
-    return ''
-  }
-  return md.render(decorateCitations(content, availableIndexes))
+    if (!content) {
+        return ''
+    }
+    return md.render(renderMath(decorateCitations(content, availableIndexes)))
 }

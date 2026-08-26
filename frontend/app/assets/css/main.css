@@ -68,3 +68,61 @@ body {
     opacity: 0;
   }
 }
+
+/* ---- 页面切换渐变过渡动画 ---- */
+.page-enter-active,
+.page-leave-active {
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* ---- 全局常用动画 ---- */
+@keyframes tqFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tqSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tq-fade-in {
+  animation: tqFadeIn 0.4s ease both;
+}
+
+.tq-slide-up {
+  animation: tqSlideUp 0.4s ease both;
+}
+
+/* 公式块样式 */
+.katex-block {
+  overflow-x: auto;
+  padding: 6px 0;
+  margin: 8px 0;
+}
+
+.katex-inline {
+  display: inline-block;
+}

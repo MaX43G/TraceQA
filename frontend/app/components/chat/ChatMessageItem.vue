@@ -7,7 +7,7 @@
       <template v-if="isUser">
         <div class="chat-msg__user-bubble">{{ msg.content }}</div>
         <div class="chat-msg__actions">
-          <a-button type="text" size="small" danger @click="emit('delete', msg.id)">
+          <a-button type="text" size="small" danger @click="emit('delete', <number>msg.id)">
             <template #icon><DeleteOutlined /></template>
             删除
           </a-button>
@@ -15,6 +15,7 @@
       </template>
       <template v-else>
         <ThinkingTracePanel v-if="hasThinking" :nodes="msg.thinkingTrace ?? []" />
+        <RetrievalStatsPanel v-if="msg.stats" :stats="msg.stats" />
         <div class="chat-msg__ai-bubble">
           <MarkdownViewer :content="displayContent" :typing="props.streaming" :available-indexes="usedIndexes" @cite-click="handleCite" />
           <div v-if="props.streaming" class="chat-msg__streaming">正在生成…</div>
@@ -22,11 +23,17 @@
         <CitationPanel v-if="hasReferences" ref="citationPanel" :references="msg.references ?? []" :used-indexes="usedIndexes" @view="openViewer" />
         <div class="chat-msg__actions">
           <a-space :size="4">
+            <a-tooltip :title="speaking ? '停止朗读' : '朗读本条回答'">
+              <a-button type="text" size="small" :class="{ 'speak-btn--active': speaking }" @click="toggleSpeak">
+                <template #icon><SoundOutlined :spin="speaking" /></template>
+                {{ speaking ? '停止' : '朗读' }}
+              </a-button>
+            </a-tooltip>
             <a-button type="text" size="small" @click="copyContent">
               <template #icon><CopyOutlined /></template>
               复制
             </a-button>
-            <a-button type="text" size="small" danger @click="emit('delete', msg.id)">
+            <a-button type="text" size="small" danger @click="emit('delete', <number>msg.id)">
               <template #icon><DeleteOutlined /></template>
               删除
             </a-button>
@@ -40,6 +47,9 @@
   <a-modal v-model:open="viewerOpen" :title="viewerRef ? `文献${viewerRef.index}：${viewerRef.title || viewerRef.filePath}` : '文献全文'" :footer="null" width="72vw" :body-style="{ padding: '14px 20px 20px' }">
     <div v-if="viewerRef" class="viewer-body">
       <a-tag color="blue">{{ viewerRef.filePath }}</a-tag>
+      <div v-if="viewerRef.headings?.length" class="viewer-headings">
+        <a-tag v-for="h in viewerRef.headings" :key="h" color="cyan">{{ h }}</a-tag>
+      </div>
       <pre class="viewer-text">{{ viewerRef.content }}</pre>
     </div>
   </a-modal>
@@ -52,16 +62,22 @@
  * <p>用户消息右侧气泡；AI 消息包含「思考折叠面板 + Markdown 打字机 +
  * 引用溯源角标 + 复制/删除操作」。</p>
  */
-import { CopyOutlined, DeleteOutlined } from '@ant-design/icons-vue'
+import { CopyOutlined, DeleteOutlined, SoundOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import MarkdownViewer from './MarkdownViewer.vue'
 import ThinkingTracePanel from './ThinkingTracePanel.vue'
 import CitationPanel from './CitationPanel.vue'
+import RetrievalStatsPanel from './RetrievalStatsPanel.vue'
 import type { ChatMessageVO, ReferenceVO } from '@/utils/api-types'
+import type { RetrievalStats } from '@/composables/useChatStream'
 
 const props = defineProps<{
   /** 消息对象（含流式临时消息） */
-  msg: ChatMessageVO & { streaming?: boolean; buffer?: string }
+  msg: ChatMessageVO & {
+    streaming?: boolean
+    buffer?: string
+    stats?: RetrievalStats
+  }
   /** 是否处于生成中 */
   streaming?: boolean
 }>()
@@ -136,6 +152,38 @@ async function copyContent(): Promise<void> {
     message.error('复制失败')
   }
 }
+
+/** 是否正在朗读本条回答 */
+const speaking = ref(false)
+
+/** 朗读 / 停止本条回答（浏览器 Web Speech API，客户端合成，免费无 Key） */
+function toggleSpeak(): void {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    message.warning('当前浏览器不支持语音朗读')
+    return
+  }
+  if (speaking.value) {
+    window.speechSynthesis.cancel()
+    speaking.value = false
+    return
+  }
+  const content = displayContent.value
+  if (!content) {
+    return
+  }
+  const u = new SpeechSynthesisUtterance(content)
+  u.lang = 'zh-CN'
+  u.rate = 1
+  u.pitch = 1
+  u.onend = () => {
+    speaking.value = false
+  }
+  u.onerror = () => {
+    speaking.value = false
+  }
+  window.speechSynthesis.speak(u)
+  speaking.value = true
+}
 </script>
 
 <style scoped>
@@ -143,6 +191,22 @@ async function copyContent(): Promise<void> {
   display: flex;
   gap: 12px;
   margin-bottom: 20px;
+  animation: chatMsgIn 0.35s ease both;
+}
+
+@keyframes chatMsgIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.speak-btn--active {
+  color: #1677ff;
 }
 
 .chat-msg--user {
@@ -206,6 +270,12 @@ async function copyContent(): Promise<void> {
 }
 
 /* 文献全文弹窗：窗口放大 + 内容纵向滚动（自动换行，无需横向拖动） */
+.viewer-headings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 .viewer-body {
   display: flex;
   flex-direction: column;

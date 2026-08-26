@@ -24,9 +24,10 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 
 import cn.hutool.crypto.SecureUtil;
-import java.nio.charset.StandardCharsets;
+
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -106,7 +107,15 @@ public class RagAgentOrchestrator {
                 answer = respondDirect(emitter, thinking, request.getContent(), modelConfig, cancelled);
             } else {
                 RetrievalResult result = retrieve(emitter, thinking, request.getContent(), history, modelConfig, cancelled);
-                references = emitReferences(emitter, result);
+                // 未检索到内容 → 换混合模式(mix)兜底重试一次；仍为空则照常回答（如实说明未检索到）
+                if (result == null || !result.hasContent()) {
+                    List<RetrievedChunk> fallback = retrievalService.retryWithStrategy(request.getContent());
+                    if (!fallback.isEmpty()) {
+                        result = new RetrievalResult(fallback, true);
+                    }
+                }
+                List<String> highlight = extractHighlightTerms(request.getContent());
+                references = emitReferences(emitter, result, highlight);
                 answer = generateAnswer(emitter, thinking, request.getContent(), history, result, modelConfig, cancelled);
             }
 
@@ -186,6 +195,7 @@ public class RagAgentOrchestrator {
      */
     private RetrievalResult retrieve(SseEmitter emitter, List<ThinkingNodeVO> thinking, String content,
                                      String history, LlmConfig config, AtomicBoolean cancelled) {
+        long retrieveStart = System.currentTimeMillis();
         // 步骤 0：查询意图路由 —— 规则分类并选择检索路径
         ThinkingNodeVO routerNode = startThinking(thinking, "检索策略调度", "router-agent",
                 "正在分析问题类型并选择检索路径");
@@ -202,20 +212,22 @@ public class RagAgentOrchestrator {
         // 术语定义：仅关键词 + 向量，跳过图谱/HyDE/重写，响应最快
         if (type == RetrievalService.QueryType.DEFINITION) {
             EnhancedQuery simple = new EnhancedQuery(content, null, null);
-            List<RetrievedChunk> vectorChunks = runVector(emitter, thinking, content, simple, config, cancelled);
-            List<RetrievedChunk> keywordChunks = runKeyword(emitter, thinking, content, simple, config, cancelled);
+            List<RetrievedChunk> vectorChunks = runVector(emitter, thinking, content, simple, cancelled);
+            List<RetrievedChunk> keywordChunks = runKeyword(emitter, thinking, content, config, cancelled);
             List<RetrievedChunk> fused = retrievalService.fuse(vectorChunks, keywordChunks);
             ThinkingNodeVO fuseNode = startThinking(thinking, "融合与补全", "fusion-agent",
                     "正在融合关键词与向量结果");
             ssePublisher.send(emitter, "thinking", fuseNode);
             finishThinking(thinking, emitter, "融合与补全", "融合后共 " + fused.size() + " 条");
+            emitRetrievalStats(emitter, 0, vectorChunks.size(), keywordChunks.size(), fused, retrieveStart);
             return new RetrievalResult(fused, true);
         }
 
         // 简单问题：仅向量检索原问题（跳过重写/HyDE 与图谱，响应更快）
         if (type == RetrievalService.QueryType.SIMPLE) {
             EnhancedQuery simple = new EnhancedQuery(content, null, null);
-            List<RetrievedChunk> vectorChunks = runVector(emitter, thinking, content, simple, config, cancelled);
+            List<RetrievedChunk> vectorChunks = runVector(emitter, thinking, content, simple, cancelled);
+            emitRetrievalStats(emitter, 0, vectorChunks.size(), 0, vectorChunks, retrieveStart);
             return new RetrievalResult(vectorChunks, true);
         }
 
@@ -237,15 +249,15 @@ public class RagAgentOrchestrator {
         ThinkingNodeVO graphNode = startThinking(thinking, "图谱检索", "graph-agent",
                 "正在执行知识图谱检索");
         ssePublisher.send(emitter, "thinking", graphNode);
-        List<RetrievedChunk> graphChunks = retrievalService.queryGraph(content, enhanced, config,
+        List<RetrievedChunk> graphChunks = retrievalService.queryGraph(content, enhanced,
                 progress -> pushProgress(emitter, graphNode, cancelled, progress));
         finishThinking(thinking, emitter, "图谱检索", "图谱命中 " + graphChunks.size() + " 条");
 
         // 步骤 3：向量检索（多查询扩展）
-        List<RetrievedChunk> vectorChunks = runVector(emitter, thinking, content, enhanced, config, cancelled);
+        List<RetrievedChunk> vectorChunks = runVector(emitter, thinking, content, enhanced, cancelled);
 
         // 步骤 4：关键词检索（术语/编号类问题召回更准）
-        List<RetrievedChunk> keywordChunks = runKeyword(emitter, thinking, content, enhanced, config, cancelled);
+        List<RetrievedChunk> keywordChunks = runKeyword(emitter, thinking, content, config, cancelled);
 
         // 步骤 5：三路融合 + ReRead 补全 + LLM 精排
         ThinkingNodeVO fuseNode = startThinking(thinking, "融合与补全", "fusion-agent",
@@ -256,16 +268,38 @@ public class RagAgentOrchestrator {
         String fuseDetail = String.format("融合后共 %d 条%s", result.getChunks().size(),
                 result.isDegraded() ? "（查询增强已降级）" : "");
         finishThinking(thinking, emitter, "融合与补全", fuseDetail);
+        emitRetrievalStats(emitter, graphChunks.size(), vectorChunks.size(), keywordChunks.size(),
+                result.getChunks(), retrieveStart);
         return result;
+    }
+
+    /** 推送「检索分析」数据（三路命中数 + 来源文档分布 + 耗时） */
+    private void emitRetrievalStats(SseEmitter emitter, int graphHits, int vectorHits, int keywordHits,
+                                    List<RetrievedChunk> fused, long startMs) {
+        Map<String, Integer> sourceDocs = new LinkedHashMap<>();
+        for (RetrievedChunk c : fused) {
+            if (c.getFilePath() != null && !c.getFilePath().isBlank()) {
+                String file = extractFilename(c.getFilePath());
+                sourceDocs.merge(file, 1, Integer::sum);
+            }
+        }
+        Map<String, Object> stats = new LinkedHashMap<>();
+        stats.put("graphHits", graphHits);
+        stats.put("vectorHits", vectorHits);
+        stats.put("keywordHits", keywordHits);
+        stats.put("fusedCount", fused.size());
+        stats.put("elapsedMs", System.currentTimeMillis() - startMs);
+        stats.put("sourceDocs", sourceDocs);
+        ssePublisher.send(emitter, "stats", stats);
     }
 
     /** 向量检索节点（含 SSE 进度推送） */
     private List<RetrievedChunk> runVector(SseEmitter emitter, List<ThinkingNodeVO> thinking, String content,
-                                           EnhancedQuery enhanced, LlmConfig config, AtomicBoolean cancelled) {
+                                           EnhancedQuery enhanced, AtomicBoolean cancelled) {
         ThinkingNodeVO vectorNode = startThinking(thinking, "向量检索", "vector-agent",
                 "正在执行向量语义检索");
         ssePublisher.send(emitter, "thinking", vectorNode);
-        List<RetrievedChunk> chunks = retrievalService.queryVector(content, enhanced, config,
+        List<RetrievedChunk> chunks = retrievalService.queryVector(content, enhanced,
                 progress -> pushProgress(emitter, vectorNode, cancelled, progress));
         finishThinking(thinking, emitter, "向量检索", "向量命中 " + chunks.size() + " 条");
         return chunks;
@@ -273,11 +307,11 @@ public class RagAgentOrchestrator {
 
     /** 关键词检索节点（含 SSE 进度推送） */
     private List<RetrievedChunk> runKeyword(SseEmitter emitter, List<ThinkingNodeVO> thinking, String content,
-                                            EnhancedQuery enhanced, LlmConfig config, AtomicBoolean cancelled) {
+                                            LlmConfig config, AtomicBoolean cancelled) {
         ThinkingNodeVO kwNode = startThinking(thinking, "关键词检索", "keyword-agent",
                 "正在执行关键词检索");
         ssePublisher.send(emitter, "thinking", kwNode);
-        List<RetrievedChunk> chunks = retrievalService.queryKeyword(content, enhanced, config,
+        List<RetrievedChunk> chunks = retrievalService.queryKeyword(content, config,
                 progress -> pushProgress(emitter, kwNode, cancelled, progress));
         finishThinking(thinking, emitter, "关键词检索", "关键词命中 " + chunks.size() + " 条");
         return chunks;
@@ -302,10 +336,10 @@ public class RagAgentOrchestrator {
     }
 
     /**
-     * 推送引用来源事件
+     * 推送引用来源事件（含章节路径与高亮术语）
      */
-    private List<ReferenceVO> emitReferences(SseEmitter emitter, RetrievalResult result) {
-        List<ReferenceVO> references = buildReferences(result);
+    private List<ReferenceVO> emitReferences(SseEmitter emitter, RetrievalResult result, List<String> highlight) {
+        List<ReferenceVO> references = buildReferences(result, highlight);
         ssePublisher.send(emitter, "references", Map.of("references", references));
         return references;
     }
@@ -337,9 +371,7 @@ public class RagAgentOrchestrator {
                                  LlmConfig config, AtomicBoolean cancelled) {
         ThinkingNodeVO node = startThinking(thinking, "直接应答", "answer-agent", "无需检索，直接应答");
         ssePublisher.send(emitter, "thinking", node);
-        StringBuilder acc = new StringBuilder();
-        acc.append(consume(emitter, llmService.callStream("chat", content, config), cancelled));
-        String answer = acc.toString();
+        String answer = consume(emitter, llmService.callStream("chat", content, config), cancelled);
         if (answer == null || answer.isBlank()) {
             answer = "您好！我是「溯知」，可以为你解答《数据挖掘》课程相关问题，"
                     + "也可以询问平台的使用方式。请描述你的问题。";
@@ -366,7 +398,7 @@ public class RagAgentOrchestrator {
      */
     private String consume(SseEmitter emitter, Flux<String> flux, AtomicBoolean cancelled) {
         StringBuilder acc = new StringBuilder();
-        flux.takeWhile(chunk -> !cancelled.get()).toIterable().forEach(chunk -> {
+        flux.takeWhile(_ -> !cancelled.get()).toIterable().forEach(chunk -> {
             acc.append(chunk);
             ssePublisher.send(emitter, "delta", Map.of("content", chunk));
         });
@@ -440,19 +472,39 @@ public class RagAgentOrchestrator {
     }
 
     /**
-     * 组装引用来源列表
+     * 组装引用来源列表（含章节路径与高亮术语）
      */
-    private List<ReferenceVO> buildReferences(RetrievalResult result) {
+    private List<ReferenceVO> buildReferences(RetrievalResult result, List<String> highlight) {
         if (result == null || !result.hasContent()) {
             return List.of();
         }
         List<ReferenceVO> refs = new ArrayList<>();
         int idx = 1;
         for (RetrievedChunk chunk : result.getChunks()) {
-            refs.add(new ReferenceVO(idx, extractFilename(chunk.getFilePath()), chunk.getFilePath(), chunk.getContent()));
+            refs.add(new ReferenceVO(idx, extractFilename(chunk.getFilePath()), chunk.getFilePath(),
+                    chunk.getContent(), chunk.getHeadings(), highlight));
             idx++;
         }
         return refs;
+    }
+
+    /** 从用户问题提取用于片段内高亮的术语（规则切分，保留 ≥2 字符 token） */
+    private List<String> extractHighlightTerms(String question) {
+        if (question == null || question.isBlank()) {
+            return List.of();
+        }
+        List<String> terms = new ArrayList<>();
+        String[] parts = question.split("[\\s，。；、？！：:（）()\"'“”‘’\\[\\]{}<>《》—…~`]+");
+        for (String part : parts) {
+            String t = part.trim();
+            if (t.length() >= 2 && t.length() <= 12 && !terms.contains(t)) {
+                terms.add(t);
+            }
+            if (terms.size() >= 8) {
+                break;
+            }
+        }
+        return terms;
     }
 
     /**

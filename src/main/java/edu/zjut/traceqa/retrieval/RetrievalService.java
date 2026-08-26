@@ -13,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import cn.hutool.crypto.SecureUtil;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -116,7 +115,7 @@ public class RetrievalService {
      * 图谱检索：local（实体局部图）+ global（关系全局图）并行，提高召回。
      * 结果缓存 10 分钟。
      */
-    public List<RetrievedChunk> queryGraph(String question, EnhancedQuery enhanced, LlmConfig config,
+    public List<RetrievedChunk> queryGraph(String question, EnhancedQuery enhanced,
                                            Consumer<String> progress) {
         notify(progress, "正在执行图谱检索（local + global）");
         String graphQuery = enhanced.getRewritten() != null ? enhanced.getRewritten() : question;
@@ -142,7 +141,7 @@ public class RetrievalService {
      * 向量检索：多查询扩展（原问题 + 重写 + HyDE + 分解子问题并行），显著提高召回。
      * 结果缓存 5 分钟。
      */
-    public List<RetrievedChunk> queryVector(String question, EnhancedQuery enhanced, LlmConfig config,
+    public List<RetrievedChunk> queryVector(String question, EnhancedQuery enhanced,
                                             Consumer<String> progress) {
         notify(progress, "正在执行向量检索（多查询扩展）");
         List<String> queries = new ArrayList<>();
@@ -176,7 +175,7 @@ public class RetrievalService {
      * 关键词检索：提取关键术语，以 hl_keywords 方式检索（对术语/编号类问题召回更准）。
      * 结果缓存 5 分钟。
      */
-    public List<RetrievedChunk> queryKeyword(String question, EnhancedQuery enhanced, LlmConfig config,
+    public List<RetrievedChunk> queryKeyword(String question, LlmConfig config,
                                              Consumer<String> progress) {
         notify(progress, "正在执行关键词检索");
         String cacheKey = "kw:" + sha256(question);
@@ -196,6 +195,25 @@ public class RetrievalService {
         redisCacheService.put(cacheKey, chunks, Duration.ofMinutes(5));
         notify(progress, String.format("关键词检索完成：命中 %d 条", chunks.size()));
         return chunks;
+    }
+
+    /**
+     * 检索兜底重试：当常规三路检索均为空时，改用 LightRAG 混合模式（mix）非流式重试一次，
+     * 提高「换一种策略」的召回机会。非流式调用可规避流式大响应被截断的边界情况。
+     */
+    public List<RetrievedChunk> retryWithStrategy(String question) {
+        if (question == null || question.trim().length() < 3) {
+            return List.of();
+        }
+        try {
+            Map<String, Object> response = lightRagClient.query(question, "mix", true);
+            List<RetrievedChunk> chunks = parseReferences(response, "retry");
+            log.info("检索兜底重试（mix）：命中 {} 条", chunks.size());
+            return chunks;
+        } catch (Exception e) {
+            log.warn("检索兜底重试降级：{}", e.getMessage());
+            return List.of();
+        }
     }
 
     /** 提取检索关键词：LLM 优先，失败回退英文 token 规则 */
@@ -224,7 +242,7 @@ public class RetrievalService {
             return List.of();
         }
         List<String> kw = new ArrayList<>();
-        Matcher m = Pattern.compile("[A-Za-z][A-Za-z0-9+.#-]{1,}").matcher(question);
+        Matcher m = Pattern.compile("[A-Za-z][A-Za-z0-9+.#-]+").matcher(question);
         while (m.find() && kw.size() < 5) {
             kw.add(m.group());
         }
@@ -238,13 +256,14 @@ public class RetrievalService {
                                              List<RetrievedChunk> vectorChunks, List<RetrievedChunk> keywordChunks,
                                              EnhancedQuery enhanced, LlmConfig config) {
         List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
-        List<RetrievedChunk> supplemented = reread(question, fused, config);
+        List<RetrievedChunk> supplemented = reread(fused, config);
         List<RetrievedChunk> reranked = rerank(question, supplemented, config);
         boolean degraded = enhanced.getRewritten() == null && enhanced.getHyde() == null;
         return new RetrievalResult(reranked, degraded);
     }
 
     /** 合并多路片段（按 reference_id+content 去重，保留首现） */
+    @SafeVarargs
     private List<RetrievedChunk> mergeChunks(List<RetrievedChunk>... sources) {
         Map<String, RetrievedChunk> merged = new LinkedHashMap<>();
         for (List<RetrievedChunk> source : sources) {
@@ -367,7 +386,7 @@ public class RetrievalService {
 
     /** 是否术语定义类问题 */
     private boolean isDefinitionQuestion(String q) {
-        return q.matches("^(什么是|何为|啥是|何谓|解释一下什么是|简单解释)[\\s]?.*")
+        return q.matches("^(什么是|何为|啥是|何谓|解释一下什么是|简单解释)\\s?.*")
                 || q.matches("^.{0,12}是.{0,6}(吗|吧|的意思|概念|原理)$")
                 || (q.length() <= 20 && (q.endsWith("？") || q.endsWith("?")) && !isCompareQuestion(q)
                 && !hasComplexSignal(q) && !q.matches(".*(为什么|如何|怎样|怎么).*"));
@@ -412,7 +431,8 @@ public class RetrievalService {
                         str(ref.get("file_path")),
                         content,
                         1.0 / (RRF_K + rank),
-                        source));
+                        source,
+                        extractHeadings(ref)));
             }
             rank++;
         }
@@ -439,7 +459,8 @@ public class RetrievalService {
                             str(refMap.get("file_path")),
                             content,
                             1.0 / (RRF_K + rank),
-                            source));
+                            source,
+                            extractHeadings(refMap)));
                 }
                 rank++;
             }
@@ -459,8 +480,24 @@ public class RetrievalService {
         return List.of();
     }
 
+    /** 提取引用片段的章节路径（LightRAG 返回 content_headings/headings，可空） */
+    private List<String> extractHeadings(Map<?, ?> refMap) {
+        Object raw = refMap.get("content_headings");
+        if (raw == null) {
+            raw = refMap.get("headings");
+        }
+        if (raw instanceof List<?> list) {
+            return list.stream().map(String::valueOf).toList();
+        }
+        if (raw instanceof String text && !text.isBlank()) {
+            return List.of(text);
+        }
+        return List.of();
+    }
+
     /** RRF 倒数排名融合：多路结果合并去重（varargs，供编排器定义类问题复用） */
-    public List<RetrievedChunk> fuse(List<RetrievedChunk>... sources) {
+    @SafeVarargs
+    public final List<RetrievedChunk> fuse(List<RetrievedChunk>... sources) {
         Map<String, RetrievedChunk> merged = new LinkedHashMap<>();
         for (List<RetrievedChunk> source : sources) {
             mergePath(merged, source);
@@ -479,12 +516,12 @@ public class RetrievalService {
             double addScore = 1.0 / (RRF_K + rank);
             String key = chunk.getReferenceId() == null ? chunk.getContent() : chunk.getReferenceId();
             if (merged.containsKey(key)) {
-                RetrievedChunk exist = merged.get(key);
-                merged.put(key, new RetrievedChunk(exist.getReferenceId(), exist.getFilePath(),
-                        exist.getContent(), exist.getScore() + addScore, exist.getSource() + "+" + chunk.getSource()));
+                merged.computeIfPresent(key, (_, exist) -> new RetrievedChunk(exist.getReferenceId(), exist.getFilePath(),
+                        exist.getContent(), exist.getScore() + addScore, exist.getSource() + "+" + chunk.getSource(),
+                        exist.getHeadings() != null ? exist.getHeadings() : chunk.getHeadings()));
             } else {
                 merged.put(key, new RetrievedChunk(chunk.getReferenceId(), chunk.getFilePath(),
-                        chunk.getContent(), addScore, chunk.getSource()));
+                        chunk.getContent(), addScore, chunk.getSource(), chunk.getHeadings()));
             }
             rank++;
         }
@@ -494,7 +531,7 @@ public class RetrievalService {
      * ReRead 二次检索：
      * 从已检索片段中抽取关键术语，用术语补查一次，将新片段合并进结果。
      */
-    private List<RetrievedChunk> reread(String question, List<RetrievedChunk> fused, LlmConfig config) {
+    private List<RetrievedChunk> reread(List<RetrievedChunk> fused, LlmConfig config) {
         if (fused.isEmpty()) {
             return fused;
         }

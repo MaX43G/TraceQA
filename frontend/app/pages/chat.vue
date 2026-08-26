@@ -1,7 +1,7 @@
 <template>
   <div class="chat-page">
     <!-- 桌面端侧边栏 -->
-    <aside class="chat-page__aside chat-page__aside--desktop">
+    <aside class="chat-page__aside chat-page__aside--desktop" :class="{ 'is-collapsed': desktopCollapsed }">
       <SessionList
         :sessions="chat.sessions"
         :current-session-id="chat.currentSessionId"
@@ -35,6 +35,14 @@
         <a-space :size="8">
           <a-button class="chat-page__menu-btn" type="text" @click="sidebarOpen = true">
             <template #icon><MenuOutlined /></template>
+          </a-button>
+          <a-button
+            class="chat-page__collapse-btn"
+            type="text"
+            :title="desktopCollapsed ? '展开会话列表' : '收起会话列表'"
+            @click="desktopCollapsed = !desktopCollapsed"
+          >
+            <template #icon><MenuFoldOutlined v-if="!desktopCollapsed" /><MenuUnfoldOutlined v-else /></template>
           </a-button>
           <ModelSelector />
         </a-space>
@@ -80,12 +88,12 @@
  * <p>布局：左侧会话列表 + 右侧聊天区（工具栏 / 消息流 / 输入框）。
  * 流式回答基于 SSE 实时渲染（打字机 + 状态图 + 引用溯源），支持随时中断。</p>
  */
-import { ExportOutlined, MenuOutlined } from '@ant-design/icons-vue'
+import { ExportOutlined, MenuOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import { useChatStore } from '@/stores/chat'
 import { useAuthStore } from '@/stores/auth'
 import { useModelStore } from '@/stores/model'
-import { streamChat } from '@/composables/useChatStream'
+import { streamChat, type RetrievalStats } from '@/composables/useChatStream'
 import SessionList from '@/components/chat/SessionList.vue'
 import ChatMessageItem from '@/components/chat/ChatMessageItem.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
@@ -104,6 +112,8 @@ const modelStore = useModelStore()
 const listRef = ref<HTMLElement | null>(null)
 /** 移动端会话抽屉开关 */
 const sidebarOpen = ref(false)
+/** 桌面端会话列表是否收起 */
+const desktopCollapsed = ref(false)
 
 /** 快捷提问示例 */
 const quickQuestions = ['什么是 K 均值聚类？', '解释一下 Apriori 关联规则算法', '决策树是如何进行特征选择的？']
@@ -216,7 +226,8 @@ async function handleSend(content: string): Promise<void> {
     latencyMs: 0,
     createTime: new Date().toISOString(),
     streaming: true,
-    buffer: ''
+    buffer: '',
+    stats: undefined as RetrievalStats | undefined
   }) as StreamMessage
   chat.messages.push(streamMsg)
 
@@ -241,6 +252,9 @@ async function handleSend(content: string): Promise<void> {
       onReferences: (references) => {
         streamMsg.references = references
       },
+      onStats: (stats) => {
+        streamMsg.stats = stats
+      },
       onDone: () => {
         streamMsg.streaming = false
         streamMsg.content = streamMsg.buffer
@@ -256,7 +270,6 @@ async function handleSend(content: string): Promise<void> {
       },
       onEnd: async () => {
         chat.generating = false
-        // 刷新会话与消息（获取真实 ID）
         await chat.loadSessions()
         if (chat.currentSessionId) {
           await chat.openSession(chat.currentSessionId)
@@ -307,6 +320,15 @@ watch(
   background: #fff;
   border-right: 1px solid #f0f0f0;
   overflow: hidden;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chat-page__aside.is-collapsed {
+  width: 0;
+}
+
+.chat-page__aside--desktop {
+  width: 260px;
 }
 
 .chat-page__main {
@@ -372,6 +394,10 @@ watch(
 /* ---- 移动端适配 ---- */
 @media (max-width: 768px) {
   .chat-page__aside--desktop {
+    display: none;
+  }
+
+  .chat-page__collapse-btn {
     display: none;
   }
 

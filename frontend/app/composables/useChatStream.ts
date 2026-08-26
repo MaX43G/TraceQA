@@ -16,12 +16,24 @@ export interface ChatStreamHandlers {
   onDelta?: (content: string) => void
   /** 引用来源 */
   onReferences?: (references: ReferenceVO[]) => void
+  /** 检索分析（三路命中数 / 来源文档分布 / 耗时） */
+  onStats?: (stats: RetrievalStats) => void
   /** 结束（携带会话/消息 ID） */
   onDone?: (payload: { sessionId?: number; messageId?: number; title?: string }) => void
   /** 服务端错误 */
   onError?: (error: { code?: number; msg?: string }) => void
   /** 流结束（无论成功失败均触发） */
   onEnd?: () => void
+}
+
+/** 检索分析数据（来自后端 stats 事件） */
+export interface RetrievalStats {
+  graphHits?: number
+  vectorHits?: number
+  keywordHits?: number
+  fusedCount?: number
+  elapsedMs?: number
+  sourceDocs?: Record<string, number>
 }
 
 /** 发起流式对话请求并消费事件 */
@@ -143,6 +155,9 @@ function dispatchBlock(block: string, handlers: ChatStreamHandlers): void {
     }
     case 'references':
       handlers.onReferences?.((payload as { references?: ReferenceVO[] })?.references ?? [])
+      break
+    case 'stats':
+      handlers.onStats?.(payload as RetrievalStats)
       break
     case 'done':
       handlers.onDone?.(payload as { sessionId?: number; messageId?: number; title?: string })

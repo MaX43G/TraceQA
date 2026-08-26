@@ -61,11 +61,17 @@ export default defineNuxtConfig({
   modules: ['@pinia/nuxt'],
 
   // Ant Design Vue 全局样式
-  css: ['ant-design-vue/dist/reset.css', '@/assets/css/main.css'],
+  css: [
+    'ant-design-vue/dist/reset.css',
+    'katex/dist/katex.min.css',
+    '@/assets/css/main.css'
+  ],
 
   // 服务端渲染 + 简单 SEO
   ssr: true,
   app: {
+    // 页面切换渐变过渡动画
+    pageTransition: { name: 'page', mode: 'out-in' },
     head: {
       charset: 'utf-8',
       viewport: 'width=device-width, initial-scale=1',

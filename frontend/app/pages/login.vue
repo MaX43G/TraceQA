@@ -1,6 +1,8 @@
 <template>
   <div class="login-page">
-    <a-card class="login-card" :bordered="false">
+    <div class="login-page__blob login-page__blob--1" />
+    <div class="login-page__blob login-page__blob--2" />
+    <a-card class="login-card tq-slide-up" :bordered="false">
       <div class="login-card__header">
         <div class="login-card__logo">溯</div>
         <h2 class="login-card__title">溯知 · TraceQA</h2>
@@ -154,15 +156,45 @@ function validateConfirm(_rule: unknown, value: string, callback: (error?: Error
 
 <style scoped>
 .login-page {
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
   background: linear-gradient(135deg, #e8f0fe 0%, #f6f7fb 100%);
 }
+
+.login-page__blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.4;
+}
+
+.login-page__blob--1 {
+  width: 340px;
+  height: 340px;
+  background: #69c0ff;
+  top: -80px;
+  right: 10%;
+}
+
+.login-page__blob--2 {
+  width: 300px;
+  height: 300px;
+  background: #b37feb;
+  bottom: -80px;
+  left: 8%;
+}
+
 .login-card {
+  position: relative;
+  z-index: 1;
   width: 420px;
   max-width: 92vw;
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(22, 119, 255, 0.12);
 }
 .login-card__header {
   text-align: center;
@@ -180,6 +212,7 @@ function validateConfirm(_rule: unknown, value: string, callback: (error?: Error
   font-size: 22px;
   font-weight: 700;
   margin-bottom: 8px;
+  box-shadow: 0 4px 12px rgba(22, 119, 255, 0.25);
 }
 .login-card__title {
   margin: 0;

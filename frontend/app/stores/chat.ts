@@ -21,6 +21,8 @@ export interface StreamMessage extends ChatMessageVO {
   streaming: boolean
   /** 内容增量缓冲 */
   buffer: string
+  /** 检索分析数据（SSE stats 事件） */
+  stats?: { graphHits?: number; vectorHits?: number; keywordHits?: number; fusedCount?: number; elapsedMs?: number; sourceDocs?: Record<string, number> }
 }
 
 export const useChatStore = defineStore('chat', {
@@ -46,12 +48,12 @@ export const useChatStore = defineStore('chat', {
     async newSession(): Promise<void> {
       const res = await createSession({
         title: '新对话',
-        knowledgeBaseId: null
+        knowledgeBaseId: undefined
       })
       const session = res.data
       if (session) {
         this.sessions.unshift(session)
-        this.currentSessionId = session.id
+        this.currentSessionId = session.id || null
         this.messages = []
       }
     },

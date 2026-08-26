@@ -307,6 +307,8 @@ declare namespace API {
     title?: string;
     filePath?: string;
     content?: string;
+    headings?: string[];
+    highlight?: string[];
   };
 
   type RegisterRequest = {
