@@ -55,7 +55,17 @@ function submit(): void {
   }
   emit('send', content)
   text.value = ''
+  resetKey.value++
 }
+
+function clear(): void {
+  text.value = ''
+  nextTick(() => {
+    resetKey.value++
+  })
+}
+
+defineExpose({ clear })
 </script>
 
 <style scoped>

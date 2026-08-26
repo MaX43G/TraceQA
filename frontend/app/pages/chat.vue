@@ -75,7 +75,7 @@
       </div>
 
       <div class="chat-page__input">
-        <ChatInput :disabled="chat.generating" :generating="chat.generating" @send="handleSend" />
+        <ChatInput ref="inputRef" :disabled="chat.generating" :generating="chat.generating" @send="handleSend" />
       </div>
     </main>
   </div>
@@ -110,6 +110,8 @@ const chat = useChatStore()
 const auth = useAuthStore()
 const modelStore = useModelStore()
 const listRef = ref<HTMLElement | null>(null)
+/** 提问框实例（用于回答结束后清空） */
+const inputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 /** 移动端会话抽屉开关 */
 const sidebarOpen = ref(false)
 /** 桌面端会话列表是否收起 */
@@ -270,6 +272,7 @@ async function handleSend(content: string): Promise<void> {
       },
       onEnd: async () => {
         chat.generating = false
+        inputRef.value?.clear()
         await chat.loadSessions()
         if (chat.currentSessionId) {
           await chat.openSession(chat.currentSessionId)
