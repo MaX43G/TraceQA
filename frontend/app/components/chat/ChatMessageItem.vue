@@ -50,7 +50,7 @@
       <div v-if="viewerRef.headings?.length" class="viewer-headings">
         <a-tag v-for="h in viewerRef.headings" :key="h" color="cyan">{{ h }}</a-tag>
       </div>
-      <pre class="viewer-text">{{ viewerRef.content }}</pre>
+      <div class="viewer-markdown markdown-body" v-html="viewerMarkdown" />
     </div>
   </a-modal>
 </template>
@@ -68,6 +68,7 @@ import MarkdownViewer from './MarkdownViewer.vue'
 import ThinkingTracePanel from './ThinkingTracePanel.vue'
 import CitationPanel from './CitationPanel.vue'
 import RetrievalStatsPanel from './RetrievalStatsPanel.vue'
+import { renderMarkdown } from '@/utils/markdown'
 import type { ChatMessageVO, ReferenceVO } from '@/utils/api-types'
 import type { RetrievalStats } from '@/composables/useChatStream'
 
@@ -126,6 +127,9 @@ const displayContent = computed<string>(() =>
 /** 文献全文查看弹窗状态 */
 const viewerOpen = ref(false)
 const viewerRef = ref<ReferenceVO | null>(null)
+
+/** 文献全文按 Markdown + 公式渲染 */
+const viewerMarkdown = computed<string>(() => renderMarkdown(viewerRef.value?.content || ''))
 
 /** 打开文献全文 */
 function openViewer(ref: ReferenceVO): void {
@@ -282,20 +286,14 @@ function toggleSpeak(): void {
   gap: 10px;
 }
 
-.viewer-text {
+.viewer-markdown {
   flex: 1;
   max-height: 62vh;
   min-height: 240px;
   overflow-y: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-size: 14px;
-  line-height: 1.8;
-  color: #1f2329;
   background: #f7f8fa;
   border: 1px solid #f0f0f0;
   border-radius: 8px;
   padding: 14px 18px;
-  margin: 0;
 }
 </style>
