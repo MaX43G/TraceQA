@@ -126,3 +126,30 @@ body {
 .katex-inline {
   display: inline-block;
 }
+
+/* ---- Windows 11 风格：磨玻璃 + 渐变 ---- */
+.tq-glass {
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.12);
+}
+
+.tq-gradient-text {
+  background: linear-gradient(135deg, #1677ff, #06b6d4);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.tq-gradient-bg {
+  background: linear-gradient(135deg, #1677ff, #06b6d4);
+}
+
+/* 全局圆角与柔和过渡 */
+.ant-card,
+.ant-modal-content,
+.ant-tabs-tabpane {
+  border-radius: 14px;
+}

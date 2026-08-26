@@ -19,18 +19,41 @@ const CITATION_RE = /\[citation:(\d+)]/g
 const MATH_BLOCK_RE = /\$\$([\s\S]+?)\$\$/g
 /** 行内公式 $...$（单行） */
 const MATH_INLINE_RE = /\$([^$\n]+?)\$/g
-/** 中文字符（数学公式不应包含中文） */
+/** 中文字符（用于区分公式与正文） */
 const CJK_RE = /[\u4e00-\u9fa5]/
 
-/** 判定是否为真正的数学公式：含中文的 `$...$` 多半是误匹配的正文，跳过以保原文 */
+/**
+ * 判定是否为真正的数学公式：
+ * - 不含中文 → 视为公式；
+ * - 含中文但使用了 LaTeX 命令（如 \text、\frac 等，含反斜杠）→ 视为公式（公式中可含 \text{中文}）；
+ * - 含中文且无任何 LaTeX 命令 → 多为被误匹配的正文，跳过以保原文。
+ */
 function isMathCandidate(tex: string): boolean {
-    return !CJK_RE.test(tex)
+    if (!CJK_RE.test(tex)) {
+        return true
+    }
+    return tex.includes('\\')
+}
+
+/** 将公式中的中文串包进 \text{...}，使 KaTeX 按文本渲染（而非当成数学符号） */
+function protectCjk(tex: string): string {
+    return tex.replace(/([\u4e00-\u9fa5]+)/g, '\\text{$1}')
+}
+
+/**
+ * 渲染单个公式：先保护中文，再以宽松模式渲染。
+ * strict=false + throwOnError=false：即使公式存在轻微瑕疵（如 OCR 产生的多余 # 等），
+ * 也尽量渲染而非整段丢弃，保证内容完整可见。
+ */
+function renderTex(tex: string, displayMode: boolean): string {
+    const options = { displayMode, throwOnError: false, strict: false }
+    return katex.renderToString(protectCjk(tex.trim()), options)
 }
 
 /**
  * 将文本中的 LaTeX 公式（$$...$$ 块级、$...$ 行内）渲染为 KaTeX HTML。
  * 在 markdown 渲染前执行，故对 markdown 文本与原始 HTML 内的公式均生效；
- * 含中文或被误匹配的 `$...$`、非法 LaTeX 均保留原文，避免破坏正文。
+ * 被误匹配的纯中文正文（无 LaTeX 命令）跳过保留原文。
  */
 function renderMath(text: string): string {
     if (!text) {
@@ -40,23 +63,13 @@ function renderMath(text: string): string {
         if (!isMathCandidate(tex)) {
             return _m
         }
-        try {
-            const html = katex.renderToString(tex.trim(), { displayMode: true, throwOnError: true })
-            return `<div class="katex-block">${html}</div>`
-        } catch {
-            return _m
-        }
+        return `<div class="katex-block">${renderTex(tex, true)}</div>`
     })
     out = out.replace(MATH_INLINE_RE, (_m, tex: string) => {
         if (!isMathCandidate(tex)) {
             return _m
         }
-        try {
-            const html = katex.renderToString(tex.trim(), { throwOnError: true })
-            return `<span class="katex-inline">${html}</span>`
-        } catch {
-            return _m
-        }
+        return `<span class="katex-inline">${renderTex(tex, false)}</span>`
     })
     return out
 }

@@ -35,6 +35,7 @@ const emit = defineEmits<{
 }>()
 
 const text = ref('')
+const resetKey = ref(0)
 
 const placeholder = computed<string>(() =>
   props.disabled ? 'AI 正在回答，请稍候…' : '请输入你的问题，例如：什么是 K 均值聚类？'
@@ -53,9 +54,9 @@ function submit(): void {
   if (!content || props.disabled || props.generating) {
     return
   }
-  emit('send', content)
   text.value = ''
   resetKey.value++
+  emit('send', content)
 }
 
 function clear(): void {

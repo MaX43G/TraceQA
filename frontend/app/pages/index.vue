@@ -6,7 +6,7 @@
       <div class="home__blob home__blob--2" />
       <div class="home__hero-inner">
         <div class="home__logo tq-slide-up">溯</div>
-        <h1 class="home__title tq-slide-up" style="animation-delay: 80ms">溯知 · TraceQA</h1>
+        <h1 class="home__title tq-gradient-text tq-slide-up" style="animation-delay: 80ms">溯知 · TraceQA</h1>
         <p class="home__subtitle tq-slide-up" style="animation-delay: 140ms">《数据挖掘》课程智能问答平台</p>
         <p class="home__desc tq-slide-up" style="animation-delay: 200ms">
           基于知识图谱（LightRAG）与向量检索的增强 RAG 引擎，
@@ -27,7 +27,7 @@
       <h2 class="home__section-title tq-slide-up">核心能力</h2>
       <a-row :gutter="[24, 24]">
         <a-col v-for="(f, idx) in features" :key="f.title" :xs="24" :sm="12" :md="8">
-          <a-card :bordered="false" class="home__feature-card tq-slide-up" :style="{ animationDelay: `${idx * 60}ms` }">
+          <a-card :bordered="false" class="home__feature-card tq-glass tq-slide-up" :style="{ animationDelay: `${idx * 60}ms` }">
             <div class="home__feature-icon" :style="{ background: f.color }">
               <component :is="f.icon" />
             </div>
@@ -71,7 +71,6 @@ import {
   FileSearchOutlined,
   ApiOutlined,
   ThunderboltOutlined,
-  SafetyCertificateOutlined,
   CommentOutlined,
   BranchesOutlined,
   SearchOutlined,
@@ -119,10 +118,10 @@ const features = [
     color: '#52c41a'
   },
   {
-    title: '异步文档解析',
-    desc: '支持 .md/.txt 上传与 zip 批量导入，内容指纹去重，后台切块限速入库，进度实时追踪',
-    icon: SafetyCertificateOutlined,
-    color: '#eb2f96'
+    title: '多轮连续对话',
+    desc: '连续问答自动结合上下文，能记住你之前提到的内容，追问更自然',
+    icon: CommentOutlined,
+    color: '#13c2c2'
   }
 ]
 
@@ -158,7 +157,6 @@ function goLogin(): void {
   padding: 72px 24px 64px;
 }
 
-/* 底部渐隐遮罩：让彩色光斑平滑过渡到下方内容区，避免突兀截断 */
 .home__hero::after {
   content: '';
   position: absolute;

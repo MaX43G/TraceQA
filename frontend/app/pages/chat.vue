@@ -3,30 +3,30 @@
     <!-- 桌面端侧边栏 -->
     <aside class="chat-page__aside chat-page__aside--desktop" :class="{ 'is-collapsed': desktopCollapsed }">
       <SessionList
-        :sessions="chat.sessions"
-        :current-session-id="chat.currentSessionId"
-        @new="handleNew"
-        @select="handleSelect"
-        @pin="handlePin"
-        @remove="handleRemove"
+          :sessions="chat.sessions"
+          :current-session-id="chat.currentSessionId"
+          @new="handleNew"
+          @select="handleSelect"
+          @pin="handlePin"
+          @remove="handleRemove"
       />
     </aside>
 
     <!-- 移动端会话抽屉 -->
     <a-drawer
-      v-model:open="sidebarOpen"
-      placement="left"
-      :width="280"
-      :closable="false"
-      body-style="padding:0"
+        v-model:open="sidebarOpen"
+        placement="left"
+        :width="280"
+        :closable="false"
+        body-style="padding:0"
     >
       <SessionList
-        :sessions="chat.sessions"
-        :current-session-id="chat.currentSessionId"
-        @new="handleNew"
-        @select="(id) => { handleSelect(id); sidebarOpen = false }"
-        @pin="handlePin"
-        @remove="handleRemove"
+          :sessions="chat.sessions"
+          :current-session-id="chat.currentSessionId"
+          @new="handleNew"
+          @select="(id) => { handleSelect(id); sidebarOpen = false }"
+          @pin="handlePin"
+          @remove="handleRemove"
       />
     </a-drawer>
 
@@ -34,20 +34,27 @@
       <div class="chat-page__toolbar">
         <a-space :size="8">
           <a-button class="chat-page__menu-btn" type="text" @click="sidebarOpen = true">
-            <template #icon><MenuOutlined /></template>
+            <template #icon>
+              <MenuOutlined/>
+            </template>
           </a-button>
           <a-button
-            class="chat-page__collapse-btn"
-            type="text"
-            :title="desktopCollapsed ? '展开会话列表' : '收起会话列表'"
-            @click="desktopCollapsed = !desktopCollapsed"
+              class="chat-page__collapse-btn"
+              type="text"
+              :title="desktopCollapsed ? '展开会话列表' : '收起会话列表'"
+              @click="desktopCollapsed = !desktopCollapsed"
           >
-            <template #icon><MenuFoldOutlined v-if="!desktopCollapsed" /><MenuUnfoldOutlined v-else /></template>
+            <template #icon>
+              <MenuFoldOutlined v-if="!desktopCollapsed"/>
+              <MenuUnfoldOutlined v-else/>
+            </template>
           </a-button>
-          <ModelSelector />
+          <ModelSelector/>
         </a-space>
         <a-button v-if="chat.currentSessionId" type="text" @click="handleExport">
-          <template #icon><ExportOutlined /></template>
+          <template #icon>
+            <ExportOutlined/>
+          </template>
           导出对话
         </a-button>
       </div>
@@ -65,17 +72,17 @@
         </div>
         <template v-else>
           <ChatMessageItem
-            v-for="msg in chat.messages"
-            :key="msg.id"
-            :msg="msg"
-            :streaming="isStreamingMsg(msg)"
-            @delete="handleDeleteMessage"
+              v-for="msg in chat.messages"
+              :key="msg.id"
+              :msg="msg"
+              :streaming="isStreamingMsg(msg)"
+              @delete="handleDeleteMessage"
           />
         </template>
       </div>
 
       <div class="chat-page__input">
-        <ChatInput ref="inputRef" :disabled="chat.generating" :generating="chat.generating" @send="handleSend" />
+        <ChatInput ref="inputRef" :disabled="chat.generating" :generating="chat.generating" @send="handleSend"/>
       </div>
     </main>
   </div>
@@ -88,18 +95,18 @@
  * <p>布局：左侧会话列表 + 右侧聊天区（工具栏 / 消息流 / 输入框）。
  * 流式回答基于 SSE 实时渲染（打字机 + 状态图 + 引用溯源），支持随时中断。</p>
  */
-import { ExportOutlined, MenuOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons-vue'
-import { message, Modal } from 'ant-design-vue'
-import { useChatStore } from '@/stores/chat'
-import { useAuthStore } from '@/stores/auth'
-import { useModelStore } from '@/stores/model'
-import { streamChat, type RetrievalStats } from '@/composables/useChatStream'
+import {ExportOutlined, MenuOutlined, MenuFoldOutlined, MenuUnfoldOutlined} from '@ant-design/icons-vue'
+import {message, Modal} from 'ant-design-vue'
+import {useChatStore} from '@/stores/chat'
+import {useAuthStore} from '@/stores/auth'
+import {useModelStore} from '@/stores/model'
+import {streamChat, type RetrievalStats} from '@/composables/useChatStream'
 import SessionList from '@/components/chat/SessionList.vue'
 import ChatMessageItem from '@/components/chat/ChatMessageItem.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ModelSelector from '@/components/chat/ModelSelector.vue'
-import type { SessionVO, ChatMessageVO, ThinkingNodeVO, ReferenceVO } from '@/utils/api-types'
-import type { StreamMessage } from '@/stores/chat'
+import type {SessionVO, ChatMessageVO, ThinkingNodeVO, ReferenceVO} from '@/utils/api-types'
+import type {StreamMessage} from '@/stores/chat'
 
 useSeoMeta({
   title: '智能问答 - 溯知 · TraceQA',
@@ -117,8 +124,12 @@ const sidebarOpen = ref(false)
 /** 桌面端会话列表是否收起 */
 const desktopCollapsed = ref(false)
 
-/** 快捷提问示例 */
-const quickQuestions = ['什么是 K 均值聚类？', '解释一下 Apriori 关联规则算法', '决策树是如何进行特征选择的？']
+/** 快捷提问示例：分别触发「术语定义」「对比」「复杂聚合」三种检索工作流 */
+const quickQuestions = [
+  '什么是Apriori 关联规则算法？',
+  'K均值聚类和层次聚类有什么区别和联系？',
+  '结合例子解释决策树如何通过特征选择来避免过拟合'
+]
 
 /** 判断是否为流式临时消息 */
 function isStreamingMsg(msg: ChatMessageVO | StreamMessage): boolean {
@@ -141,7 +152,7 @@ async function handleSelect(sessionId: number | string): Promise<void> {
 }
 
 async function handlePin(session: SessionVO): Promise<void> {
-  await chat.pinSession(session.id, session.pinned !== 1)
+  await chat.pinSession(session.id || -1, session.pinned !== 1)
 }
 
 async function handleRemove(session: SessionVO): Promise<void> {
@@ -152,7 +163,7 @@ async function handleRemove(session: SessionVO): Promise<void> {
     okType: 'danger',
     cancelText: '取消',
     onOk: async () => {
-      await chat.removeSession(session.id)
+      await chat.removeSession(session.id || -1)
       message.success('会话已删除')
     }
   })
@@ -174,7 +185,7 @@ async function handleExport(): Promise<void> {
       message.warning('当前会话为空')
       return
     }
-    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
+    const blob = new Blob([md], {type: 'text/markdown;charset=utf-8'})
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -237,48 +248,48 @@ async function handleSend(content: string): Promise<void> {
   const serverModel = modelStore.activeServerModel
   const modelConfig = modelStore.activeCustomConfig
   await streamChat(
-    {
-      sessionId,
-      knowledgeBaseId: null,
-      content,
-      ...(serverModel ? { serverModel } : {}),
-      ...(modelConfig ? { model: modelConfig.model, baseUrl: modelConfig.baseUrl, apiKey: modelConfig.apiKey } : {})
-    },
-    {
-      onThinking: (node) => {
-        mergeThinkingNode(streamMsg, node)
+      {
+        sessionId,
+        knowledgeBaseId: null,
+        content,
+        ...(serverModel ? {serverModel} : {}),
+        ...(modelConfig ? {model: modelConfig.model, baseUrl: modelConfig.baseUrl, apiKey: modelConfig.apiKey} : {})
       },
-      onDelta: (chunk) => {
-        streamMsg.buffer += chunk
-      },
-      onReferences: (references) => {
-        streamMsg.references = references
-      },
-      onStats: (stats) => {
-        streamMsg.stats = stats
-      },
-      onDone: () => {
-        streamMsg.streaming = false
-        streamMsg.content = streamMsg.buffer
-        // 回答已完成即解除输入锁定（onEnd 可能因 SSE 连接未及时关闭而不触发）
-        chat.generating = false
-      },
-      onError: (err) => {
-        streamMsg.streaming = false
-        streamMsg.content = streamMsg.buffer || err.msg || '服务异常'
-        message.error(err.msg || 'AI 服务暂时不可用')
-        // 出错即解除输入锁定，避免持续禁用
-        chat.generating = false
-      },
-      onEnd: async () => {
-        chat.generating = false
-        inputRef.value?.clear()
-        await chat.loadSessions()
-        if (chat.currentSessionId) {
-          await chat.openSession(chat.currentSessionId)
+      {
+        onThinking: (node) => {
+          mergeThinkingNode(streamMsg, node)
+        },
+        onDelta: (chunk) => {
+          streamMsg.buffer += chunk
+        },
+        onReferences: (references) => {
+          streamMsg.references = references
+        },
+        onStats: (stats) => {
+          streamMsg.stats = stats
+        },
+        onDone: () => {
+          streamMsg.streaming = false
+          streamMsg.content = streamMsg.buffer
+          // 回答已完成即解除输入锁定（onEnd 可能因 SSE 连接未及时关闭而不触发）
+          chat.generating = false
+        },
+        onError: (err) => {
+          streamMsg.streaming = false
+          streamMsg.content = streamMsg.buffer || err.msg || '服务异常'
+          message.error(err.msg || 'AI 服务暂时不可用')
+          // 出错即解除输入锁定，避免持续禁用
+          chat.generating = false
+        },
+        onEnd: async () => {
+          chat.generating = false
+          inputRef.value?.clear()
+          await chat.loadSessions()
+          if (chat.currentSessionId) {
+            await chat.openSession(chat.currentSessionId)
+          }
         }
       }
-    }
   )
 }
 
@@ -296,18 +307,18 @@ function mergeThinkingNode(streamMsg: StreamMessage, node: ThinkingNodeVO): void
 
 /** 消息或流式缓冲变化时自动滚动到底部 */
 watch(
-  () => {
-    const last = chat.messages[chat.messages.length - 1]
-    return last
-      ? [chat.messages.length, last.content, (last as StreamMessage).buffer]
-      : [0, '', '']
-  },
-  () => {
-    nextTick(() => {
-      listRef.value?.scrollTo({ top: listRef.value.scrollHeight, behavior: 'smooth' })
-    })
-  },
-  { deep: true }
+    () => {
+      const last = chat.messages[chat.messages.length - 1]
+      return last
+          ? [chat.messages.length, last.content, (last as StreamMessage).buffer]
+          : [0, '', '']
+    },
+    () => {
+      nextTick(() => {
+        listRef.value?.scrollTo({top: listRef.value.scrollHeight, behavior: 'smooth'})
+      })
+    },
+    {deep: true}
 )
 </script>
 

@@ -2,7 +2,7 @@
   <div class="login-page">
     <div class="login-page__blob login-page__blob--1" />
     <div class="login-page__blob login-page__blob--2" />
-    <a-card class="login-card tq-slide-up" :bordered="false">
+    <a-card class="login-card tq-glass tq-slide-up" :bordered="false">
       <div class="login-card__header">
         <div class="login-card__logo">溯</div>
         <h2 class="login-card__title">溯知 · TraceQA</h2>
