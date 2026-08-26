@@ -149,12 +149,35 @@ function handleCite(index: number): void {
 /** 复制消息内容（纯文本） */
 async function copyContent(): Promise<void> {
   const text = displayContent.value
+  if (!text) {
+    return
+  }
   try {
-    await navigator.clipboard.writeText(text || '')
+    // navigator.clipboard 仅在安全上下文（HTTPS/localhost）可用；HTTP 环境用 execCommand 兜底
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      copyWithFallback(text)
+    }
     message.success('已复制')
   } catch {
     message.error('复制失败')
   }
+}
+
+/** 非安全上下文（HTTP）复制兜底：隐藏 textarea + execCommand */
+function copyWithFallback(text: string): void {
+  const ta = document.createElement('textarea')
+  ta.value = text
+  ta.setAttribute('readonly', '')
+  ta.style.position = 'fixed'
+  ta.style.top = '-9999px'
+  ta.style.opacity = '0'
+  document.body.appendChild(ta)
+  ta.select()
+  ta.setSelectionRange(0, text.length)
+  document.execCommand('copy')
+  document.body.removeChild(ta)
 }
 
 /** 是否正在朗读本条回答 */
