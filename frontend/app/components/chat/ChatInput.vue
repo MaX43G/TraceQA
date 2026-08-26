@@ -1,7 +1,6 @@
 <template>
   <div class="chat-input">
     <a-textarea
-      :key="resetKey"
       v-model:value="text"
       :auto-size="{ minRows: 2, maxRows: 6 }"
       :placeholder="placeholder"
@@ -36,7 +35,6 @@ const emit = defineEmits<{
 }>()
 
 const text = ref('')
-const resetKey = ref(0)
 
 const placeholder = computed<string>(() =>
   props.disabled ? 'AI 正在回答，请稍候…' : '请输入你的问题，例如：什么是 K 均值聚类？'
@@ -57,7 +55,6 @@ function submit(): void {
   }
   emit('send', content)
   text.value = ''
-  resetKey.value++
 }
 </script>
 
