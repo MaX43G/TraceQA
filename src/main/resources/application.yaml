@@ -116,10 +116,29 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus,loggers
+        include: '*'
       base-path: /actuator
   endpoint:
     health:
       show-details: always
     prometheus:
       enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+    enable:
+      jvm: true
+      system: true
+      process: true
+      http: true
+      hikaricp: true
+      jdbc: true
+      data: true
+      lettuce: true
+      executor: true
+      tomcat: true
+      logback: true
+      cache: true
