@@ -29,12 +29,6 @@
                   {{ speaking ? '停止' : '朗读' }}
                 </a-button>
               </a-tooltip>
-              <a-tooltip title="查看回答相关知识图谱路径">
-                <a-button type="text" size="small" @click="kgOpen = true">
-                  <template #icon><ApartmentOutlined /></template>
-                  图谱
-                </a-button>
-              </a-tooltip>
               <a-button type="text" size="small" @click="copyContent">
                 <template #icon><CopyOutlined /></template>
                 复制
@@ -59,9 +53,6 @@
         <div class="viewer-markdown markdown-body" v-html="viewerMarkdown" />
       </div>
     </a-modal>
-
-    <!-- 知识图谱路径可视化 -->
-    <KnowledgeGraphModal v-model:open="kgOpen" :query="props.question" />
 </template>
 
 <script setup lang="ts">
@@ -71,13 +62,12 @@
  * <p>用户消息右侧气泡；AI 消息包含「思考折叠面板 + Markdown 打字机 +
  * 引用溯源角标 + 复制/删除操作」。</p>
  */
-import { CopyOutlined, DeleteOutlined, SoundOutlined, ApartmentOutlined } from '@ant-design/icons-vue'
+import { CopyOutlined, DeleteOutlined, SoundOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import MarkdownViewer from './MarkdownViewer.vue'
 import ThinkingTracePanel from './ThinkingTracePanel.vue'
 import CitationPanel from './CitationPanel.vue'
 import RetrievalStatsPanel from './RetrievalStatsPanel.vue'
-import KnowledgeGraphModal from './KnowledgeGraphModal.vue'
 import { renderMarkdown } from '@/utils/markdown'
 import type { ChatMessageVO, ReferenceVO } from '@/utils/api-types'
 import type { RetrievalStats } from '@/composables/useChatStream'
@@ -91,8 +81,6 @@ const props = defineProps<{
   }
   /** 是否处于生成中 */
   streaming?: boolean
-  /** 引发本条回答的用户问题（用于图谱可视化实体提取） */
-  question?: string
 }>()
 
 const emit = defineEmits<{
@@ -139,9 +127,6 @@ const displayContent = computed<string>(() =>
 /** 文献全文查看弹窗状态 */
 const viewerOpen = ref(false)
 const viewerRef = ref<ReferenceVO | null>(null)
-
-/** 知识图谱可视化弹窗开关 */
-const kgOpen = ref(false)
 
 /** 文献全文按 Markdown + 公式渲染 */
 const viewerMarkdown = computed<string>(() => renderMarkdown(viewerRef.value?.content || ''))

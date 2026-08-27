@@ -108,10 +108,6 @@ cd frontend && pnpm gen:api   # 依据 http://localhost:8080/v3/api-docs 生成 
 
 > **Agentic 检索策略**：`RetrievalService.classifyQueryAgentic` 让 LLM 动态决定检索策略（SIMPLE=向量 / DEFINITION=向量+关键词 / COMPLEX=图谱+向量+关键词），结果缓存 30 分钟；LLM 失败时回退 `classifyQuery` 规则。Rerank 通过 `app.rerank.*` 配置（默认关闭）。
 
-### 5.2 知识图谱路径可视化
-- 后端：`LightRagClient.getGraph(label, depth, nodes)` 调 LightRAG `/graphs`；`GraphVizService` 对一组实体词合并连通子图并归一化为 `{nodes:[{id,label,type}], edges:[{source,target,label}]}`；`GraphController` 提供 `POST /api/graph/viz`（登录用户，入参 `terms` 或 `query`）。
-- 前端：`KnowledgeGraphModal.vue` 从回答内容粗提取实体词，调用 `/api/graph/viz`，以 SVG 圆形布局渲染节点与边。
-
 > 查询/决策结果经 `RedisCacheService` 短 TTL 缓存；Redis 不可用时自动降级。
 >
 > **知识库粒度**：检索基于单一 LightRAG 全局索引，**不区分知识库、不做按库选择或隔离**——所有已入库文档都会参与检索。上传时指定知识库仅用于归档与管理。

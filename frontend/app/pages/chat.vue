@@ -72,11 +72,10 @@
         </div>
         <template v-else>
 <ChatMessageItem
-            v-for="(msg, idx) in chat.messages"
+            v-for="msg in chat.messages"
             :key="msg.id"
             :msg="msg"
             :streaming="isStreamingMsg(msg)"
-            :question="questionAt(idx)"
             @delete="handleDeleteMessage"
           />
         </template>
@@ -135,16 +134,6 @@ const quickQuestions = [
 /** 判断是否为流式临时消息 */
 function isStreamingMsg(msg: ChatMessageVO | StreamMessage): boolean {
   return 'streaming' in msg && msg.streaming
-}
-
-/** 取某条消息之前最近的一条用户消息作为其问题（用于图谱可视化） */
-function questionAt(index: number): string | undefined {
-  for (let i = index - 1; i >= 0; i--) {
-    if (chat.messages[i]?.role === 'USER') {
-      return chat.messages[i]?.content
-    }
-  }
-  return undefined
 }
 
 onMounted(async () => {
