@@ -23,8 +23,8 @@ public class SsePublisher {
 
     
 
-    /** 写入一个 SSE 事件 */
-    public void send(SseEmitter emitter, String event, Object data) {
+    /** 写入一个 SSE 事件（synchronized 保证并行检索推送进度时线程安全） */
+    public synchronized void send(SseEmitter emitter, String event, Object data) {
         if (emitter == null) {
             return;
         }

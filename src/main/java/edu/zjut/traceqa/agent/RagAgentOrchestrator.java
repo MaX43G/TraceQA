@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -76,6 +77,12 @@ public class RagAgentOrchestrator {
 
     @Value("${spring.ai.openai.api-key:}")
     private String springAiApiKey;
+
+    /** 并行检索时保护 thinking 节点列表与 SSE 进度推送的锁 */
+    private final Object thinkingLock = new Object();
+
+    /** 关键词检索作为兜底：图谱+向量（或向量）命中数达到该阈值时跳过关键词检索 */
+    private static final int KEYWORD_FALLBACK_THRESHOLD = 4;
 
     
 
@@ -213,7 +220,9 @@ public class RagAgentOrchestrator {
         if (type == RetrievalService.QueryType.DEFINITION) {
             EnhancedQuery simple = new EnhancedQuery(content, null, null);
             List<RetrievedChunk> vectorChunks = runVector(emitter, thinking, content, simple, cancelled);
-            List<RetrievedChunk> keywordChunks = runKeyword(emitter, thinking, content, config, cancelled);
+            List<RetrievedChunk> keywordChunks = vectorChunks.size() >= KEYWORD_FALLBACK_THRESHOLD
+                    ? List.of()
+                    : runKeyword(emitter, thinking, content, config, cancelled);
             List<RetrievedChunk> fused = retrievalService.fuse(vectorChunks, keywordChunks);
             ThinkingNodeVO fuseNode = startThinking(thinking, "融合与补全", "fusion-agent",
                     "正在融合关键词与向量结果");
@@ -245,19 +254,25 @@ public class RagAgentOrchestrator {
         }
         finishThinking(thinking, emitter, "查询重写与 HyDE", enhanceDetail);
 
-        // 步骤 2：图谱检索（local + global）
-        ThinkingNodeVO graphNode = startThinking(thinking, "图谱检索", "graph-agent",
-                "正在执行知识图谱检索");
-        ssePublisher.send(emitter, "thinking", graphNode);
-        List<RetrievedChunk> graphChunks = retrievalService.queryGraph(content, enhanced,
-                progress -> pushProgress(emitter, graphNode, cancelled, progress));
-        finishThinking(thinking, emitter, "图谱检索", "图谱命中 " + graphChunks.size() + " 条");
+        // 步骤 2-3：图谱 / 向量 并行检索
+        CompletableFuture<List<RetrievedChunk>> graphFuture = CompletableFuture.supplyAsync(() -> {
+            ThinkingNodeVO gNode = startThinking(thinking, "图谱检索", "graph-agent", "正在执行知识图谱检索");
+            ssePublisher.send(emitter, "thinking", gNode);
+            List<RetrievedChunk> chunks = retrievalService.queryGraph(content, enhanced,
+                    progress -> pushProgress(emitter, gNode, cancelled, progress));
+            finishThinking(thinking, emitter, "图谱检索", "图谱命中 " + chunks.size() + " 条");
+            return chunks;
+        });
+        CompletableFuture<List<RetrievedChunk>> vectorFuture = CompletableFuture.supplyAsync(
+                () -> runVector(emitter, thinking, content, enhanced, cancelled));
+        List<RetrievedChunk> graphChunks = graphFuture.join();
+        List<RetrievedChunk> vectorChunks = vectorFuture.join();
 
-        // 步骤 3：向量检索（多查询扩展）
-        List<RetrievedChunk> vectorChunks = runVector(emitter, thinking, content, enhanced, cancelled);
-
-        // 步骤 4：关键词检索（术语/编号类问题召回更准）
-        List<RetrievedChunk> keywordChunks = runKeyword(emitter, thinking, content, config, cancelled);
+        // 步骤 4：关键词检索作为兜底（图谱+向量已足够则跳过；关键词在大型库上最慢）
+        int baseCount = retrievalService.fuse(graphChunks, vectorChunks).size();
+        List<RetrievedChunk> keywordChunks = baseCount >= KEYWORD_FALLBACK_THRESHOLD
+                ? List.of()
+                : runKeyword(emitter, thinking, content, config, cancelled);
 
         // 步骤 5：三路融合 + ReRead 补全 + LLM 精排
         ThinkingNodeVO fuseNode = startThinking(thinking, "融合与补全", "fusion-agent",
@@ -530,7 +545,9 @@ public class RagAgentOrchestrator {
     private ThinkingNodeVO startThinking(List<ThinkingNodeVO> thinking, String stage,
                                          String agent, String message) {
         ThinkingNodeVO node = new ThinkingNodeVO(stage, agent, "running", message, null);
-        thinking.add(node);
+        synchronized (thinkingLock) {
+            thinking.add(node);
+        }
         return node;
     }
 
@@ -539,14 +556,16 @@ public class RagAgentOrchestrator {
      * 保证持久化的思考链路状态正确（历史会话不会再显示"进行中"）。
      */
     private void finishThinking(List<ThinkingNodeVO> thinking, SseEmitter emitter, String stage, String detail) {
-        for (int i = thinking.size() - 1; i >= 0; i--) {
-            ThinkingNodeVO node = thinking.get(i);
-            if (node.getStage().equals(stage) && "running".equals(node.getStatus())) {
-                ThinkingNodeVO done = new ThinkingNodeVO(node.getStage(), node.getAgent(),
-                        "done", node.getMessage(), detail);
-                thinking.set(i, done);
-                ssePublisher.send(emitter, "thinking", done);
-                return;
+        synchronized (thinkingLock) {
+            for (int i = thinking.size() - 1; i >= 0; i--) {
+                ThinkingNodeVO node = thinking.get(i);
+                if (node.getStage().equals(stage) && "running".equals(node.getStatus())) {
+                    ThinkingNodeVO done = new ThinkingNodeVO(node.getStage(), node.getAgent(),
+                            "done", node.getMessage(), detail);
+                    thinking.set(i, done);
+                    ssePublisher.send(emitter, "thinking", done);
+                    return;
+                }
             }
         }
     }
@@ -555,12 +574,14 @@ public class RagAgentOrchestrator {
      * 异常时将未完成节点标记为失败
      */
     private void markThinkingFailed(List<ThinkingNodeVO> thinking) {
-        for (int i = thinking.size() - 1; i >= 0; i--) {
-            ThinkingNodeVO node = thinking.get(i);
-            if ("running".equals(node.getStatus())) {
-                thinking.set(i, new ThinkingNodeVO(node.getStage(), node.getAgent(), "failed",
-                        node.getMessage(), "执行失败，已降级"));
-                break;
+        synchronized (thinkingLock) {
+            for (int i = thinking.size() - 1; i >= 0; i--) {
+                ThinkingNodeVO node = thinking.get(i);
+                if ("running".equals(node.getStatus())) {
+                    thinking.set(i, new ThinkingNodeVO(node.getStage(), node.getAgent(), "failed",
+                            node.getMessage(), "执行失败，已降级"));
+                    break;
+                }
             }
         }
     }
