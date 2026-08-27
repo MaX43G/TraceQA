@@ -61,7 +61,7 @@
     </a-modal>
 
     <!-- 知识图谱路径可视化 -->
-    <KnowledgeGraphModal v-model:open="kgOpen" :content="displayContent" />
+    <KnowledgeGraphModal v-model:open="kgOpen" :query="props.question" />
 </template>
 
 <script setup lang="ts">
@@ -91,6 +91,8 @@ const props = defineProps<{
   }
   /** 是否处于生成中 */
   streaming?: boolean
+  /** 引发本条回答的用户问题（用于图谱可视化实体提取） */
+  question?: string
 }>()
 
 const emit = defineEmits<{

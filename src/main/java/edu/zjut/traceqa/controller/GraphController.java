@@ -47,14 +47,28 @@ public class GraphController {
         }
         Object query = body.get("query");
         if (terms.isEmpty() && query != null) {
-            // 从问题/文本中按非中文词符切分，粗提取候选实体
-            for (String part : String.valueOf(query).split("[\\s，。；、？！：:（）()\\[\\]{}<>《》\"'“”’—…~`]+")) {
-                String t = part.trim();
-                if (t.length() >= 2 && t.length() <= 16) {
-                    terms.add(t);
-                }
+            terms = extractTerms(String.valueOf(query));
+        }
+        return terms.stream().distinct().limit(6).toList();
+    }
+
+    private List<String> extractTerms(String query) {
+        List<String> terms = new ArrayList<>();
+        String[] parts = query.split(
+                "[\\s，。；、？！：:（）()\\[\\]{}<>《》\"'“”‘’—…~`+=|/\\\\和与及或区别联系对比比较关系怎么如何什么为什么是呢吗请解释一下的]");
+        for (String part : parts) {
+            String t = part.trim();
+            if (t.length() >= 2 && t.length() <= 16 && !terms.contains(t)) {
+                terms.add(t);
             }
         }
-        return terms.stream().limit(5).toList();
+        String flat = query.replaceAll("\\s+", "");
+        if (flat.length() > 16) {
+            String head = flat.substring(0, 16);
+            if (!terms.contains(head)) {
+                terms.add(head);
+            }
+        }
+        return terms;
     }
 }

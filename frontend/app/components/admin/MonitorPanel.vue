@@ -42,9 +42,33 @@
         </a-col>
       </a-row>
 
-      <!-- 延迟分位 + 状态分布 + 会话/运行时 -->
+      <!-- 可视化图表 -->
       <a-row :gutter="16" style="margin-top: 16px">
-        <a-col :span="8">
+        <a-col :xs="24" :sm="12" :md="6">
+          <a-card size="small" title="HTTP 状态分布">
+            <VChart :option="statusPieOption" height="240px" />
+          </a-card>
+        </a-col>
+        <a-col :xs="24" :sm="12" :md="6">
+          <a-card size="small" title="请求方法分布">
+            <VChart :option="methodBarOption" height="240px" />
+          </a-card>
+        </a-col>
+        <a-col :xs="24" :sm="12" :md="6">
+          <a-card size="small" title="Top 请求接口">
+            <VChart :option="topPathsBarOption" height="240px" />
+          </a-card>
+        </a-col>
+        <a-col :xs="24" :sm="12" :md="6">
+          <a-card size="small" title="缓存命中率">
+            <VChart :option="cacheGaugeOption" height="240px" />
+          </a-card>
+        </a-col>
+      </a-row>
+
+      <!-- 延迟分位 + 会话/运行时 -->
+      <a-row :gutter="16" style="margin-top: 16px">
+        <a-col :xs="24" :md="12">
           <a-card size="small" title="延迟分位 (ms)">
             <a-descriptions :column="1" size="small">
               <a-descriptions-item label="P50">{{ data.latencyPercentiles?.p50 ?? 0 }}</a-descriptions-item>
@@ -53,17 +77,7 @@
             </a-descriptions>
           </a-card>
         </a-col>
-        <a-col :span="8">
-          <a-card size="small" title="HTTP 状态分布">
-            <a-descriptions :column="1" size="small">
-              <a-descriptions-item v-for="(v, k) in statusCounts" :key="k" :label="k">
-                <a-tag :color="statusColor(k)">{{ v }}</a-tag>
-              </a-descriptions-item>
-              <a-descriptions-item v-if="!Object.keys(statusCounts).length">暂无数据</a-descriptions-item>
-            </a-descriptions>
-          </a-card>
-        </a-col>
-        <a-col :span="8">
+        <a-col :xs="24" :md="12">
           <a-card size="small" title="JVM 运行时">
             <a-descriptions :column="1" size="small">
               <a-descriptions-item label="运行时长">{{ fmtUptime(runtime?.uptimeSeconds) }}</a-descriptions-item>
@@ -131,6 +145,7 @@
  */
 import { getAuthHeaders } from '@/utils/request'
 import { BarChartOutlined, LineChartOutlined } from '@ant-design/icons-vue'
+import VChart from '@/components/common/VChart.vue'
 
 interface SlowRequest {
   path?: string
@@ -205,21 +220,6 @@ const cbColor = computed<string>(() => {
   }
 })
 
-function statusColor(bucket: string): string {
-  switch (bucket) {
-    case '2xx':
-      return 'green'
-    case '3xx':
-      return 'blue'
-    case '4xx':
-      return 'orange'
-    case '5xx':
-      return 'red'
-    default:
-      return 'default'
-  }
-}
-
 function fmtUptime(seconds?: number): string {
   if (!seconds) {
     return '-'
@@ -229,6 +229,69 @@ function fmtUptime(seconds?: number): string {
   const m = Math.floor((seconds % 3600) / 60)
   return d > 0 ? `${d}天 ${h}时 ${m}分` : `${h}时 ${m}分`
 }
+
+// ---- ECharts 图表配置 ----
+const STATUS_COLORS: Record<string, string> = { '2xx': '#52c41a', '3xx': '#1677ff', '4xx': '#fa8c16', '5xx': '#ff4d4f' }
+
+const statusPieOption = computed<object>(() => {
+  const counts = statusCounts.value
+  return {
+    tooltip: { trigger: 'item' },
+    legend: { bottom: 0, textStyle: { fontSize: 11 } },
+    series: [
+      {
+        type: 'pie',
+        radius: ['42%', '70%'],
+        itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+        label: { show: true, formatter: '{b}: {c}' },
+        data: Object.entries(counts).map(([k, v]) => ({ name: k, value: v, itemStyle: { color: STATUS_COLORS[k] || '#999' } }))
+      }
+    ]
+  }
+})
+
+const methodBarOption = computed<object>(() => {
+  const m = data.value?.methodCounts ?? {}
+  return {
+    tooltip: { trigger: 'axis' },
+    grid: { left: 8, right: 8, bottom: 8, top: 30, containLabel: true },
+    xAxis: { type: 'category', data: Object.keys(m) },
+    yAxis: { type: 'value', minInterval: 1 },
+    series: [{ type: 'bar', data: Object.values(m), itemStyle: { color: '#1677ff', borderRadius: [4, 4, 0, 0] }, barMaxWidth: 32 }]
+  }
+})
+
+const topPathsBarOption = computed<object>(() => {
+  const rows = topPaths.value.slice(0, 8)
+  return {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    grid: { left: 8, right: 8, bottom: 8, top: 30, containLabel: true },
+    xAxis: { type: 'value', minInterval: 1 },
+    yAxis: { type: 'category', data: rows.map((r) => r.path).reverse() },
+    series: [{ type: 'bar', data: rows.map((r) => r.count).reverse(), itemStyle: { color: '#722ed1', borderRadius: [0, 4, 4, 0] }, barMaxWidth: 18 }]
+  }
+})
+
+const cacheGaugeOption = computed<object>(() => {
+  const rate = data.value?.cacheHitRate ?? 0
+  return {
+    series: [
+      {
+        type: 'gauge',
+        startAngle: 210,
+        endAngle: -30,
+        min: 0,
+        max: 100,
+        progress: { show: true, width: 14, itemStyle: { color: '#13c2c2' } },
+        axisLine: { lineStyle: { width: 14 } },
+        axisLabel: { show: false },
+        pointer: { show: false },
+        detail: { valueAnimation: true, formatter: '{value}%', fontSize: 18, color: '#1f2329' },
+        data: [{ value: rate }]
+      }
+    ]
+  }
+})
 
 /** 打开 Grafana 大盘（经后端代理 /grafana/**，需先获取可观测性会话 Cookie） */
 const grafanaLoading = ref(false)

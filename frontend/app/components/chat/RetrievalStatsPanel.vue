@@ -27,6 +27,11 @@
       </div>
     </div>
 
+    <!-- 三路命中分布 -->
+    <div class="stats-panel__chart">
+      <VChart :option="pathDonutOption" height="150px" />
+    </div>
+
     <template v-if="sourceDocs.length">
       <div class="stats-panel__src-title">来源文档分布</div>
       <div class="stats-panel__src">
@@ -43,11 +48,34 @@
  * 检索可解释性面板：展示三路命中数、来源文档分布与耗时。
  */
 import { PieChartOutlined } from '@ant-design/icons-vue'
+import VChart from '@/components/common/VChart.vue'
 import type { RetrievalStats } from '@/composables/useChatStream'
 
 const props = defineProps<{
   stats: RetrievalStats
 }>()
+
+/** 三路命中分布环形图 */
+const pathDonutOption = computed<object>(() => {
+  return {
+    tooltip: { trigger: 'item' },
+    legend: { bottom: 0, textStyle: { fontSize: 11 } },
+    series: [
+      {
+        type: 'pie',
+        radius: ['45%', '70%'],
+        center: ['50%', '42%'],
+        itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 1 },
+        label: { formatter: '{b}: {c}' },
+        data: [
+          { name: '图谱', value: props.stats.graphHits ?? 0, itemStyle: { color: '#722ed1' } },
+          { name: '向量', value: props.stats.vectorHits ?? 0, itemStyle: { color: '#1677ff' } },
+          { name: '关键词', value: props.stats.keywordHits ?? 0, itemStyle: { color: '#13c2c2' } }
+        ]
+      }
+    ]
+  }
+})
 
 const sourceDocs = computed<{ file: string; count: number }[]>(() => {
   const docs = props.stats.sourceDocs ?? {}
@@ -96,6 +124,9 @@ function srcWidth(count: number): string {
 .stat-item__label {
   font-size: 12px;
   color: #86909c;
+}
+.stats-panel__chart {
+  margin-top: 6px;
 }
 .stats-panel__src-title {
   margin-top: 8px;
