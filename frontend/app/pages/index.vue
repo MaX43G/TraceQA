@@ -80,8 +80,7 @@ import { useAuthStore } from '@/stores/auth'
 
 useSeoMeta({
   title: '溯知 · TraceQA - 数据挖掘课程智能问答平台',
-  description: '基于知识图谱与向量检索的《数据挖掘》课程智能问答平台，多 Agent 协同、流式思考、引用溯源。',
-  keywords: '数据挖掘,TraceQA,溯知,RAG,知识图谱,智能问答'
+  description: '基于知识图谱与向量检索的《数据挖掘》课程智能问答平台，多 Agent 协同、流式思考、引用溯源。'
 })
 
 const auth = useAuthStore()
@@ -89,13 +88,13 @@ const auth = useAuthStore()
 const features = [
   {
     title: '多 Agent 协同',
-    desc: '意图识别、检索调度、重写/HyDE、图谱检索、向量检索、融合补全、总结生成，多 Agent 编排为完整工作流',
+    desc: 'Agentic 检索策略由模型动态规划，调用合适的检索工具；多 Agent 编排意图识别、检索调度、融合补全、总结生成',
     icon: RobotOutlined,
     color: '#1677ff'
   },
   {
     title: '图谱 + 向量 + 关键词三路检索',
-    desc: 'LightRAG 图谱、语义向量与关键词三路并行检索，RRF 融合 + ReRead 补全 + LLM 精排，召回更准',
+    desc: 'LightRAG 图谱、语义向量与关键词三路并行检索，RRF 融合 + ReRead 补全 + 语义重排精排，召回更准',
     icon: ApartmentOutlined,
     color: '#722ed1'
   },
@@ -107,7 +106,7 @@ const features = [
   },
   {
     title: '引用溯源',
-    desc: '回答逐句标注来源，点击即可查看文献全文，学习有据可查',
+    desc: '点击即可查看相关文献，学习有据可查',
     icon: FileSearchOutlined,
     color: '#13c2c2'
   },

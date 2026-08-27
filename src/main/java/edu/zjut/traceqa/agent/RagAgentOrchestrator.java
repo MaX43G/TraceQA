@@ -196,11 +196,11 @@ public class RagAgentOrchestrator {
     private RetrievalResult retrieve(SseEmitter emitter, List<ThinkingNodeVO> thinking, String content,
                                      String history, LlmConfig config, AtomicBoolean cancelled) {
         long retrieveStart = System.currentTimeMillis();
-        // 步骤 0：查询意图路由 —— 规则分类并选择检索路径
+        // 步骤 0：Agentic 检索策略规划 —— LLM 动态决定调用哪些检索工具（失败回退规则）
         ThinkingNodeVO routerNode = startThinking(thinking, "检索策略调度", "router-agent",
-                "正在分析问题类型并选择检索路径");
+                "正在由模型规划检索策略并选择检索工具");
         ssePublisher.send(emitter, "thinking", routerNode);
-        RetrievalService.QueryType type = retrievalService.classifyQuery(content, config);
+        RetrievalService.QueryType type = retrievalService.classifyQueryAgentic(content, config);
         String pathLabel = switch (type) {
             case DEFINITION -> "术语定义 → 关键词 + 向量检索（最快）";
             case COMPARE -> "对比问题 → 查询分解 + 聚合链路（图谱 + 向量 + 关键词）";

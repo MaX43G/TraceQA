@@ -12,7 +12,7 @@
 | ORM | MyBatis-Plus |
 | 数据库 | MySQL 8（单库），本地文件系统存储文件 |
 | 缓存/队列 | Redis（查询与 Agent 决策缓存、文档解析任务队列 Redis Stream） |
-| 检索 | LightRAG（图谱 + 向量 + 关键词），查询重写 / HyDE / 查询分解 / 三路检索 / RRF 融合 / ReRead / LLM 精排 |
+| 检索 | LightRAG（图谱 + 向量 + 关键词），Agentic 策略规划 / 查询重写 / HyDE / 查询分解 / 三路检索 / RRF 融合 / ReRead / 语义重排（bge-reranker-v2-m3，可选） |
 | 可观测性 | Spring Boot Actuator + Micrometer/Prometheus + Prometheus + Grafana（管理员专属） |
 | 部署 | Docker Compose（mysql + redis + lightrag + backend + frontend + prometheus + grafana） |
 
@@ -104,7 +104,13 @@ cd frontend && pnpm gen:api   # 依据 http://localhost:8080/v3/api-docs 生成 
 | 关键词检索 | scenario=keyword 提取术语，`hl_keywords` 检索（术语/编号类问题更准） |
 | RRF 融合 | 三路结果按倒数排名融合去重 |
 | ReRead | 从片段提取关键术语二次检索补全 |
-| LLM 精排 | scenario=rerank 筛除无关片段并按相关度重排 |
+| 语义重排 | 优先调用外部 Rerank 模型（`BAAI/bge-reranker-v2-m3`）按相关度排序；失败/未配置时回退 LLM 精排 |
+
+> **Agentic 检索策略**：`RetrievalService.classifyQueryAgentic` 让 LLM 动态决定检索策略（SIMPLE=向量 / DEFINITION=向量+关键词 / COMPLEX=图谱+向量+关键词），结果缓存 30 分钟；LLM 失败时回退 `classifyQuery` 规则。Rerank 通过 `app.rerank.*` 配置（默认关闭）。
+
+### 5.2 知识图谱路径可视化
+- 后端：`LightRagClient.getGraph(label, depth, nodes)` 调 LightRAG `/graphs`；`GraphVizService` 对一组实体词合并连通子图并归一化为 `{nodes:[{id,label,type}], edges:[{source,target,label}]}`；`GraphController` 提供 `POST /api/graph/viz`（登录用户，入参 `terms` 或 `query`）。
+- 前端：`KnowledgeGraphModal.vue` 从回答内容粗提取实体词，调用 `/api/graph/viz`，以 SVG 圆形布局渲染节点与边。
 
 > 查询/决策结果经 `RedisCacheService` 短 TTL 缓存；Redis 不可用时自动降级。
 >

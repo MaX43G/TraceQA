@@ -3,6 +3,7 @@ package edu.zjut.traceqa.retrieval;
 import jakarta.annotation.Resource;
 import com.fasterxml.jackson.core.type.TypeReference;
 import edu.zjut.traceqa.config.LightRagClient;
+import edu.zjut.traceqa.config.RerankClient;
 import edu.zjut.traceqa.model.dto.EnhancedQuery;
 import edu.zjut.traceqa.model.dto.LlmConfig;
 import edu.zjut.traceqa.model.dto.RetrievalResult;
@@ -51,6 +52,9 @@ public class RetrievalService {
 
     @Resource
     private RedisCacheService redisCacheService;
+
+    @Resource
+    private RerankClient rerankClient;
 
     /** RRF 融合常数 */
     private static final double RRF_K = 60.0;
@@ -255,11 +259,33 @@ public class RetrievalService {
     public RetrievalResult fuseAndSupplement(String question, List<RetrievedChunk> graphChunks,
                                              List<RetrievedChunk> vectorChunks, List<RetrievedChunk> keywordChunks,
                                              EnhancedQuery enhanced, LlmConfig config) {
-        List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
+List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
         List<RetrievedChunk> supplemented = reread(fused, config);
-        List<RetrievedChunk> reranked = rerank(question, supplemented, config);
+        List<RetrievedChunk> reranked = rerankWithModel(question, supplemented, config);
         boolean degraded = enhanced.getRewritten() == null && enhanced.getHyde() == null;
         return new RetrievalResult(reranked, degraded);
+    }
+
+    /** 语义重排：优先调用外部 Rerank 模型（如 bge-reranker-v2-m3），失败回退 LLM 精排 */
+    private List<RetrievedChunk> rerankWithModel(String question, List<RetrievedChunk> chunks, LlmConfig config) {
+        if (chunks == null || chunks.size() <= 3) {
+            return chunks;
+        }
+        List<Integer> order = rerankClient.rerank(question,
+                chunks.stream().map(RetrievedChunk::getContent).toList());
+        if (order != null && order.size() == chunks.size()) {
+            List<RetrievedChunk> out = new ArrayList<>();
+            for (Integer idx : order) {
+                if (idx != null && idx >= 0 && idx < chunks.size()) {
+                    out.add(chunks.get(idx));
+                }
+            }
+            if (out.size() == chunks.size()) {
+                log.info("语义重排完成：共 {} 条", out.size());
+                return out;
+            }
+        }
+        return rerank(question, chunks, config);
     }
 
     /** 合并多路片段（按 reference_id+content 去重，保留首现） */
@@ -371,6 +397,44 @@ public class RetrievalService {
         }
         // 其余按复杂度
         return isComplexQuery(q, config) ? QueryType.COMPLEX : QueryType.SIMPLE;
+    }
+
+    /**
+     * Agentic 检索策略规划：由 LLM 动态决定检索策略（调用哪些检索工具），
+     * 结果缓存 30 分钟；LLM 失败时回退到规则 {@link #classifyQuery}。
+     */
+    public QueryType classifyQueryAgentic(String question, LlmConfig config) {
+        if (question == null || question.isBlank()) {
+            return QueryType.SIMPLE;
+        }
+        String cacheKey = "agentic:" + sha256(question);
+        Optional<QueryType> cached = redisCacheService.get(cacheKey, QueryType.class);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
+        QueryType type;
+        try {
+            String raw = llmService.call("agentic", question, config);
+            if (raw != null && !raw.isBlank()) {
+                String u = raw.trim().toUpperCase();
+                if (u.contains("COMPLEX")) {
+                    type = QueryType.COMPLEX;
+                } else if (u.contains("DEFINITION")) {
+                    type = QueryType.DEFINITION;
+                } else if (u.contains("SIMPLE")) {
+                    type = QueryType.SIMPLE;
+                } else {
+                    type = classifyQuery(question, config);
+                }
+            } else {
+                type = classifyQuery(question, config);
+            }
+        } catch (Exception e) {
+            log.debug("Agentic 策略规划降级为规则：{}", e.getMessage());
+            type = classifyQuery(question, config);
+        }
+        redisCacheService.put(cacheKey, type, Duration.ofMinutes(30));
+        return type;
     }
 
     /** 是否对比/比较类问题 */

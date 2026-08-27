@@ -107,7 +107,6 @@ const md = new MarkdownIt({
                     ignoreIllegals: true
                 }).value}</code></pre>`
             } catch {
-                // 忽略高亮异常，退回转义展示
             }
         }
         return `<pre class="hljs"><code>${md.utils.escapeHtml(str)}</code></pre>`

@@ -289,6 +289,20 @@ public class LightRagClient {
     }
 
     /**
+     * 查询以指定标签为起点、包含该标签的连通子图（知识图谱路径可视化用）。
+     * LightRAG 返回 {@code {nodes:[...], edges:[...], is_truncated:bool}}。
+     */
+    public Map<String, Object> getGraph(String label, int maxDepth, int maxNodes) {
+        try {
+            String encoded = org.springframework.web.util.UriUtils.encodePathSegment(label, java.nio.charset.StandardCharsets.UTF_8);
+            return getJson("/graphs?label=" + encoded + "&max_depth=" + maxDepth + "&max_nodes=" + maxNodes);
+        } catch (Exception e) {
+            log.warn("LightRAG 图谱查询失败：label={}, err={}", label, e.getMessage());
+            return Map.of("nodes", List.of(), "edges", List.of());
+        }
+    }
+
+    /**
      * 查询 LightRAG 可用模型（Ollama 兼容 /api/tags）
      */
     public Map<String, Object> getModels() {

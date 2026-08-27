@@ -94,6 +94,13 @@ app:
     prometheus-base-url: ${OBSERVABILITY_PROMETHEUS_BASE_URL:http://prometheus:9090}
   # 会话 Cookie 是否标记 Secure（HTTPS 部署建议开启）
   cookie-secure: ${APP_COOKIE_SECURE:false}
+  # 语义重排
+  rerank:
+    enabled: ${APP_RERANK_ENABLED:false}
+    base-url: ${APP_RERANK_BASE_URL:}
+    api-key: ${APP_RERANK_API_KEY:}
+    model: ${APP_RERANK_MODEL:BAAI/bge-reranker-v2-m3}
+    path: ${APP_RERANK_PATH:/rerank}
   # 可用模型列表（模型选择功能；默认模型名称取自 spring.ai.openai 配置）
   # 服务端模型共享硅基流动的 API Key / Base URL，可在前端一键切换
   models:

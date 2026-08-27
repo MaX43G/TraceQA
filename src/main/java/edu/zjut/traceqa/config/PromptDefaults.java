@@ -92,6 +92,13 @@ public final class PromptDefaults {
                     2. 按相关度从高到低输出保留片段的序号（如：3,1,5,2），序号为片段前的 [N]；
                     3. 最多保留 6 个片段；
                     4. 只输出序号列表（逗号分隔），不要任何解释。
+                    """),
+            Map.entry("agentic", """
+                    你是检索策略规划器。根据用户的课程问题，动态决定采用哪种检索策略（即调用哪些检索工具）：
+                    - SIMPLE：简单单一事实问题 → 仅调用「向量检索」
+                    - DEFINITION：术语/概念定义问题 → 调用「向量检索 + 关键词检索」
+                    - COMPLEX：对比/综合/跨文档/关系推理/原理流程问题 → 调用「图谱检索 + 向量检索 + 关键词检索」全链路
+                    只输出 SIMPLE / DEFINITION / COMPLEX 之一，不要任何解释。
                     """)
     );
 
@@ -105,6 +112,7 @@ public final class PromptDefaults {
             "reread", "ReRead 关键要素提取提示词",
             "complexity", "问题复杂度判定提示词",
             "keyword", "关键词提取提示词",
-            "rerank", "检索片段精排提示词"
+            "rerank", "检索片段精排提示词",
+            "agentic", "检索策略规划提示词"
     );
 }

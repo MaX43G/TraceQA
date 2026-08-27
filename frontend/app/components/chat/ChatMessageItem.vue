@@ -21,38 +21,47 @@
           <div v-if="props.streaming" class="chat-msg__streaming">正在生成…</div>
         </div>
         <CitationPanel v-if="hasReferences" ref="citationPanel" :references="msg.references ?? []" :used-indexes="usedIndexes" @view="openViewer" />
-        <div class="chat-msg__actions">
-          <a-space :size="4">
-            <a-tooltip :title="speaking ? '停止朗读' : '朗读本条回答'">
-              <a-button type="text" size="small" :class="{ 'speak-btn--active': speaking }" @click="toggleSpeak">
-                <template #icon><SoundOutlined :spin="speaking" /></template>
-                {{ speaking ? '停止' : '朗读' }}
+<div class="chat-msg__actions">
+            <a-space :size="4">
+              <a-tooltip :title="speaking ? '停止朗读' : '朗读本条回答'">
+                <a-button type="text" size="small" :class="{ 'speak-btn--active': speaking }" @click="toggleSpeak">
+                  <template #icon><SoundOutlined :spin="speaking" /></template>
+                  {{ speaking ? '停止' : '朗读' }}
+                </a-button>
+              </a-tooltip>
+              <a-tooltip title="查看回答相关知识图谱路径">
+                <a-button type="text" size="small" @click="kgOpen = true">
+                  <template #icon><ApartmentOutlined /></template>
+                  图谱
+                </a-button>
+              </a-tooltip>
+              <a-button type="text" size="small" @click="copyContent">
+                <template #icon><CopyOutlined /></template>
+                复制
               </a-button>
-            </a-tooltip>
-            <a-button type="text" size="small" @click="copyContent">
-              <template #icon><CopyOutlined /></template>
-              复制
-            </a-button>
-            <a-button type="text" size="small" danger @click="emit('delete', <number>msg.id)">
-              <template #icon><DeleteOutlined /></template>
-              删除
-            </a-button>
-          </a-space>
-        </div>
+              <a-button type="text" size="small" danger @click="emit('delete', msg.id)">
+                <template #icon><DeleteOutlined /></template>
+                删除
+              </a-button>
+            </a-space>
+          </div>
       </template>
     </div>
   </div>
 
   <!-- 文献全文查看弹窗 -->
   <a-modal v-model:open="viewerOpen" :title="viewerRef ? `文献${viewerRef.index}：${viewerRef.title || viewerRef.filePath}` : '文献全文'" :footer="null" width="72vw" :body-style="{ padding: '14px 20px 20px' }">
-    <div v-if="viewerRef" class="viewer-body">
-      <a-tag color="blue">{{ viewerRef.filePath }}</a-tag>
-      <div v-if="viewerRef.headings?.length" class="viewer-headings">
-        <a-tag v-for="h in viewerRef.headings" :key="h" color="cyan">{{ h }}</a-tag>
+<div v-if="viewerRef" class="viewer-body">
+        <a-tag color="blue">{{ viewerRef.filePath }}</a-tag>
+        <div v-if="viewerRef.headings?.length" class="viewer-headings">
+          <a-tag v-for="h in viewerRef.headings" :key="h" color="cyan">{{ h }}</a-tag>
+        </div>
+        <div class="viewer-markdown markdown-body" v-html="viewerMarkdown" />
       </div>
-      <div class="viewer-markdown markdown-body" v-html="viewerMarkdown" />
-    </div>
-  </a-modal>
+    </a-modal>
+
+    <!-- 知识图谱路径可视化 -->
+    <KnowledgeGraphModal v-model:open="kgOpen" :content="displayContent" />
 </template>
 
 <script setup lang="ts">
@@ -62,12 +71,13 @@
  * <p>用户消息右侧气泡；AI 消息包含「思考折叠面板 + Markdown 打字机 +
  * 引用溯源角标 + 复制/删除操作」。</p>
  */
-import { CopyOutlined, DeleteOutlined, SoundOutlined } from '@ant-design/icons-vue'
+import { CopyOutlined, DeleteOutlined, SoundOutlined, ApartmentOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import MarkdownViewer from './MarkdownViewer.vue'
 import ThinkingTracePanel from './ThinkingTracePanel.vue'
 import CitationPanel from './CitationPanel.vue'
 import RetrievalStatsPanel from './RetrievalStatsPanel.vue'
+import KnowledgeGraphModal from './KnowledgeGraphModal.vue'
 import { renderMarkdown } from '@/utils/markdown'
 import type { ChatMessageVO, ReferenceVO } from '@/utils/api-types'
 import type { RetrievalStats } from '@/composables/useChatStream'
@@ -127,6 +137,9 @@ const displayContent = computed<string>(() =>
 /** 文献全文查看弹窗状态 */
 const viewerOpen = ref(false)
 const viewerRef = ref<ReferenceVO | null>(null)
+
+/** 知识图谱可视化弹窗开关 */
+const kgOpen = ref(false)
 
 /** 文献全文按 Markdown + 公式渲染 */
 const viewerMarkdown = computed<string>(() => renderMarkdown(viewerRef.value?.content || ''))

@@ -34,6 +34,9 @@ public class AppProperties {
     /** 会话 Cookie 是否标记 Secure（HTTPS 部署建议开启） */
     private boolean cookieSecure = false;
 
+    /** 语义重排（Rerank）配置 */
+    private Rerank rerank = new Rerank();
+
     /** 可用模型列表（供前端模型选择，后续可扩展多个模型） */
     private List<ModelItem> models = List.of(
             new ModelItem("默认模型", "", ""));
@@ -91,7 +94,7 @@ public class AppProperties {
         private String prometheusBaseUrl = "http://prometheus:9090";
     }
 
-    /** 模型条目（模型选择功能） */
+/** 模型条目（模型选择功能） */
     @Data
     public static class ModelItem {
         /** 展示名称 */
@@ -101,10 +104,28 @@ public class AppProperties {
         /** OpenAI 兼容地址（默认模型为空串表示使用 spring.ai 配置） */
         private String baseUrl;
 
+        public ModelItem() {
+        }
+
         public ModelItem(String name, String model, String baseUrl) {
             this.name = name;
             this.model = model;
             this.baseUrl = baseUrl;
         }
+    }
+
+    /** 语义重排（Rerank） */
+    @Data
+    public static class Rerank {
+        /** 是否启用语义重排 */
+        private boolean enabled = false;
+        /** Rerank 服务地址（如硅基流动的 rerank 端点） */
+        private String baseUrl = "";
+        /** API Key（可为空） */
+        private String apiKey = "";
+        /** 重排模型 */
+        private String model = "BAAI/bge-reranker-v2-m3";
+        /** Rerank 接口路径 */
+        private String path = "/rerank";
     }
 }
