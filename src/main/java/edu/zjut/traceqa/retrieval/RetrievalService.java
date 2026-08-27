@@ -210,7 +210,7 @@ public class RetrievalService {
             return List.of();
         }
         try {
-            Map<String, Object> response = lightRagClient.query(question, "mix", true);
+            Map<String, Object> response = lightRagClient.query(question, "hybrid", true);
             List<RetrievedChunk> chunks = parseReferences(response, "retry");
             log.info("检索兜底重试（mix）：命中 {} 条", chunks.size());
             return chunks;
@@ -607,7 +607,7 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
             return fused;
         }
         try {
-            Map<String, Object> response = lightRagClient.query(termQuery, "mix", true);
+            Map<String, Object> response = lightRagClient.query(termQuery, "hybrid", true);
             List<RetrievedChunk> extra = parseReferences(response, "reread");
             Map<String, RetrievedChunk> merged = new LinkedHashMap<>();
             fused.forEach(c -> merged.put(c.getReferenceId(), c));

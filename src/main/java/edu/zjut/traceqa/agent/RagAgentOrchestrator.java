@@ -81,7 +81,7 @@ public class RagAgentOrchestrator {
     /** 并行检索时保护 thinking 节点列表与 SSE 进度推送的锁 */
     private final Object thinkingLock = new Object();
 
-    /** 关键词检索作为兜底：图谱+向量（或向量）命中数达到该阈值时跳过关键词检索 */
+    /** 关键词检索作为首次查询补充：图谱+向量（或向量）命中数达到该阈值时跳过关键词 */
     private static final int KEYWORD_FALLBACK_THRESHOLD = 4;
 
     
@@ -254,7 +254,7 @@ public class RagAgentOrchestrator {
         }
         finishThinking(thinking, emitter, "查询重写与 HyDE", enhanceDetail);
 
-        // 步骤 2-3：图谱 / 向量 并行检索
+        // 步骤 2-3：图谱 / 向量 并行检索（关键词检索已移除，避免在大型库上拖慢）
         CompletableFuture<List<RetrievedChunk>> graphFuture = CompletableFuture.supplyAsync(() -> {
             ThinkingNodeVO gNode = startThinking(thinking, "图谱检索", "graph-agent", "正在执行知识图谱检索");
             ssePublisher.send(emitter, "thinking", gNode);
@@ -268,7 +268,7 @@ public class RagAgentOrchestrator {
         List<RetrievedChunk> graphChunks = graphFuture.join();
         List<RetrievedChunk> vectorChunks = vectorFuture.join();
 
-        // 步骤 4：关键词检索作为兜底（图谱+向量已足够则跳过；关键词在大型库上最慢）
+        // 关键词检索作为首次查询补充（图谱+向量已足够则跳过）
         int baseCount = retrievalService.fuse(graphChunks, vectorChunks).size();
         List<RetrievedChunk> keywordChunks = baseCount >= KEYWORD_FALLBACK_THRESHOLD
                 ? List.of()
