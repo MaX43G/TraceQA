@@ -85,28 +85,29 @@ cd frontend && pnpm gen:api   # 依据 http://localhost:8080/v3/api-docs 生成 
 ## 4. 多 Agent 工作流
 
 ```
-意图识别 → 检索策略调度 → 查询重写与HyDE → 图谱检索(local+global) → 向量检索(多查询+分解子问题) → 关键词检索 → 融合与补全(RRF+ReRead+LLM精排) → 总结生成
+意图识别 → 检索策略调度 → 查询重写与假设文档 → 图谱检索 → 向量检索 → 关键词检索(按需兜底) → 多路融合 → 二次检索补全 → 语义重排 → 总结生成
      ↳ 简单问题（LLM 判定）：仅 向量检索 → 总结生成
 ```
 
 - 调度节点用 **LLM 判定**问题复杂度（跨文档聚合/关系推理/主题归纳 → 复杂；单点事实/小文档集/叙事文本 → 简单），LLM 失败时规则兜底。
-- 全程 SSE 推送 `thinking` 节点状态，前端状态图实时可视化（含「关键词检索」节点）。
+- 全程 SSE 推送 `thinking` 节点状态，前端状态图实时可视化（含「关键词检索」节点，按需启用）。
+- 图谱/向量检索并行执行；「多路融合 → 二次检索补全 → 语义重排」为三个独立节点，逐一可见。
 
 ## 5. 检索增强链路（RetrievalService）
 
 | 步骤 | 说明 |
 | --- | --- |
 | 复杂度判定 | LLM（scenario=complexity）+ 快速预检 + 规则兜底，结果缓存 |
-| 查询重写 / HyDE | 结合多轮历史消解指代，并行生成；结果缓存 |
+| 查询重写 / 假设文档 | 结合多轮历史消解指代，并行生成；结果缓存 |
 | 查询分解 | 对比/比较类问题按连接词拆分子问题，并入向量多查询 |
 | 图谱检索 | `local`（实体局部图）+ `global`（关系全局图）并行，结果缓存 |
-| 向量检索 | 原问题 + 重写 + HyDE + 子问题多查询并行，`naive` 模式，结果缓存 |
-| 关键词检索 | scenario=keyword 提取术语，`hl_keywords` 检索（术语/编号类问题更准） |
-| RRF 融合 | 三路结果按倒数排名融合去重 |
-| ReRead | 从片段提取关键术语二次检索补全 |
+| 向量检索 | 原问题 + 重写 + 假设文档 + 子问题多查询并行，`naive` 模式，结果缓存 |
+| 关键词检索 | scenario=keyword 提取术语，`hl_keywords` 检索；作为**兜底**（图谱+向量不足时启用，结果缓存） |
+| 多路融合 | 三路结果按倒数排名融合去重 |
+| 二次检索补全 | 从已检片段提取关键术语，`hybrid`（图谱+向量，不含关键词）二次检索补全 |
 | 语义重排 | 优先调用外部 Rerank 模型（`BAAI/bge-reranker-v2-m3`）按相关度排序；失败/未配置时回退 LLM 精排 |
 
-> **Agentic 检索策略**：`RetrievalService.classifyQueryAgentic` 让 LLM 动态决定检索策略（SIMPLE=向量 / DEFINITION=向量+关键词 / COMPLEX=图谱+向量+关键词），结果缓存 30 分钟；LLM 失败时回退 `classifyQuery` 规则。Rerank 通过 `app.rerank.*` 配置（默认关闭）。
+> **Agentic 检索策略**：`RetrievalService.classifyQueryAgentic` 让 LLM 动态决定检索策略（SIMPLE=向量 / DEFINITION=向量+关键词 / COMPLEX=图谱+向量+关键词），结果缓存 30 分钟；LLM 失败时回退 `classifyQuery` 规则。Rerank 通过 `app.rerank.*` 配置（默认关闭）。图谱/向量检索并行执行，`LIGHTRAG_TOP_K` 默认 8 控制每路召回量。
 
 > 查询/决策结果经 `RedisCacheService` 短 TTL 缓存；Redis 不可用时自动降级。
 >
