@@ -190,7 +190,7 @@ services:
   #   6115 -> 兼容旧入口，转发到同一前端 HTTPS
   #   6116 -> MinIO S3（HTTPS，自签证书）
   caddy:
-    image: caddy:2.11.4-alpine
+    image: caddy:2.11.4-builder
     container_name: traceqa-caddy
     logging: *default-logging
     restart: unless-stopped
