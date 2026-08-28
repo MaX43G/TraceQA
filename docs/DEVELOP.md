@@ -15,7 +15,8 @@
 | 缓存/队列 | Redis（查询与 Agent 决策缓存、文档解析任务队列 Redis Stream；AOF 落盘持久化、无内存上限） |
 | 检索 | LightRAG（图谱 + 向量 + 关键词），Agentic 策略规划 / 查询重写 / HyDE / 查询分解 / 三路检索 / RRF 融合 / ReRead / 语义重排（bge-reranker-v2-m3，可选） |
 | 可观测性 | Spring Boot Actuator + Micrometer/Prometheus + Prometheus + Grafana（管理员专属） |
-| 部署 | Docker Compose（mysql + redis + lightrag + backend + frontend + prometheus + grafana） |
+| 部署 | Docker Compose（mysql + redis + lightrag + minio + backend + frontend + caddy + prometheus + grafana） |
+| HTTPS | Caddy 反向代理前端 `:6115`；无域名用自签证书（`tls internal`，自动管理/续期）提供安全上下文以放行浏览器麦克风；有域名改 Caddyfile 的 `tls` 即可自动申请 Let's Encrypt |
 
 ## 2. 目录结构
 

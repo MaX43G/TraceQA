@@ -1,13 +1,18 @@
 # ============================================================
 # 溯知 / TraceQA 一键部署编排
-# 服务：mysql + redis + lightrag(知识图谱引擎) + minio(对象存储) + backend(Spring Boot) + frontend(Nuxt SSR)
-# 端口：6114 后端 | 6115 前端 | 6116 MinIO(S3) | 6117 Redis | 6118 MySQL | 6119 LightRAG
+# 服务：mysql + redis + lightrag + minio + backend(Spring Boot) + frontend(Nuxt SSR) + caddy(HTTPS入口) + prometheus + grafana
+#
+# 其余所有服务仅内部网络访问（后端/MySQL/Redis/LightRAG/Prometheus/Grafana 均不对外绑定端口）。
+#
+# HTTPS：无域名时 Caddy 用自签证书（tls internal，自动管理/续期）提供安全上下文，浏览器放行麦克风；
+#        有域名后改 frontend/Caddyfile 的 `tls internal` 为 `tls 你的域名` 即可自动申请 Let's Encrypt。
+# 资源：不限制 CPU/内存，充分利用服务器资源（Redis 无内存上限、JVM 按可用内存动态分配）。
 # 使用：cp .env.example .env && docker compose up -d --build
 # ============================================================
 name: traceqa
 
 services:
-  # 数据库（单库，极简架构）
+  # 数据库
   mysql:
     image: mysql:latest
     container_name: traceqa-mysql
@@ -26,27 +31,26 @@ services:
       - ./src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - traceqa-mysql-data:/var/lib/mysql
     ports:
-      # 映射到宿主机 6118，供外部访问
       - "6118:3306"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root123456}"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root123456}" ]
       interval: 10s
       timeout: 5s
       retries: 10
 
   # Redis：查询/Agent 决策缓存 + 文档处理异步队列
+  # 不设内存上限（充分利用服务器资源），开启 AOF 落盘持久化
   redis:
     image: redis:latest
     container_name: traceqa-redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--save", "60 1", "--appendfsync", "everysec"]
+    command: [ "redis-server", "--appendonly", "yes", "--save", "60 1", "--appendfsync", "everysec" ]
     volumes:
       - traceqa-redis-data:/data
     ports:
-      # 映射到宿主机 6117，供外部访问
       - "6117:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -62,25 +66,17 @@ services:
       LLM_BINDING_HOST: ${LIGHTRAG_LLM_BASE_URL:-https://api.siliconflow.cn/v1}
       LLM_BASE_URL: ${LIGHTRAG_LLM_BASE_URL:-https://api.siliconflow.cn/v1}
       LLM_API_KEY: ${LLM_API_KEY:-}
-      # LightRAG openai binding 同时读取 OPENAI_API_KEY / OPENAI_BASE_URL
       OPENAI_API_KEY: ${LLM_API_KEY:-}
       OPENAI_BASE_URL: ${LIGHTRAG_LLM_BASE_URL:-https://api.siliconflow.cn/v1}
       LLM_MODEL: ${LIGHTRAG_LLM_MODEL:-Qwen/Qwen3.5-4B}
       MAX_ASYNC_LLM: ${LIGHTRAG_MAX_ASYNC_LLM:-2}
       MAX_ASYNC_EMBEDDING: ${LIGHTRAG_MAX_ASYNC_EMBEDDING:-4}
-      # 单次抽取可并行提交的文档数（大文档多块时生效，避免瞬时打爆限流）
       MAX_PARALLEL_INSERT: ${LIGHTRAG_MAX_PARALLEL_INSERT:-1}
       LLM_MAX_RETRIES: 8
-      # LLM 请求超时（秒）：硅基流动免费额度的 4B 小模型生成较慢，
-      # 默认 480s 太紧容易在抽取中途被判定超时导致整篇失败，放宽到 900s
       LLM_TIMEOUT: ${LIGHTRAG_LLM_TIMEOUT:-900}
-      # Embedding 请求超时（秒）：bge-m3 一般 1-3s 返回，60s 足够
       EMBEDDING_TIMEOUT: ${LIGHTRAG_EMBEDDING_TIMEOUT:-60}
-      # 限制实体/关系抽取的单次 LLM 输出上限（防止部分 LLM 无限输出触发超时），
-      # 经验公式：LLM_TIMEOUT * 输出速度 ≈ 900s * 50 tokens/s
       OPENAI_LLM_MAX_TOKENS: ${LIGHTRAG_LLM_MAX_OUTPUT_TOKENS:-9000}
       MAX_TOKENS: 2000
-      # Embedding（同 OpenAI 兼容端点）
       EMBEDDING_BINDING: openai
       EMBEDDING_BINDING_HOST: ${LIGHTRAG_LLM_BASE_URL:-https://api.siliconflow.cn/v1}
       EMBEDDING_BASE_URL: ${LIGHTRAG_LLM_BASE_URL:-https://api.siliconflow.cn/v1}
@@ -93,8 +89,6 @@ services:
       WORKING_DIR: /app/data/rag_storage
       # 反向代理前缀：WebUI 与所有 API 都挂在该前缀下，仅经后端 /lightrag-webui/** 代理访问
       LIGHTRAG_API_PREFIX: /lightrag-webui
-      # 鉴权由后端反向代理（管理员 Cookie）统一承担，故不再为 LightRAG 配置 API Key 与 WebUI 账号，
-      # LightRAG 仅限 Docker 内网访问，不对外暴露端口
       LIGHTRAG_API_KEY: ""
       AUTH_ACCOUNTS: ""
       WHITELIST_PATHS: /health
@@ -105,18 +99,19 @@ services:
     ports:
       - "6119:9621"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:9621/health', timeout=5)"]
+      test: [ "CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:9621/health', timeout=5)" ]
       interval: 15s
       timeout: 8s
       retries: 10
       start_period: 30s
 
-  # MinIO 对象存储：统一管理用户上传的文件（如头像），公开端口 6116 供外界访问
+  # MinIO 对象存储：统一管理用户上传的文件（如头像）。
+  # S3 API（9000）仅内部访问，由 caddy 在 6116 提供 HTTPS 对外。
   minio:
     image: minio/minio:latest
     container_name: traceqa-minio
     restart: unless-stopped
-    command: ["server", "/data", "--console-address", ":9001"]
+    command: [ "server", "/data", "--console-address", ":9001" ]
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
@@ -124,12 +119,10 @@ services:
     volumes:
       - traceqa-minio-data:/data
     ports:
-      # S3 API：对外暴露 6116（供浏览器/前端直连访问，含头像公开访问）
-      - "6116:9000"
-      # 控制台
+      - "6110:9000"
       - "9001:9001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -155,7 +148,7 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-traceqa}
-      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:6116}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-https://121.41.72.189:6116}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-THUDM/GLM-4-9B-0414}
@@ -175,7 +168,7 @@ services:
       lightrag:
         condition: service_healthy
 
-  # Nuxt SSR 前端
+  # Nuxt SSR 前端（内部 3000，由 caddy 提供 HTTPS 对外）
   frontend:
     build:
       context: ./frontend
@@ -185,11 +178,32 @@ services:
     container_name: traceqa-frontend
     restart: unless-stopped
     ports:
-      - "6115:3000"
+      - "6109:3000"
     depends_on:
       - backend
 
-  # Prometheus：抓取后端 /actuator/prometheus 指标，并挂载在 /prometheus 子路径下供代理访问
+  # Caddy：HTTPS 反向代理入口。
+  #   6115 -> 前端（HTTPS）
+  #   6116 -> MinIO S3（HTTPS，头像公开访问）
+  # 无域名用自签证书（tls internal，自动管理），有域名改 Caddyfile 的 tls 即可。
+  caddy:
+    image: caddy:2-alpine
+    container_name: traceqa-caddy
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - ./frontend/Caddyfile:/etc/caddy/Caddyfile:ro
+      - traceqa-caddy-data:/data
+      - traceqa-caddy-config:/config
+    ports:
+      - "6115:443"
+      - "6116:8443"
+    depends_on:
+      - frontend
+      - minio
+
+  # Prometheus：抓取后端 /actuator/prometheus 指标
   prometheus:
     image: prom/prometheus:latest
     container_name: traceqa-prometheus
@@ -209,10 +223,8 @@ services:
     depends_on:
       - backend
     ports:
-      # 对外暴露（请用防火墙限制来源）；管理端走 /prometheus/** 代理
       - "6112:9090"
-
-  # Grafana：可观测性可视化大盘（管理员鉴权），挂载在 /grafana 子路径下供代理访问
+  # Grafana：可观测性可视化大盘（仅内部访问，经后端 /grafana/** 代理）
   grafana:
     image: grafana/grafana:latest
     container_name: traceqa-grafana
@@ -222,13 +234,11 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
-      # 免登录：项目已通过后端代理（管理员 Cookie）鉴权，Grafana 以匿名管理员身份进入
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
       GF_AUTH_DISABLE_SIGNOUT_MENU: "true"
       GF_AUTH_BASIC_ENABLED: "false"
-      # 子路径部署：使 Grafana 生成 /grafana/... 资源引用，经后端反向代理正常访问
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
       GF_SERVER_ROOT_URL: /grafana
       GF_SERVER_ENABLE_GZIP: "true"
@@ -239,7 +249,6 @@ services:
       - ./docker/grafana/dashboard-traceqa.json:/var/lib/grafana/dashboards/traceqa.json:ro
       - traceqa-grafana-data:/var/lib/grafana
     ports:
-      # 对外暴露（请用防火墙限制来源）；管理端走 /grafana/** 代理
       - "6113:3000"
     depends_on:
       - prometheus
@@ -248,6 +257,8 @@ volumes:
   traceqa-mysql-data:
   traceqa-redis-data:
   traceqa-lightrag-data:
+  traceqa-minio-data:
   traceqa-backend-data:
   traceqa-grafana-data:
-  traceqa-minio-data:
+  traceqa-caddy-data:
+  traceqa-caddy-config:

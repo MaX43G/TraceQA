@@ -120,7 +120,7 @@ docker compose up -d --build
 
 | 服务 | 地址 |
 | --- | --- |
-| 前端 | http://localhost:6115 |
+| 前端（HTTPS） | https://localhost:6115 |
 | 后端 API | http://localhost:6114 |
 | OpenAPI 规范 | http://localhost:6114/v3/api-docs |
 | MinIO 对象存储（S3，对外公开） | http://localhost:6116 |
@@ -132,7 +132,14 @@ docker compose up -d --build
 
 **默认账号**：`admin/admin123456`（管理员）、`user/user123456`（生产环境务必修改）。
 
-> **MinIO**：公开端口 **6116** 供外界访问（浏览器直连上传/查看头像等文件）。原 6116 由 LightRAG 使用，现已迁移至 **6119**。默认账号 `minioadmin / minioadmin`，可在 `.env` 通过 `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` 修改（生产环境务必修改）；头像等文件的对外访问地址由 `MINIO_PUBLIC_URL` 控制。后端自动建桶并设置**公共只读策略**，保证头像可经公开 URL 直接访问。
+> **HTTPS / 麦克风（重要）**：浏览器要求页面为**安全上下文**才允许调用麦克风（语音输入）。前端经 **Caddy** 在 `:6115` 提供 HTTPS（`tls internal` 自签证书，Caddy 自动管理/续期）。**无公网域名时无法申请公网受信证书（Let's Encrypt 只给域名发证）**，但可把 Caddy 内部 CA 安装为系统/浏览器受信根，获得绿锁（等效受信）：
+> ```bash
+> docker compose exec caddy cat /data/caddy/pki/authorities/local/root.crt   # 导出根证书
+> # 将导出的 root.crt 导入系统/浏览器的「受信任的根证书颁发机构」
+> ```
+> 若配置了公网域名，改 `frontend/Caddyfile` 的 `tls internal` 为 `tls 你的域名` 即可自动申请受信任的 Let's Encrypt 证书。
+>
+> **MinIO（HTTPS）**：MinIO 的 S3 API 也经 Caddy 在 `:6116` 提供 HTTPS（与前端共用同一内部 CA，受信后头像图片可正常显示，避免 HTTPS 页面加载 HTTP 图片的混合内容拦截）。`MINIO_PUBLIC_URL` 请设为服务器公网 HTTPS 地址，如 `https://121.41.72.189:6116`。默认账号 `minioadmin / minioadmin`，可在 `.env` 修改（生产务必改）。后端自动建桶并设置**公共只读策略**。
 >
 > **Redis**：已取消内存上限限制，并开启 AOF 落盘持久化，重启后缓存与任务队列不丢失。
 >
