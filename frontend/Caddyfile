@@ -3,14 +3,12 @@
 #
 # ============================================================
 
-# HTTPS 前端（对外 443 / 6115，Let's Encrypt IP 证书）
-121.41.72.189:443 {
-	reverse_proxy frontend:3000
-	encode gzip
-	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+121.41.72.189 {
+    reverse_proxy frontend:3000
+    encode gzip
+    header Strict-Transport-Security "max-age=31536000; includeSubDomains"
 }
 
-# HTTPS MinIO（对外 6116，复用同一张 Let's Encrypt IP 证书）
-121.41.72.189:8443 {
-	reverse_proxy minio:9000
+minio.121.41.72.189 {
+    reverse_proxy minio:9000
 }

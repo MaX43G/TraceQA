@@ -35,7 +35,7 @@ services:
     ports:
       - "6118:3306"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root123456}"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root123456}" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -47,13 +47,13 @@ services:
     container_name: traceqa-redis
     logging: *default-logging
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--save", "60 1", "--appendfsync", "everysec"]
+    command: [ "redis-server", "--appendonly", "yes", "--save", "60 1", "--appendfsync", "everysec" ]
     volumes:
       - traceqa-redis-data:/data
     ports:
       - "6117:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -100,7 +100,7 @@ services:
     ports:
       - "6119:9621"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:9621/health', timeout=5)"]
+      test: [ "CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:9621/health', timeout=5)" ]
       interval: 15s
       timeout: 8s
       retries: 10
@@ -113,7 +113,7 @@ services:
     container_name: traceqa-minio
     logging: *default-logging
     restart: unless-stopped
-    command: ["server", "/data", "--console-address", ":9001"]
+    command: [ "server", "/data", "--console-address", ":9001" ]
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
@@ -124,7 +124,7 @@ services:
       - "6110:9000"
       - "9001:9001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -190,7 +190,7 @@ services:
   #   6115 -> 兼容旧入口，转发到同一前端 HTTPS
   #   6116 -> MinIO S3（HTTPS，自签证书）
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.11.4-builder-alpine
     container_name: traceqa-caddy
     logging: *default-logging
     restart: unless-stopped
