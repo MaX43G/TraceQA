@@ -10,8 +10,8 @@
         root * /var/www/acme-challenge
         file_server
     }
-    handle {
-        redir https://{host}{uri} permanent
+    handle /traceqa/* {
+        reverse_proxy minio:9000
     }
 }
 
