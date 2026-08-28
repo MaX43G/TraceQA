@@ -198,7 +198,12 @@ services:
       - traceqa-caddy-data:/data
       - traceqa-caddy-config:/config
     ports:
-      - "6115:443"
+      # HTTP 重定向（80 与 6115 都跳到 https://:443）
+      - "80:80"
+      - "6115:80"
+      # HTTPS 前端（标准 443 端口）
+      - "443:443"
+      # HTTPS MinIO
       - "6116:8443"
     depends_on:
       - frontend
