@@ -1,9 +1,19 @@
-# ============================================================
-# 溯知 / TraceQA Caddy 反向代理
-#
-# ============================================================
+# 专门处理续期验证
+:80 {
+    handle /.well-known/acme-challenge/* {
+        root * /var/www/acme-challenge
+        file_server
+    }
+    # 其他所有 HTTP 请求，强制跳转到 HTTPS
+    handle {
+        redir https://{host}{uri} permanent
+    }
+}
 
+# 前端 HTTPS 服务
 121.41.72.189 {
+    tls /root/.acme.sh/121.41.72.189_ecc/fullchain.cer /root/.acme.sh/121.41.72.189_ecc/121.41.72.189.key
+
     reverse_proxy frontend:3000
     encode gzip
     header Strict-Transport-Security "max-age=31536000; includeSubDomains"

@@ -118,11 +118,10 @@ services:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
       TZ: Asia/Shanghai
-      MINIO_CERTS_DIR: /caddy-data/certificates/acme-v02.api.letsencrypt.org-directory/121.41.72.189
-      MINIO_PUBLIC_URL: https://121.41.72.189:6116
+      MINIO_CERTS_DIR: /root/.minio/certs
     volumes:
       - traceqa-minio-data:/data
-      - traceqa-caddy-data:/caddy-data:ro
+      - /root/.acme.sh/121.41.72.189_ecc:/root/.minio/certs:ro
     ports:
       - "6116:9000"
       - "9001:9001"
@@ -203,6 +202,7 @@ services:
       - ./frontend/Caddyfile:/etc/caddy/Caddyfile:ro
       - traceqa-caddy-data:/data
       - traceqa-caddy-config:/config
+      - acme-webroot:/var/www/acme-challenge
     ports:
       - "80:80"
       - "443:443"
