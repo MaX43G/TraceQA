@@ -408,5 +408,6 @@ declare namespace API {
     roleCode?: string;
     status?: number;
     permissions?: string[];
+    avatar?: string;
   };
 }

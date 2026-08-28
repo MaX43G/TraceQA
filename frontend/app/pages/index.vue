@@ -2,34 +2,52 @@
   <div class="home">
     <!-- Hero 区 -->
     <section class="home__hero">
-      <div class="home__blob home__blob--1" />
-      <div class="home__blob home__blob--2" />
+      <div class="home__blob home__blob--1"/>
+      <div class="home__blob home__blob--2"/>
       <div class="home__hero-inner">
         <div class="home__logo tq-slide-up">溯</div>
         <h1 class="home__title tq-gradient-text tq-slide-up" style="animation-delay: 80ms">溯知 · TraceQA</h1>
-        <p class="home__subtitle tq-slide-up" style="animation-delay: 140ms">《数据挖掘》课程智能问答平台</p>
+        <p class="home__subtitle tq-slide-up" style="animation-delay: 140ms">《数据挖掘》智能问答平台</p>
         <p class="home__desc tq-slide-up" style="animation-delay: 200ms">
           基于知识图谱（LightRAG）与向量检索的增强 RAG 引擎，
-          多 Agent 协同、流式思考、引用溯源，助你高效学习数据挖掘。
+          多 Agent 协同、流式思考、引用溯源；支持语音输入与「猜你想问」智能追问，助你高效学习数据挖掘。
         </p>
         <a-space :size="16" class="home__cta tq-slide-up" style="animation-delay: 260ms">
           <a-button type="primary" size="large" @click="goChat">
-            <template #icon><MessageOutlined /></template>
+            <template #icon>
+              <MessageOutlined/>
+            </template>
             开始问答
           </a-button>
-          <a-button v-if="!auth.isLoggedIn" size="large" @click="goLogin">登录 / 注册</a-button>
+          <ClientOnly>
+            <a-button v-if="!auth.isLoggedIn" size="large" @click="goLogin">登录 / 注册</a-button>
+          </ClientOnly>
         </a-space>
       </div>
     </section>
+
+    <!-- 公告栏 -->
+    <ClientOnly>
+      <section v-if="announcements.length" class="home__announce">
+        <div class="home__announce-icon">📢</div>
+        <div class="home__announce-list">
+          <div v-for="a in announcements" :key="a.id" class="home__announce-item">
+            <b class="home__announce-title">{{ a.title }}</b>
+            <span class="home__announce-content">{{ a.content }}</span>
+          </div>
+        </div>
+      </section>
+    </ClientOnly>
 
     <!-- 功能亮点 -->
     <section class="home__features">
       <h2 class="home__section-title tq-slide-up">核心能力</h2>
       <a-row :gutter="[24, 24]">
         <a-col v-for="(f, idx) in features" :key="f.title" :xs="24" :sm="12" :md="8">
-          <a-card :bordered="false" class="home__feature-card tq-glass tq-slide-up" :style="{ animationDelay: `${idx * 60}ms` }">
+          <a-card :bordered="false" class="home__feature-card tq-glass tq-slide-up"
+                  :style="{ animationDelay: `${idx * 60}ms` }">
             <div class="home__feature-icon" :style="{ background: f.color }">
-              <component :is="f.icon" />
+              <component :is="f.icon"/>
             </div>
             <h3 class="home__feature-title">{{ f.title }}</h3>
             <p class="home__feature-desc">{{ f.desc }}</p>
@@ -45,7 +63,7 @@
       <div class="home__workflow-flow">
         <template v-for="(step, i) in workflow" :key="step.label">
           <span class="tq-slide-up" :style="{ animationDelay: `${i * 60}ms` }">
-            <component :is="step.icon" />
+            <component :is="step.icon"/>
             {{ step.label }}
           </span>
           <i v-if="i < workflow.length - 1">→</i>
@@ -66,7 +84,6 @@
  */
 import {
   MessageOutlined,
-  RobotOutlined,
   ApartmentOutlined,
   FileSearchOutlined,
   ApiOutlined,
@@ -74,24 +91,19 @@ import {
   CommentOutlined,
   BranchesOutlined,
   SearchOutlined,
-  CompressOutlined
+  CompressOutlined,
+  BulbOutlined
 } from '@ant-design/icons-vue'
-import { useAuthStore } from '@/stores/auth'
+import {useAuthStore} from '@/stores/auth'
 
 useSeoMeta({
-  title: '溯知 · TraceQA - 数据挖掘课程智能问答平台',
-  description: '基于知识图谱与向量检索的《数据挖掘》课程智能问答平台，多 Agent 协同、流式思考、引用溯源。'
+  title: '溯知 · TraceQA - 数据挖掘智能问答平台',
+  description: '基于知识图谱与向量检索的《数据挖掘》智能问答平台，多 Agent 协同、流式思考、引用溯源、语音输入与智能追问。'
 })
 
 const auth = useAuthStore()
 
 const features = [
-  {
-    title: '多 Agent 协同',
-    desc: 'Agentic 检索策略由模型动态规划，调用合适的检索工具；多 Agent 编排意图识别、检索调度、融合补全、总结生成',
-    icon: RobotOutlined,
-    color: '#1677ff'
-  },
   {
     title: '图谱 + 向量 + 关键词三路检索',
     desc: 'LightRAG 图谱、语义向量与关键词三路并行检索，RRF 融合 + ReRead 补全 + 语义重排精排，召回更准',
@@ -120,19 +132,37 @@ const features = [
     title: '多轮连续对话',
     desc: '连续问答自动结合上下文，能记住你之前提到的内容，追问更自然',
     icon: CommentOutlined,
-    color: '#13c2c2'
+    color: '#c312c2'
+  },
+  {
+    title: '猜你想问',
+    desc: '每次回答后 AI 智能解读，推荐你最可能追问的问题，点击即可继续深入',
+    icon: BulbOutlined,
+    color: '#1677ff'
   }
 ]
 
 const workflow = [
-  { label: '意图识别', icon: CommentOutlined },
-  { label: '策略调度', icon: BranchesOutlined },
-  { label: '图谱检索', icon: ApartmentOutlined },
-  { label: '向量检索', icon: SearchOutlined },
-  { label: '关键词检索', icon: FileSearchOutlined },
-  { label: '融合精排', icon: CompressOutlined },
-  { label: '总结生成', icon: ThunderboltOutlined }
+  {label: '意图识别', icon: CommentOutlined},
+  {label: '策略调度', icon: BranchesOutlined},
+  {label: '图谱检索', icon: ApartmentOutlined},
+  {label: '向量检索', icon: SearchOutlined},
+  {label: '关键词检索', icon: FileSearchOutlined},
+  {label: '融合精排', icon: CompressOutlined},
+  {label: '总结生成', icon: ThunderboltOutlined}
 ]
+
+const announcements = ref<any[]>([])
+
+onMounted(async () => {
+  try {
+    const res = await fetch('/api/announcement/active')
+    const json = await res.json()
+    announcements.value = json.data ?? []
+  } catch {
+    announcements.value = []
+  }
+})
 
 function goChat(): void {
   navigateTo('/chat')
@@ -246,6 +276,42 @@ function goLogin(): void {
   max-width: 1100px;
   margin: 0 auto;
   padding: 32px 24px 8px;
+}
+
+.home__announce {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fffbe6;
+  border: 1px solid #ffe58f;
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
+.home__announce-icon {
+  font-size: 20px;
+}
+
+.home__announce-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.home__announce-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: #4e5969;
+  font-size: 13px;
+}
+
+.home__announce-title {
+  color: #ad6800;
 }
 
 .home__section-title {

@@ -26,6 +26,9 @@
         <a-tab-pane key="lightrag" tab="LightRAG 管理">
           <LightRagManager v-if="activeKey === 'lightrag'" />
         </a-tab-pane>
+        <a-tab-pane key="announcement" tab="公告管理">
+          <AnnouncementManager v-if="activeKey === 'announcement'" />
+        </a-tab-pane>
         <a-tab-pane key="monitor" tab="系统监控">
           <MonitorPanel v-if="activeKey === 'monitor'" />
         </a-tab-pane>
@@ -46,6 +49,7 @@ import PromptManager from '@/components/admin/PromptManager.vue'
 import UserManager from '@/components/admin/UserManager.vue'
 import LightRagManager from '@/components/admin/LightRagManager.vue'
 import MonitorPanel from '@/components/admin/MonitorPanel.vue'
+import AnnouncementManager from '@/components/admin/AnnouncementManager.vue'
 
 useSeoMeta({
   title: '管理后台 - 溯知 · TraceQA',

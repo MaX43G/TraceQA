@@ -10,6 +10,8 @@ import edu.zjut.traceqa.mapper.KnowledgeBaseMapper;
 import edu.zjut.traceqa.mapper.RoleMapper;
 import edu.zjut.traceqa.mapper.SystemPromptMapper;
 import edu.zjut.traceqa.mapper.UserMapper;
+import edu.zjut.traceqa.mapper.AnnouncementMapper;
+import edu.zjut.traceqa.model.po.Announcement;
 import edu.zjut.traceqa.service.AuthService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -41,6 +43,8 @@ public class DataInitializer implements ApplicationRunner {
     @Resource
     private SystemPromptMapper systemPromptMapper;
     @Resource
+    private AnnouncementMapper announcementMapper;
+    @Resource
     private PasswordEncoder passwordEncoder;
 
     @Override
@@ -50,6 +54,7 @@ public class DataInitializer implements ApplicationRunner {
         initUsers();
         initKnowledgeBase();
         initSystemPrompts();
+        initAnnouncement();
         log.info("系统初始化数据装载完成");
     }
 
@@ -118,6 +123,20 @@ public class DataInitializer implements ApplicationRunner {
         user.setStatus(1);
         userMapper.insert(user);
         log.info("已创建默认账号：{} / {}（角色：{}）", username, rawPassword, roleCode);
+    }
+
+    /** 初始化默认公告（幂等） */
+    private void initAnnouncement() {
+        long count = announcementMapper.selectCount(new LambdaQueryWrapper<Announcement>().eq(Announcement::getDeleted, 0));
+        if (count > 0) {
+            return;
+        }
+        Announcement a = new Announcement();
+        a.setTitle("欢迎使用溯知 · TraceQA");
+        a.setContent("欢迎使用《数据挖掘》智能问答平台。输入问题即可获得基于知识图谱与向量检索的智能回答，支持语音输入与「猜你想问」智能追问。");
+        a.setEnabled(1);
+        announcementMapper.insert(a);
+        log.info("已创建默认公告");
     }
 
     /** 幂等写入系统提示词 */

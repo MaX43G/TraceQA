@@ -1,8 +1,8 @@
 # 溯知 · TraceQA
 
-> 《数据挖掘》课程 RAG 智能问答平台 —— 基于知识图谱与向量检索，多 Agent 协同的智能助教系统。
+> 《数据挖掘》智能问答平台 —— 基于知识图谱与向量检索，多 Agent 协同的智能助教系统。
 
-溯知（TraceQA）以课程教材与 PPT 为知识源，通过 **LightRAG（图谱 + 向量双路检索）** 与 **Spring AI Alibaba 多 Agent 协同**，实现「意图识别 → 检索调度 → 检索/搜索 → 总结」的完整工作流；SSE 流式推送思考状态与打字机回答，支持引用溯源、随时中断、模型自由切换、多轮对话与移动端访问。
+溯知（TraceQA）以课程教材与 PPT 为知识源，通过 **LightRAG（图谱 + 向量双路检索）** 与 **Spring AI Alibaba 多 Agent 协同**，实现「意图识别 → 检索调度 → 检索/搜索 → 总结」的完整工作流；SSE 流式推送思考状态与打字机回答，支持引用溯源、随时中断、模型自由切换、多轮对话与移动端访问。平台进一步支持**语音输入**（Web Speech API）与**「猜你想问」智能追问**，并接入 **MinIO 对象存储**统一管理用户文件（头像）。
 
 ---
 
@@ -83,6 +83,10 @@
 - **RBAC 管理后台**：用户/角色/知识库/文档/系统提示词
 - **可观测性（管理员专属）**：后端 Actuator 指标 + Prometheus 采集 + Grafana 大盘，经后端反向代理统一鉴权访问；管理页实时展示延迟分位/慢请求/错误率/JVM/运行日志
 - **移动端适配** + SSR/SEO 首页
+- **语音输入**：调用浏览器原生 **Web Speech API**（`SpeechRecognition`）**前端实时识别**并填入输入框，完全免费、无需后端参与（Chrome/Edge 支持）
+- **猜你想问**：每次回答完成后，AI 解读当前问答并推荐 1-2 个最可能追问的问题，点击即继续深入
+- **头像与个人信息**：接入 **MinIO 对象存储**统一管理用户文件；前端基于 cropperjs 高级裁剪（参考线/比例/旋转/缩放）后上传；修改昵称、上传头像、修改密码整合到统一的个人信息页
+- **公告栏**：管理员可在管理后台发布系统公告，首页顶部公告栏面向所有用户展示
 
 ## 模型体系
 
@@ -108,7 +112,7 @@
 cp .env.example .env
 #    填入 LLM_API_KEY（硅基流动）；可调整 LLM_MODEL 等
 
-# 2. 一键拉起（mysql + redis + lightrag + backend + frontend + prometheus + grafana）
+# 2. 一键拉起（mysql + redis + lightrag + minio + backend + frontend + prometheus + grafana）
 docker compose up -d --build
 ```
 
@@ -119,13 +123,20 @@ docker compose up -d --build
 | 前端 | http://localhost:6115 |
 | 后端 API | http://localhost:6114 |
 | OpenAPI 规范 | http://localhost:6114/v3/api-docs |
-| LightRAG WebUI | 经前端「LightRAG 管理 → 打开 WebUI」代理访问（`/lightrag-webui/`，不对外直连） |
+| MinIO 对象存储（S3，对外公开） | http://localhost:6116 |
+| LightRAG WebUI | 经前端「LightRAG 管理 → 打开 WebUI」代理访问（`/lightrag-webui/`，不对外直连）；外网端口已迁移至 `:6119` |
 | Prometheus | 经前端「系统监控 → 打开 Prometheus」代理访问（`/prometheus/`）；或直连 `:6112/prometheus` |
 | Grafana 大盘 | 经前端「系统监控 → 打开 Grafana」代理访问（`/grafana/`）；或直连 `:6113` |
 | MySQL | localhost:6118 |
 | Redis | localhost:6117 |
 
 **默认账号**：`admin/admin123456`（管理员）、`user/user123456`（生产环境务必修改）。
+
+> **MinIO**：公开端口 **6116** 供外界访问（浏览器直连上传/查看头像等文件）。原 6116 由 LightRAG 使用，现已迁移至 **6119**。默认账号 `minioadmin / minioadmin`，可在 `.env` 通过 `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` 修改（生产环境务必修改）；头像等文件的对外访问地址由 `MINIO_PUBLIC_URL` 控制。后端自动建桶并设置**公共只读策略**，保证头像可经公开 URL 直接访问。
+>
+> **Redis**：已取消内存上限限制，并开启 AOF 落盘持久化，重启后缓存与任务队列不丢失。
+>
+> **资源利用**：docker-compose 各服务不限制 CPU/内存，JVM 堆按容器可用内存动态分配（`-XX:MaxRAMPercentage=75`），Redis 无 `--maxmemory` 上限，充分利用服务器资源。
 
 > **文档格式说明**：仅支持上传 **`.md` / `.txt`** 文本文件（支持 zip 批量导入，自动内容去重）。
 > PDF / PPT / Word / 图片等格式请先用 MinerU 等工具转换为 Markdown 后再上传（LightRAG 内置 pypdf 无法解析扫描版 PDF 的文本层）。
@@ -165,12 +176,13 @@ cd frontend && pnpm gen:api         # 依据 /v3/api-docs 重新生成 TS API �
 
 | 模块 | 接口 |
 | --- | --- |
-| 认证 | `/api/auth/login|register|me|password` |
+| 认证 | `/api/auth/login|register|me|nickname|password|avatar` |
 | 模型 | `/api/models` |
-| 对话 | `/api/chat/stream`（SSE）、会话/消息 CRUD、`/export` |
+| 对话 | `/api/chat/stream`（SSE）、会话/消息 CRUD、`/export`、`/api/chat/followup`（猜你想问） |
 | 知识库 | `/api/kbs` |
 | 文档 | `/api/documents`（202 异步）、`/{id}/progress`（SSE） |
 | 系统提示词 | `/api/prompts` |
+| 系统公告 | `/api/announcement/active`（公开）、`/api/announcement`（管理员） |
 | 管理后台 | `/api/admin/users`、`/api/admin/roles` |
 
 ## 目录结构

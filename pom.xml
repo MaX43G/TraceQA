@@ -156,6 +156,13 @@
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
+
+        <!-- MinIO 对象存储：统一管理用户上传的文件（如头像），返回可访问 URL -->
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>8.5.12</version>
+        </dependency>
     </dependencies>
 
     <dependencyManagement>

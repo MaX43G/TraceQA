@@ -18,7 +18,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 认证接口。
@@ -63,6 +65,12 @@ public class AuthController {
     public ApiResponse<Void> updateNickname(@Valid @RequestBody NicknameRequest request) {
         authService.updateNickname(request.getNickname());
         return ApiResponse.ok();
+    }
+
+    @Operation(summary = "上传头像（前端裁剪后提交，返回头像 URL）")
+    @PostMapping("/avatar")
+    public ApiResponse<String> uploadAvatar(@RequestParam("file") MultipartFile file) {
+        return ApiResponse.ok(authService.updateAvatar(file));
     }
 
     @Operation(summary = "修改当前用户密码")

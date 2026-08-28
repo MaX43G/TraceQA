@@ -33,4 +33,7 @@ public class User extends BaseEntity {
 
     /** 用户状态：1 启用，0 禁用 */
     private Integer status;
+
+    /** 头像地址（MinIO 对象存储公开 URL） */
+    private String avatar;
 }

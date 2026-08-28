@@ -42,7 +42,7 @@ COPY --from=build /app/target/*.jar app.jar
 
 # 运行参数
 ENV SPRING_PROFILES_ACTIVE=prod
-ENV JAVA_OPTS="-Xms256m -Xmx768m"
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=25.0"
 
 EXPOSE 8080
 

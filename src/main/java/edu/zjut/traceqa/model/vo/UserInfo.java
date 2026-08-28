@@ -25,6 +25,8 @@ public class UserInfo {
 
     private List<String> permissions;
 
+    private String avatar;
+
 /** 由用户实体与权限码集合组装 */
     public static UserInfo of(User user, List<String> permissions) {
         return new UserInfo(
@@ -33,7 +35,8 @@ public class UserInfo {
                 user.getNickname(),
                 user.getRoleCode(),
                 user.getStatus(),
-                permissions
+                permissions,
+                user.getAvatar()
         );
     }
 }

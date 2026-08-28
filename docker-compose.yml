@@ -1,6 +1,7 @@
 # ============================================================
 # 溯知 / TraceQA 一键部署编排
-# 服务：mysql + redis + lightrag(知识图谱引擎) + backend(Spring Boot) + frontend(Nuxt SSR)
+# 服务：mysql + redis + lightrag(知识图谱引擎) + minio(对象存储) + backend(Spring Boot) + frontend(Nuxt SSR)
+# 端口：6114 后端 | 6115 前端 | 6116 MinIO(S3) | 6117 Redis | 6118 MySQL | 6119 LightRAG
 # 使用：cp .env.example .env && docker compose up -d --build
 # ============================================================
 name: traceqa
@@ -34,12 +35,11 @@ services:
       retries: 10
 
   # Redis：查询/Agent 决策缓存 + 文档处理异步队列
-  # 轻量配置：内存上限 256MB、不落盘（缓存可重建），适配小内存服务器
   redis:
     image: redis:latest
     container_name: traceqa-redis
     restart: unless-stopped
-    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--appendonly", "no", "--save", ""]
+    command: ["redis-server", "--appendonly", "yes", "--save", "60 1", "--appendfsync", "everysec"]
     volumes:
       - traceqa-redis-data:/data
     ports:
@@ -103,13 +103,36 @@ services:
     volumes:
       - traceqa-lightrag-data:/app/data
     ports:
-      - "6116:9621"
+      - "6119:9621"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:9621/health', timeout=5)"]
       interval: 15s
       timeout: 8s
       retries: 10
       start_period: 30s
+
+  # MinIO 对象存储：统一管理用户上传的文件（如头像），公开端口 6116 供外界访问
+  minio:
+    image: minio/minio:latest
+    container_name: traceqa-minio
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+      TZ: Asia/Shanghai
+    volumes:
+      - traceqa-minio-data:/data
+    ports:
+      # S3 API：对外暴露 6116（供浏览器/前端直连访问，含头像公开访问）
+      - "6116:9000"
+      # 控制台
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
 
   # Spring Boot 后端
   backend:
@@ -128,6 +151,11 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traceqa123}
       LIGHTRAG_BASE_URL: http://lightrag:9621
       LIGHTRAG_API_KEY: ""
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-traceqa}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:6116}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-THUDM/GLM-4-9B-0414}
@@ -222,3 +250,4 @@ volumes:
   traceqa-lightrag-data:
   traceqa-backend-data:
   traceqa-grafana-data:
+  traceqa-minio-data:

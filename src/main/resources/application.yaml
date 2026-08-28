@@ -70,6 +70,13 @@ app:
   # 本地文件存储根目录（初期不引入对象存储/Redis 等中间件）
   storage:
     root: ${APP_STORAGE_ROOT:./data/files}
+  # MinIO 对象存储
+  minio:
+    endpoint: ${MINIO_ENDPOINT:http://localhost:6116}
+    access-key: ${MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${MINIO_SECRET_KEY:minioadmin}
+    bucket: ${MINIO_BUCKET:traceqa}
+    public-url: ${MINIO_PUBLIC_URL:}
   jwt:
     secret: ${APP_JWT_SECRET:traceqa-secret-key-please-change-in-prod-2026}
     expiration: ${APP_JWT_EXPIRATION:7200000}

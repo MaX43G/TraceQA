@@ -77,6 +77,7 @@
             :msg="msg"
             :streaming="isStreamingMsg(msg)"
             @delete="handleDeleteMessage"
+            @ask="handleFollowup"
           />
         </template>
       </div>
@@ -98,9 +99,9 @@
 import {ExportOutlined, MenuOutlined, MenuFoldOutlined, MenuUnfoldOutlined} from '@ant-design/icons-vue'
 import {message, Modal} from 'ant-design-vue'
 import {useChatStore} from '@/stores/chat'
-import {useAuthStore} from '@/stores/auth'
 import {useModelStore} from '@/stores/model'
 import {streamChat, type RetrievalStats} from '@/composables/useChatStream'
+import {getAuthHeaders} from '@/utils/request'
 import SessionList from '@/components/chat/SessionList.vue'
 import ChatMessageItem from '@/components/chat/ChatMessageItem.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
@@ -114,7 +115,6 @@ useSeoMeta({
 })
 
 const chat = useChatStore()
-const auth = useAuthStore()
 const modelStore = useModelStore()
 const listRef = ref<HTMLElement | null>(null)
 /** 提问框实例（用于回答结束后清空） */
@@ -203,6 +203,28 @@ async function askQuick(question: string): Promise<void> {
   await handleSend(question)
 }
 
+/** 点击「猜你想问」推荐的问题继续提问 */
+async function handleFollowup(question: string): Promise<void> {
+  await handleSend(question)
+}
+
+/** 调用后端「猜你想问」接口，获取并填充推荐问题（失败静默） */
+async function loadFollowup(content: string, streamMsg: StreamMessage): Promise<void> {
+  try {
+    const res = await fetch('/api/chat/followup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ content, answer: streamMsg.buffer || '' })
+    })
+    const json = await res.json()
+    if (json.code === 200 && Array.isArray(json.data) && json.data.length) {
+      streamMsg.followup = json.data
+    }
+  } catch {
+    // 静默失败：不阻塞对话
+  }
+}
+
 /** 发送消息（SSE 流式消费） */
 async function handleSend(content: string): Promise<void> {
   if (chat.generating) {
@@ -273,6 +295,8 @@ async function handleSend(content: string): Promise<void> {
           streamMsg.content = streamMsg.buffer
           // 回答已完成即解除输入锁定（onEnd 可能因 SSE 连接未及时关闭而不触发）
           chat.generating = false
+          // 猜你想问：AI 解读当前问答，推荐可能追问的问题（异步获取，失败静默）
+          loadFollowup(content, streamMsg)
         },
         onError: (err) => {
           streamMsg.streaming = false

@@ -35,20 +35,17 @@
           <template v-if="auth.isLoggedIn">
             <a-dropdown>
               <a-space class="app-header__user-info">
-                <a-avatar size="small" style="background: linear-gradient(135deg, #1677ff, #06b6d4)">
+                <a-avatar v-if="auth.userInfo?.avatar" :size="28" :src="auth.userInfo.avatar" />
+                <a-avatar v-else size="28" style="background: linear-gradient(135deg, #1677ff, #06b6d4)">
                   {{ (auth.userInfo?.nickname || 'U').charAt(0) }}
                 </a-avatar>
                 <span>{{ auth.userInfo?.nickname || auth.userInfo?.username }}</span>
               </a-space>
               <template #overlay>
                 <a-menu>
-                  <a-menu-item key="nickname" @click="showNicknameModal = true">
-                    <EditOutlined />
-                    修改昵称
-                  </a-menu-item>
-                  <a-menu-item key="password" @click="showPasswordModal = true">
-                    <KeyOutlined />
-                    修改密码
+                  <a-menu-item key="personal" @click="navigateTo('/personal')">
+                    <UserOutlined />
+                    个人信息
                   </a-menu-item>
                   <a-menu-divider />
                   <a-menu-item key="logout" @click="handleLogout">
@@ -93,32 +90,25 @@
       </div>
     </a-drawer>
 
-    <ChangePasswordModal v-model:open="showPasswordModal" />
-    <NicknameModal v-model:open="showNicknameModal" />
-  </a-layout>
+    </a-layout>
 </template>
 
 <script setup lang="ts">
 /**
- * 默认布局：顶栏（品牌 + 导航 + 用户菜单）+ 内容区 + 修改密码/昵称弹窗 + 移动端导航抽屉。
+ * 默认布局：顶栏（品牌 + 导航 + 用户菜单）+ 内容区 + 移动端导航抽屉。
  */
 import {
-  EditOutlined,
-  KeyOutlined,
   LogoutOutlined,
+  UserOutlined,
   HomeOutlined,
   MessageOutlined,
   SettingOutlined,
   MenuOutlined
 } from '@ant-design/icons-vue'
 import { useAuthStore } from '@/stores/auth'
-import ChangePasswordModal from '@/components/auth/ChangePasswordModal.vue'
-import NicknameModal from '@/components/auth/NicknameModal.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
-const showPasswordModal = ref(false)
-const showNicknameModal = ref(false)
 const drawerOpen = ref(false)
 
 const staticNav = [

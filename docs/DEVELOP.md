@@ -10,8 +10,9 @@
 | API 契约 | 后端 springdoc 生成 OpenAPI → 前端 `@umijs/openapi` 生成 TS 客户端 |
 | 后端 | Spring Boot 4.1、Java 25、Spring AI Alibaba Agent、springdoc-openapi |
 | ORM | MyBatis-Plus |
-| 数据库 | MySQL 8（单库），本地文件系统存储文件 |
-| 缓存/队列 | Redis（查询与 Agent 决策缓存、文档解析任务队列 Redis Stream） |
+| 数据库 | MySQL 8（单库） |
+| 对象存储 | MinIO（统一管理用户上传文件，如头像；S3 兼容，公开端口 6116） |
+| 缓存/队列 | Redis（查询与 Agent 决策缓存、文档解析任务队列 Redis Stream；AOF 落盘持久化、无内存上限） |
 | 检索 | LightRAG（图谱 + 向量 + 关键词），Agentic 策略规划 / 查询重写 / HyDE / 查询分解 / 三路检索 / RRF 融合 / ReRead / 语义重排（bge-reranker-v2-m3，可选） |
 | 可观测性 | Spring Boot Actuator + Micrometer/Prometheus + Prometheus + Grafana（管理员专属） |
 | 部署 | Docker Compose（mysql + redis + lightrag + backend + frontend + prometheus + grafana） |
@@ -22,19 +23,19 @@
 TraceQA/
 ├── src/main/java/edu/zjut/traceqa/
 │   ├── common/          # 统一响应/错误码/异常/traceId/JWT/RBAC/分页/JSON/Web 配置
-│   ├── config/          # LightRAG 客户端、OpenAI 兼容客户端、Jackson、OpenAPI、提示词默认、数据初始化
-│   ├── entity/          # MyBatis-Plus 实体
+│   ├── config/          # LightRAG 客户端、MinIO 客户端、OpenAI 兼容客户端、Jackson、OpenAPI、提示词默认、数据初始化
+│   ├── entity/          # MyBatis-Plus 实体（含 user.avatar）
 │   ├── mapper/          # 数据访问接口
 │   ├── dto/             # 请求/响应 DTO
-│   ├── service/         # 认证、对话、文档、解析 worker、知识库、提示词、LLM、熔断、管理
+│   ├── service/         # 认证、对话、文档、解析 worker、知识库、提示词、LLM、熔断、管理、文件存储
 │   ├── retrieval/       # 检索增强：复杂度判定、重写/HyDE、图谱/向量检索、RRF、ReRead
 │   ├── agent/           # 多 Agent（意图/调度/重写/图谱/向量/融合/总结）编排器
 │   ├── sse/             # SSE 事件发布
 │   └── controller/      # REST 接口
 ├── frontend/
 │   ├── app/
-│   │   ├── pages/       # 首页 / 智能问答(/chat) / 登录 / 管理后台
-│   │   ├── components/  # 聊天与后台组件（状态图、引用、模型选择、消息等）
+│   │   ├── pages/       # 首页 / 智能问答(/chat) / 个人信息(/personal) / 登录 / 管理后台
+│   │   ├── components/  # 聊天与后台组件（状态图、引用、模型选择、消息、头像裁剪等）
 │   │   ├── composables/ # SSE 流式消费
 │   │   ├── stores/      # Pinia（auth / chat / model）
 │   │   ├── utils/       # request / markdown / api-types
@@ -146,15 +147,28 @@ cd frontend && pnpm gen:api   # 依据 http://localhost:8080/v3/api-docs 生成 
 ## 8. 数据模型
 
 ```
-t_role (RBAC 角色+权限码) ── t_user (role_code)
+t_role (RBAC 角色+权限码) ── t_user (role_code, avatar)
 t_knowledge_base ── t_document (异步解析状态/进度)
 t_chat_session ── t_chat_message (thinking_trace/references JSON)
 t_system_prompt (各 Agent 场景提示词，管理员可编辑)
+t_announcement (系统公告：title/content/enabled)
 ```
 
 - 雪花 ID 序列化为字符串传输（避免 JS 精度丢失）。
 - 逻辑删除统一 `deleted` 字段。
 - 系统提示词缺省回退 `PromptDefaults`，保证始终有提示词。
+- 头像字段为 `t_user.avatar`（存量库执行 `docs/table.sql` 补充；新部署由 `schema.sql` 自动建列）。
+
+### 8.2 头像与 MinIO 对象存储
+
+- `MinioConfig` 提供 `MinioClient`；`FileStorageService` 负责建桶、上传并返回公开 URL，自动设置**桶公共只读策略**解决对象直链 403。
+- `AuthService.updateAvatar` 接收前端裁剪后的图片写入 MinIO 并回写 `t_user.avatar`；前端 `AvatarCropperModal` 基于 cropperjs 高级裁剪后上传。
+- `app.minio.*` 配置（Docker 内网连 `minio:9000`，对外公开 URL 用 `MINIO_PUBLIC_URL`）。
+
+### 8.3 语音输入与「猜你想问」
+
+- **语音输入**：`ChatInput` 调用浏览器原生 **Web Speech API**（`SpeechRecognition`/`webkitSpeechRecognition`），`continuous + interimResults` 前端实时识别并填入输入框，自动重启保持持续聆听（免费、无需后端参与）。
+- **猜你想问**：`POST /api/chat/followup` 由 AI 解读当前问答，推荐 1-2 个最可能追问的问题；回答完成后前端调用并展示在回答下方，点击即发送。
 
 ### 8.1 文档切分与入库（DocumentParseWorker）
 

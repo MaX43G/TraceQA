@@ -41,6 +41,9 @@ public class AppProperties {
     private List<ModelItem> models = List.of(
             new ModelItem("默认模型", "", ""));
 
+    /** MinIO 对象存储配置 */
+    private Minio minio = new Minio();
+
     /** 本地文件存储 */
     @Data
     public static class Storage {
@@ -127,5 +130,20 @@ public class AppProperties {
         private String model = "BAAI/bge-reranker-v2-m3";
         /** Rerank 接口路径 */
         private String path = "/rerank";
+    }
+
+    /** MinIO 对象存储 */
+    @Data
+    public static class Minio {
+        /** 服务地址（如 http://localhost:6116） */
+        private String endpoint = "http://localhost:6116";
+        /** 访问密钥 */
+        private String accessKey = "minioadmin";
+        /** 私有密钥 */
+        private String secretKey = "minioadmin";
+        /** 默认桶名 */
+        private String bucket = "traceqa";
+        /** 对外可访问的地址（用于拼接头像等文件的公开 URL；默认取 endpoint） */
+        private String publicUrl = "";
     }
 }

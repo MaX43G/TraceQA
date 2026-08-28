@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS t_user (
     nickname    VARCHAR(64)  DEFAULT '',
     role_code   VARCHAR(32)  DEFAULT 'USER',
     status      TINYINT      DEFAULT 1,
+    avatar      VARCHAR(512) DEFAULT '',
     create_time DATETIME     DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME     DEFAULT CURRENT_TIMESTAMP,
     deleted     TINYINT      DEFAULT 0
@@ -92,6 +93,17 @@ CREATE TABLE IF NOT EXISTS t_chat_message (
     create_time    DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time    DATETIME DEFAULT CURRENT_TIMESTAMP,
     deleted        TINYINT  DEFAULT 0
+);
+
+-- 系统公告表
+CREATE TABLE IF NOT EXISTS t_announcement (
+    id          BIGINT       NOT NULL PRIMARY KEY,
+    title       VARCHAR(128) DEFAULT '',
+    content     TEXT,
+    enabled     TINYINT      DEFAULT 1,
+    create_time DATETIME     DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME     DEFAULT CURRENT_TIMESTAMP,
+    deleted     TINYINT      DEFAULT 0
 );
 
 -- 系统提示词表

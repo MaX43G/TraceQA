@@ -21,6 +21,12 @@
           <div v-if="props.streaming" class="chat-msg__streaming">正在生成…</div>
         </div>
         <CitationPanel v-if="hasReferences" ref="citationPanel" :references="msg.references ?? []" :used-indexes="usedIndexes" @view="openViewer" />
+        <div v-if="props.msg.followup?.length && !props.streaming" class="chat-msg__followup">
+          <span class="chat-msg__followup-label">猜你想问</span>
+          <a-tag v-for="(q, i) in props.msg.followup" :key="i" class="chat-msg__followup-tag" @click="emit('ask', q)">
+            {{ q }}
+          </a-tag>
+        </div>
 <div class="chat-msg__actions">
             <a-space :size="4">
               <a-tooltip :title="speaking ? '停止朗读' : '朗读本条回答'">
@@ -78,6 +84,7 @@ const props = defineProps<{
     streaming?: boolean
     buffer?: string
     stats?: RetrievalStats
+    followup?: string[]
   }
   /** 是否处于生成中 */
   streaming?: boolean
@@ -85,6 +92,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'delete', messageId: number): void
+  (e: 'ask', question: string): void
 }>()
 
 const citationPanel = ref<InstanceType<typeof CitationPanel> | null>(null)
@@ -289,6 +297,27 @@ function toggleSpeak(): void {
 .chat-msg__actions {
   margin-top: 4px;
   opacity: 1;
+}
+
+.chat-msg__followup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chat-msg__followup-label {
+  font-size: 12px;
+  color: #86909c;
+  margin-right: 2px;
+}
+
+.chat-msg__followup-tag {
+  cursor: pointer;
+  background: #e6f4ff;
+  border: 1px solid #91caff;
+  color: #1677ff;
 }
 
 /* 文献全文弹窗：窗口放大 + 内容纵向滚动（自动换行，无需横向拖动） */

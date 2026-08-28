@@ -23,6 +23,8 @@ export interface StreamMessage extends ChatMessageVO {
   buffer: string
   /** 检索分析数据（SSE stats 事件） */
   stats?: { graphHits?: number; vectorHits?: number; keywordHits?: number; fusedCount?: number; elapsedMs?: number; sourceDocs?: Record<string, number> }
+  /** 猜你想问：AI 推荐的追问问题（仅本次展示，不持久化） */
+  followup?: string[]
 }
 
 export const useChatStore = defineStore('chat', {

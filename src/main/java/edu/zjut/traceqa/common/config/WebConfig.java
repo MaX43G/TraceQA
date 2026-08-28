@@ -46,7 +46,8 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addInterceptor(new SaInterceptor(handle -> {
             // 业务 API：除放行项外需登录
             SaRouter.match("/api/**")
-                    .notMatch("/api/auth/login", "/api/auth/register", "/api/health")
+                    .notMatch("/api/auth/login", "/api/auth/register", "/api/health",
+                            "/api/announcement/active")
                     .check(r -> {
                         StpUtil.checkLogin();
                         checkUserEnabled();

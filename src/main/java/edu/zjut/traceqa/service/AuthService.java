@@ -18,9 +18,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import edu.zjut.traceqa.common.convert.DtoMapper;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 认证服务。
@@ -49,6 +51,9 @@ public class AuthService {
 
     @Resource
     private PasswordEncoder passwordEncoder;
+
+    @Resource
+    private FileStorageService fileStorageService;
 
     /** 用户注册（默认角色 USER；账号需英文数字且唯一，注册后不可修改） */
     public UserInfo register(RegisterRequest request) {
@@ -130,6 +135,30 @@ public class AuthService {
             StpUtil.getSession().set(UserContext.SESSION_KEY, lu);
         }
         log.info("用户修改昵称成功：{} → {}", user.getUsername(), nickname);
+    }
+
+    /** 上传并更新当前用户头像（文件经前端裁剪后提交） */
+    public String updateAvatar(MultipartFile file) {
+        Long userId = UserContext.getUserId();
+        if (userId == null) {
+            throw new BizException(ErrorCode.UNAUTHORIZED);
+        }
+        if (file == null || file.isEmpty()) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "头像文件为空");
+        }
+        try {
+            String url = fileStorageService.uploadAvatar(file.getBytes(), file.getContentType());
+            User user = userMapper.selectById(userId);
+            if (user != null) {
+                user.setAvatar(url);
+                userMapper.updateById(user);
+            }
+            log.info("用户更新头像成功：{}", userId);
+            return url;
+        } catch (IOException e) {
+            log.error("读取头像文件失败：{}", e.getMessage());
+            throw new BizException(ErrorCode.FILE_ERROR, "头像文件读取失败");
+        }
     }
 
     /** 修改当前用户密码（校验原密码，BCrypt 加密新密码） */
