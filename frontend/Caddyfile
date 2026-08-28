@@ -3,15 +3,14 @@
 #
 # ============================================================
 
-# HTTPS 前端（Let's Encrypt IP 证书，自动续期）
-121.41.72.189 {
+# HTTPS 前端（对外 443 / 6115，Let's Encrypt IP 证书）
+121.41.72.189:443 {
 	reverse_proxy frontend:3000
 	encode gzip
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
 }
 
-# HTTPS MinIO（host 6116，自签证书）
-:8443 {
-	tls /certs/fullchain.pem /certs/privkey.pem
+# HTTPS MinIO（对外 6116，复用同一张 Let's Encrypt IP 证书）
+121.41.72.189:8443 {
 	reverse_proxy minio:9000
 }
