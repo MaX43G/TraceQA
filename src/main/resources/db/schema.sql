@@ -8,19 +8,21 @@ CREATE DATABASE IF NOT EXISTS traceqa DEFAULT CHARACTER SET utf8mb4 COLLATE utf8
 USE traceqa;
 
 -- 角色表（RBAC）
-CREATE TABLE IF NOT EXISTS t_role (
-    id          BIGINT       NOT NULL PRIMARY KEY,
-    code        VARCHAR(32)  NOT NULL,
-    name        VARCHAR(64)  NOT NULL,
+CREATE TABLE IF NOT EXISTS t_role
+(
+    id          BIGINT      NOT NULL PRIMARY KEY,
+    code        VARCHAR(32) NOT NULL,
+    name        VARCHAR(64) NOT NULL,
     permissions VARCHAR(1024) DEFAULT '',
-    description VARCHAR(255) DEFAULT '',
-    create_time DATETIME     DEFAULT CURRENT_TIMESTAMP,
-    update_time DATETIME     DEFAULT CURRENT_TIMESTAMP,
-    deleted     TINYINT      DEFAULT 0
+    description VARCHAR(255)  DEFAULT '',
+    create_time DATETIME      DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME      DEFAULT CURRENT_TIMESTAMP,
+    deleted     TINYINT       DEFAULT 0
 );
 
 -- 用户表
-CREATE TABLE IF NOT EXISTS t_user (
+CREATE TABLE IF NOT EXISTS t_user
+(
     id          BIGINT       NOT NULL PRIMARY KEY,
     username    VARCHAR(64)  NOT NULL,
     password    VARCHAR(128) NOT NULL,
@@ -34,7 +36,8 @@ CREATE TABLE IF NOT EXISTS t_user (
 );
 
 -- 知识库表
-CREATE TABLE IF NOT EXISTS t_knowledge_base (
+CREATE TABLE IF NOT EXISTS t_knowledge_base
+(
     id          BIGINT       NOT NULL PRIMARY KEY,
     name        VARCHAR(128) NOT NULL,
     description VARCHAR(512) DEFAULT '',
@@ -46,7 +49,8 @@ CREATE TABLE IF NOT EXISTS t_knowledge_base (
 );
 
 -- 文档表（异步解析进度）
-CREATE TABLE IF NOT EXISTS t_document (
+CREATE TABLE IF NOT EXISTS t_document
+(
     id                BIGINT       NOT NULL PRIMARY KEY,
     knowledge_base_id BIGINT       NOT NULL,
     original_name     VARCHAR(255) NOT NULL,
@@ -68,9 +72,10 @@ CREATE TABLE IF NOT EXISTS t_document (
 );
 
 -- 聊天会话表
-CREATE TABLE IF NOT EXISTS t_chat_session (
-    id                BIGINT       NOT NULL PRIMARY KEY,
-    user_id           BIGINT       NOT NULL,
+CREATE TABLE IF NOT EXISTS t_chat_session
+(
+    id                BIGINT NOT NULL PRIMARY KEY,
+    user_id           BIGINT NOT NULL,
     title             VARCHAR(128) DEFAULT '新对话',
     knowledge_base_id BIGINT       DEFAULT NULL,
     pinned            TINYINT      DEFAULT 0,
@@ -81,13 +86,14 @@ CREATE TABLE IF NOT EXISTS t_chat_session (
 );
 
 -- 聊天消息表
-CREATE TABLE IF NOT EXISTS t_chat_message (
-    id             BIGINT   NOT NULL PRIMARY KEY,
-    session_id     BIGINT   NOT NULL,
+CREATE TABLE IF NOT EXISTS t_chat_message
+(
+    id             BIGINT      NOT NULL PRIMARY KEY,
+    session_id     BIGINT      NOT NULL,
     role           VARCHAR(16) NOT NULL,
     content        TEXT,
     thinking_trace TEXT,
-    `references`     TEXT,
+    `references`   TEXT,
     latency_ms     BIGINT   DEFAULT 0,
     status         TINYINT  DEFAULT 1,
     create_time    DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -96,8 +102,9 @@ CREATE TABLE IF NOT EXISTS t_chat_message (
 );
 
 -- 系统公告表
-CREATE TABLE IF NOT EXISTS t_announcement (
-    id          BIGINT       NOT NULL PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS t_announcement
+(
+    id          BIGINT NOT NULL PRIMARY KEY,
     title       VARCHAR(128) DEFAULT '',
     content     TEXT,
     enabled     TINYINT      DEFAULT 1,
@@ -107,9 +114,10 @@ CREATE TABLE IF NOT EXISTS t_announcement (
 );
 
 -- 系统提示词表
-CREATE TABLE IF NOT EXISTS t_system_prompt (
-    id          BIGINT       NOT NULL PRIMARY KEY,
-    scenario    VARCHAR(64)  NOT NULL,
+CREATE TABLE IF NOT EXISTS t_system_prompt
+(
+    id          BIGINT      NOT NULL PRIMARY KEY,
+    scenario    VARCHAR(64) NOT NULL,
     name        VARCHAR(128) DEFAULT '',
     content     TEXT,
     enabled     TINYINT      DEFAULT 1,

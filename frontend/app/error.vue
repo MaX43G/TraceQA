@@ -1,7 +1,7 @@
 <template>
   <div class="err-page">
-    <div class="err-blob err-blob--1" />
-    <div class="err-blob err-blob--2" />
+    <div class="err-blob err-blob--1"/>
+    <div class="err-blob err-blob--2"/>
     <div class="err-card tq-glass">
       <div class="err-code" :class="isNotFound ? 'err-code--404' : 'err-code--500'">
         {{ error?.statusCode || 500 }}
@@ -15,11 +15,15 @@
       <div v-if="error?.statusMessage" class="err-message">{{ error.statusMessage }}</div>
       <div class="err-actions">
         <a-button type="primary" size="large" @click="goHome">
-          <template #icon><HomeOutlined /></template>
+          <template #icon>
+            <HomeOutlined/>
+          </template>
           返回首页
         </a-button>
         <a-button size="large" @click="goBack">
-          <template #icon><ArrowLeftOutlined /></template>
+          <template #icon>
+            <ArrowLeftOutlined/>
+          </template>
           返回上一页
         </a-button>
       </div>
@@ -31,7 +35,7 @@
 /**
  * 全局错误页：404 / 500 等 HTTP 错误统一展示（美观提示 + 返回入口）。
  */
-import { HomeOutlined, ArrowLeftOutlined } from '@ant-design/icons-vue'
+import {HomeOutlined, ArrowLeftOutlined} from '@ant-design/icons-vue'
 
 const props = defineProps<{
   error?: { statusCode?: number; statusMessage?: string }
@@ -39,7 +43,7 @@ const props = defineProps<{
 
 const isNotFound = computed(() => (props.error?.statusCode ?? 0) === 404)
 
-useSeoMeta({ title: `${props.error?.statusCode || 500} - 溯知 · TraceQA`, robots: 'noindex' })
+useSeoMeta({title: `${props.error?.statusCode || 500} - 溯知 · TraceQA`, robots: 'noindex'})
 
 function goHome(): void {
   clearError()
@@ -48,7 +52,11 @@ function goHome(): void {
 
 function goBack(): void {
   clearError()
-  navigateBack()
+  if (window.history.length > 1) {
+    window.history.back()
+  } else {
+    navigateTo('/')
+  }
 }
 </script>
 

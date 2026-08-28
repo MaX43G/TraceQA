@@ -26,7 +26,6 @@ public class AnswerAgent {
     @Resource
     private LlmService llmService;
 
-    
 
     /**
      * 流式生成回答。

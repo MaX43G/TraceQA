@@ -33,7 +33,6 @@ public class AuthController {
     @Resource
     private AuthService authService;
 
-    
 
     @Operation(summary = "用户注册")
     @PostMapping("/register")

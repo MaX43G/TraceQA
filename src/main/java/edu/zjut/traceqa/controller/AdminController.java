@@ -37,7 +37,6 @@ public class AdminController {
     @Resource
     private AdminService adminService;
 
-    
 
     @Operation(summary = "分页查询用户")
     @GetMapping("/users")
@@ -81,7 +80,9 @@ public class AdminController {
         return ApiResponse.ok(adminService.updateRole(id, dto));
     }
 
-    /** 角色变更请求体（@NotNull 校验） */
+    /**
+     * 角色变更请求体（@NotNull 校验）
+     */
     @Data
     @AllArgsConstructor
     @NoArgsConstructor

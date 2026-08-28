@@ -1,4 +1,5 @@
 package edu.zjut.traceqa.model.vo;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -12,16 +13,24 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class ModelVO {
 
-    /** 展示名称 */
+    /**
+     * 展示名称
+     */
     private String name;
 
-    /** 模型标识 */
+    /**
+     * 模型标识
+     */
     private String model;
 
-    /** OpenAI 兼容地址（默认模型可为空） */
+    /**
+     * OpenAI 兼容地址（默认模型可为空）
+     */
     private String baseUrl;
 
-    /** 是否默认模型 */
+    /**
+     * 是否默认模型
+     */
     private boolean isDefault;
 
 }

@@ -13,18 +13,24 @@ public final class TraceIdHolder {
     private TraceIdHolder() {
     }
 
-    /** 获取当前线程的 traceId，为空时返回占位符 */
+    /**
+     * 获取当前线程的 traceId，为空时返回占位符
+     */
     public static String get() {
         String traceId = TRACE_ID.get();
         return traceId == null ? "-" : traceId;
     }
 
-    /** 设置当前线程的 traceId */
+    /**
+     * 设置当前线程的 traceId
+     */
     public static void set(String traceId) {
         TRACE_ID.set(traceId);
     }
 
-    /** 清理当前线程的 traceId（请求结束时必须调用，防止线程复用串号） */
+    /**
+     * 清理当前线程的 traceId（请求结束时必须调用，防止线程复用串号）
+     */
     public static void clear() {
         TRACE_ID.remove();
     }

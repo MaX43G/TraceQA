@@ -11,6 +11,6 @@ scrape_configs:
       # 启动时由容器命令将 __SCRAPE_TOKEN__ 替换为 OBSERVABILITY_SCRAPE_TOKEN
       credentials: '__SCRAPE_TOKEN__'
     static_configs:
-      - targets: ['backend:8080']
+      - targets: [ 'backend:8080' ]
         labels:
           app: traceqa-backend

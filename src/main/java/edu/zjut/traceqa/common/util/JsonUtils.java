@@ -20,9 +20,10 @@ public class JsonUtils {
     @Resource
     private ObjectMapper objectMapper;
 
-    
 
-    /** 对象序列化为 JSON 字符串，失败返回 null */
+    /**
+     * 对象序列化为 JSON 字符串，失败返回 null
+     */
     public String toJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -32,7 +33,9 @@ public class JsonUtils {
         }
     }
 
-    /** 解析 JSON 为对象列表（按元素类型），失败返回空列表 */
+    /**
+     * 解析 JSON 为对象列表（按元素类型），失败返回空列表
+     */
     public <T> List<T> parseList(String json, Class<T> elementType) {
         if (json == null || json.isBlank()) {
             return List.of();

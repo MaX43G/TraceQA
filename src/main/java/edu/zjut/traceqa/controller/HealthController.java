@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 健康检查接口。
@@ -49,7 +50,7 @@ public class HealthController {
 
     private String redisStatus() {
         try {
-            stringRedisTemplate.getConnectionFactory().getConnection().ping();
+            Objects.requireNonNull(stringRedisTemplate.getConnectionFactory()).getConnection().ping();
             return "UP";
         } catch (Exception e) {
             return "DOWN";

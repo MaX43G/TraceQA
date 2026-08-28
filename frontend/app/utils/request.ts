@@ -12,48 +12,49 @@
 
 /** 后端统一响应结构 */
 export interface ApiResponse<T = unknown> {
-  /** 业务错误码，200 为成功 */
-  code: number
-  /** 提示信息 */
-  msg: string
-  /** 业务数据 */
-  data: T
-  /** 链路追踪 ID */
-  traceId: string
-  /** 诊断详情：后端附带的根因信息（排障用，可空） */
-  detail?: string
+    /** 业务错误码，200 为成功 */
+    code: number
+    /** 提示信息 */
+    msg: string
+    /** 业务数据 */
+    data: T
+    /** 链路追踪 ID */
+    traceId: string
+    /** 诊断详情：后端附带的根因信息（排障用，可空） */
+    detail?: string
 }
 
 /** 请求选项（兼容 umijs/openapi 生成的调用签名） */
 export interface RequestOptions {
-  /** HTTP 方法 */
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
-  /** 请求体（JSON） */
-  data?: unknown
-  /** URL 查询参数 */
-  params?: Record<string, unknown>
-  /** 附加请求头 */
-  headers?: Record<string, string>
-  /** 其余透传给 fetch 的选项 */
-  [key: string]: unknown
+    /** HTTP 方法 */
+    method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+    /** 请求体（JSON） */
+    data?: unknown
+    /** URL 查询参数 */
+    params?: Record<string, unknown>
+    /** 附加请求头 */
+    headers?: Record<string, string>
+
+    /** 其余透传给 fetch 的选项 */
+    [key: string]: unknown
 }
 
 /** 统一业务异常 */
 export class ApiError extends Error {
-  /** 业务错误码 */
-  code: number
-  /** 链路追踪 ID */
-  traceId: string
-  /** 诊断详情（根因信息） */
-  detail?: string
+    /** 业务错误码 */
+    code: number
+    /** 链路追踪 ID */
+    traceId: string
+    /** 诊断详情（根因信息） */
+    detail?: string
 
-  constructor(msg: string, code: number, traceId = '-', detail?: string) {
-    super(detail ? `${msg}（${detail}）` : msg)
-    this.name = 'ApiError'
-    this.code = code
-    this.traceId = traceId
-    this.detail = detail
-  }
+    constructor(msg: string, code: number, traceId = '-', detail?: string) {
+        super(detail ? `${msg}（${detail}）` : msg)
+        this.name = 'ApiError'
+        this.code = code
+        this.traceId = traceId
+        this.detail = detail
+    }
 }
 
 /** 认证 Token 存储键 */
@@ -61,26 +62,26 @@ export const TOKEN_KEY = 'tq_token'
 
 /** 获取认证请求头（SSR 环境无 window 时返回空） */
 export function getAuthHeaders(): Record<string, string> {
-  if (typeof window === 'undefined') {
-    return {}
-  }
-  const token = window.localStorage.getItem(TOKEN_KEY)
-  return token ? { Authorization: `Bearer ${token}` } : {}
+    if (typeof window === 'undefined') {
+        return {}
+    }
+    const token = window.localStorage.getItem(TOKEN_KEY)
+    return token ? {Authorization: `Bearer ${token}`} : {}
 }
 
 /** 组装查询字符串（过滤空值） */
 function buildQuery(params?: Record<string, unknown>): string {
-  if (!params) {
-    return ''
-  }
-  const usp = new URLSearchParams()
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      usp.append(key, String(value))
+    if (!params) {
+        return ''
     }
-  })
-  const qs = usp.toString()
-  return qs ? `?${qs}` : ''
+    const usp = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            usp.append(key, String(value))
+        }
+    })
+    const qs = usp.toString()
+    return qs ? `?${qs}` : ''
 }
 
 /**
@@ -90,31 +91,41 @@ function buildQuery(params?: Record<string, unknown>): string {
  * 非 200 业务码抛出 {@link ApiError}。
  */
 async function unwrapResponse<T>(res: Response): Promise<T> {
-  const contentType = res.headers.get('content-type') || ''
-  if (contentType.includes('application/json')) {
-    const json = (await res.json()) as ApiResponse<T>
-    if (json.code !== 200) {
-      throw new ApiError(json.msg || '请求失败', json.code, json.traceId, json.detail)
+    const contentType = res.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+        const json = (await res.json()) as ApiResponse<T>
+        if (json.code !== 200) {
+            throw new ApiError(json.msg || '请求失败', json.code, json.traceId, json.detail)
+        }
+        return json as T
     }
-    return json as T
-  }
-  return (await res.text()) as T
+    return (await res.text()) as T
 }
 
 /** 认证失败错误码：清除本地令牌并跳转登录页 */
 export function handleAuthFailure(error: ApiError): void {
-  if (error.code !== 40100 && error.code !== 40101) {
-    return
-  }
-  if (typeof window === 'undefined') {
-    return
-  }
-  window.localStorage.removeItem(TOKEN_KEY)
-  // 避免已在登录页时重复跳转
-  if (!window.location.pathname.startsWith('/login')) {
-    const redirect = encodeURIComponent(window.location.pathname + window.location.search)
-    window.location.href = `/login?redirect=${redirect}`
-  }
+    if (error.code !== 40100 && error.code !== 40101) {
+        return
+    }
+    if (typeof window === 'undefined') {
+        return
+    }
+    window.localStorage.removeItem(TOKEN_KEY)
+    // 避免已在登录页时重复跳转
+    if (!window.location.pathname.startsWith('/login')) {
+        const redirect = encodeURIComponent(window.location.pathname + window.location.search)
+        window.location.href = `/login?redirect=${redirect}`
+    }
+}
+
+/**
+ * 抛出前统一处理认证失败；将 throw 收敛到独立函数，避免在 try/catch 内直接 throw。
+ */
+function throwHandled(error: unknown): never {
+    if (error instanceof ApiError) {
+        handleAuthFailure(error)
+    }
+    throw error
 }
 
 /**
@@ -124,40 +135,43 @@ export function handleAuthFailure(error: ApiError): void {
  * @param options 请求选项
  */
 export default async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', data, params, headers = {}, ...rest } = options
-  const query = buildQuery(params)
-  const isFormData = data instanceof FormData
+    const {method = 'GET', data, params, headers = {}, ...rest} = options
+    const query = buildQuery(params)
+    const isFormData = data instanceof FormData
 
-  try {
-    const res = await fetch(`${url}${query}`, {
-      method,
-      headers: {
-        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-        ...getAuthHeaders(),
-        ...headers
-      },
-      body: isFormData ? (data as FormData) : data !== undefined ? JSON.stringify(data) : undefined,
-      ...rest
-    })
+    let res: Response
+    try {
+        res = await fetch(`${url}${query}`, {
+            method,
+            headers: {
+                ...(isFormData ? {} : {'Content-Type': 'application/json'}),
+                ...getAuthHeaders(),
+                ...headers
+            },
+            body: isFormData ? (data as FormData) : data !== undefined ? JSON.stringify(data) : undefined,
+            ...rest
+        })
+    } catch {
+        throwHandled(new ApiError(`网络异常`, 0))
+    }
 
     if (!res.ok) {
-      // 后端全局异常已返回统一结构，尝试解包
-      try {
-        const json = (await res.json()) as ApiResponse<unknown>
-        throw new ApiError(json.msg || `请求失败(${res.status})`, json.code || res.status, json.traceId, json.detail)
-      } catch (e) {
-        if (e instanceof ApiError) {
-          throw e
+        // 后端全局异常已返回统一结构，尝试解包；json 解析失败则视为网络异常
+        let json: ApiResponse | null = null
+        try {
+            json = (await res.json()) as ApiResponse
+        } catch {
+            json = null
         }
-        throw new ApiError(`网络异常(${res.status})`, res.status)
-      }
+        throwHandled(json
+            ? new ApiError(json.msg || `请求失败(${res.status})`, json.code || res.status, json.traceId, json.detail)
+            : new ApiError(`网络异常(${res.status})`, res.status))
     }
-    return await unwrapResponse<T>(res)
-  } catch (error) {
-    // 统一在此处处理认证失败（避免重复触发）
-    if (error instanceof ApiError) {
-      handleAuthFailure(error)
+
+    try {
+        return await unwrapResponse<T>(res)
+    } catch (error) {
+        // unwrapResponse 抛出的 ApiError 也统一处理认证失败后再向上抛
+        throwHandled(error)
     }
-    throw error
-  }
 }

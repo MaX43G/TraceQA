@@ -84,31 +84,33 @@ public class LlmService {
             String systemPrompt = resolveSystemPrompt(scenario);
             if (config != null && config.isValid()) {
                 return openAiCompatClient.stream(config, systemPrompt, userContent)
-                        .filter(c -> c != null && !c.isEmpty())
+                        .filter(c -> !c.isEmpty())
                         .doOnError(e -> {
                             circuitBreakerService.recordFailure();
                             log.warn("LLM 流式调用失败：scenario={}, err={}", scenario, e.getMessage());
                         })
                         .doOnComplete(() -> circuitBreakerService.recordSuccess())
-                        .onErrorResume(e -> Flux.empty());
+                        .onErrorResume(_ -> Flux.empty());
             }
             return buildPrompt(systemPrompt).user(userContent)
                     .stream()
                     .content()
-                    .filter(c -> c != null && !c.isEmpty())
+                    .filter(c -> !c.isEmpty())
                     .doOnError(e -> {
                         circuitBreakerService.recordFailure();
                         log.warn("LLM 流式调用失败：scenario={}, err={}", scenario, e.getMessage());
                     })
                     .doOnComplete(() -> circuitBreakerService.recordSuccess())
-                    .onErrorResume(e -> Flux.empty());
+                    .onErrorResume(_ -> Flux.empty());
         } catch (Exception e) {
             log.warn("LLM 流式调用异常：scenario={}, err={}", scenario, e.getMessage());
             return Flux.empty();
         }
     }
 
-    /** 解析系统提示词内容（数据库缺失时由 Service 回退默认模板） */
+    /**
+     * 解析系统提示词内容（数据库缺失时由 Service 回退默认模板）
+     */
     private String resolveSystemPrompt(String scenario) {
         SystemPrompt prompt = systemPromptService.getActive(scenario);
         if (prompt == null || prompt.getContent() == null) {
@@ -117,7 +119,9 @@ public class LlmService {
         return prompt.getContent();
     }
 
-    /** 构造带系统提示词的 ChatClient 请求（提示词为空时仅使用用户输入） */
+    /**
+     * 构造带系统提示词的 ChatClient 请求（提示词为空时仅使用用户输入）
+     */
     private ChatClient.ChatClientRequestSpec buildPrompt(String systemPrompt) {
         if (systemPrompt == null || systemPrompt.isBlank()) {
             return chatClient.prompt();

@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+
 import edu.zjut.traceqa.common.convert.DtoMapper;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.multipart.MultipartFile;
@@ -39,12 +40,16 @@ import java.time.Duration;
 @Service
 public class AuthService {
 
-    /** 系统全部权限码（管理员角色持有，DB 层展开存储） */
+    /**
+     * 系统全部权限码（管理员角色持有，DB 层展开存储）
+     */
     public static final List<String> ALL_PERMISSIONS = List.of(
             "user:manage", "role:manage", "kb:manage", "prompt:manage",
             "kb:view", "doc:view", "chat:manage"
     );
-    /** 管理员权限码的逗号拼接串（写入角色表） */
+    /**
+     * 管理员权限码的逗号拼接串（写入角色表）
+     */
     public static final String ALL_PERMISSIONS_STR = String.join(",", ALL_PERMISSIONS);
 
     @Resource
@@ -62,12 +67,16 @@ public class AuthService {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
-    /** 登录防爆破：允许的最大失败次数与锁定时长 */
+    /**
+     * 登录防爆破：允许的最大失败次数与锁定时长
+     */
     private static final int LOGIN_MAX_FAIL = 5;
     private static final Duration LOGIN_LOCK_TTL = Duration.ofMinutes(10);
     private static final Duration LOGIN_FAIL_TTL = Duration.ofMinutes(10);
 
-    /** 用户注册（默认角色 USER；账号需英文数字且唯一，注册后不可修改） */
+    /**
+     * 用户注册（默认角色 USER；账号需英文数字且唯一，注册后不可修改）
+     */
     public UserInfo register(RegisterRequest request) {
         if (!request.getPassword().equals(request.getConfirmPassword())) {
             throw new BizException(ErrorCode.PARAM_ERROR, "两次输入的密码不一致");
@@ -88,7 +97,9 @@ public class AuthService {
         return DtoMapper.INSTANCE.toUserInfo(user, resolvePermissions(user.getRoleCode()));
     }
 
-    /** 用户登录（sa-token 单端登录：同一账号新登录会顶掉旧会话）；含账号+IP 级防爆破 */
+    /**
+     * 用户登录（sa-token 单端登录：同一账号新登录会顶掉旧会话）；含账号+IP 级防爆破
+     */
     public LoginResponse login(HttpServletRequest request, LoginRequest req) {
         String ip = resolveIp(request);
         String failKey = "login:fail:" + req.getUsername() + ":" + ip;
@@ -122,7 +133,9 @@ public class AuthService {
         return LoginResponse.of(user, permissions, token);
     }
 
-    /** 记录一次登录失败；达到阈值则锁定（账号+IP） */
+    /**
+     * 记录一次登录失败；达到阈值则锁定（账号+IP）
+     */
     private void recordFail(String failKey, String lockKey) {
         try {
             Long count = stringRedisTemplate.opsForValue().increment(failKey);
@@ -137,7 +150,9 @@ public class AuthService {
         }
     }
 
-    /** 解析客户端 IP（优先 X-Forwarded-For） */
+    /**
+     * 解析客户端 IP（优先 X-Forwarded-For）
+     */
     private String resolveIp(HttpServletRequest request) {
         String xff = request.getHeader("X-Forwarded-For");
         if (xff != null && !xff.isBlank()) {
@@ -146,12 +161,16 @@ public class AuthService {
         return request.getRemoteAddr();
     }
 
-    /** 当前用户登出 */
+    /**
+     * 当前用户登出
+     */
     public void logout() {
         StpUtil.logout();
     }
 
-    /** 查询当前登录用户信息（账号被禁用时拒绝返回并注销会话） */
+    /**
+     * 查询当前登录用户信息（账号被禁用时拒绝返回并注销会话）
+     */
     public UserInfo currentUser() {
         Long userId = UserContext.getUserId();
         User user = userMapper.selectById(userId);
@@ -166,7 +185,9 @@ public class AuthService {
         return DtoMapper.INSTANCE.toUserInfo(user, resolvePermissions(user.getRoleCode()));
     }
 
-    /** 修改当前用户昵称 */
+    /**
+     * 修改当前用户昵称
+     */
     public void updateNickname(String nickname) {
         Long userId = UserContext.getUserId();
         if (userId == null) {
@@ -187,7 +208,9 @@ public class AuthService {
         log.info("用户修改昵称成功：{} → {}", user.getUsername(), nickname);
     }
 
-    /** 上传并更新当前用户头像（文件经前端裁剪后提交） */
+    /**
+     * 上传并更新当前用户头像（文件经前端裁剪后提交）
+     */
     public String updateAvatar(MultipartFile file) {
         Long userId = UserContext.getUserId();
         if (userId == null) {
@@ -211,7 +234,9 @@ public class AuthService {
         }
     }
 
-    /** 修改当前用户密码（校验原密码，BCrypt 加密新密码） */
+    /**
+     * 修改当前用户密码（校验原密码，BCrypt 加密新密码）
+     */
     public void changePassword(Long userId, String oldPassword, String newPassword) {
         User user = userMapper.selectById(userId);
         if (user == null) {
@@ -225,7 +250,9 @@ public class AuthService {
         log.info("用户修改密码成功：{}", user.getUsername());
     }
 
-    /** 解析角色权限码集合 */
+    /**
+     * 解析角色权限码集合
+     */
     public List<String> resolvePermissions(String roleCode) {
         Role role = roleMapper.selectOne(
                 new LambdaQueryWrapper<Role>().eq(Role::getCode, roleCode).last("LIMIT 1"));
@@ -238,7 +265,9 @@ public class AuthService {
                 .toList();
     }
 
-    /** 按用户名查询用户 */
+    /**
+     * 按用户名查询用户
+     */
     private User findByUsername(String username) {
         return userMapper.selectOne(
                 new LambdaQueryWrapper<User>().eq(User::getUsername, username).last("LIMIT 1"));

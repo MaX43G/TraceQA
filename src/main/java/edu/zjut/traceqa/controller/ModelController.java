@@ -53,7 +53,7 @@ public class ModelController {
         }
         // 兜底：确保至少返回一个默认模型
         if (!hasDefault) {
-            result.add(0, new ModelVO(defaultModelName, defaultModelName, defaultBaseUrl, true));
+            result.addFirst(new ModelVO(defaultModelName, defaultModelName, defaultBaseUrl, true));
         }
         return ApiResponse.ok(result);
     }

@@ -5,8 +5,8 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -29,19 +29,27 @@ import java.util.UUID;
 @Component
 public class RateLimitInterceptor implements HandlerInterceptor {
 
-    /** 限流规则：perIpMin / perUserMin 为每分钟次数 */
+    /**
+     * 限流规则：perIpMin / perUserMin 为每分钟次数
+     */
     private record Rule(int perIpMin, int perUserMin) {
-        Rule(int perIpMin) { this(perIpMin, 0); }
+        Rule(int perIpMin) {
+            this(perIpMin, 0);
+        }
     }
 
-    /** 各接口限流规则 */
+    /**
+     * 各接口限流规则
+     */
     private static final Map<String, Rule> RULES = Map.of(
             "/api/auth/login", new Rule(10),
             "/api/auth/register", new Rule(10),
             "/api/chat/stream", new Rule(120, 40)
     );
 
-    /** 未匹配到专用规则的 /api/** 默认按 IP 限制 */
+    /**
+     * 未匹配到专用规则的 /api/** 默认按 IP 限制
+     */
     private static final Rule DEFAULT_RULE = new Rule(240);
 
     private static final Duration WINDOW = Duration.ofSeconds(60);
@@ -50,7 +58,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private StringRedisTemplate stringRedisTemplate;
 
     @Override
-    public boolean preHandle(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
+    public boolean preHandle(HttpServletRequest request, @NonNull HttpServletResponse response,
                              @NonNull Object handler) {
         String uri = request.getRequestURI();
         Rule rule = RULES.getOrDefault(uri, DEFAULT_RULE);
@@ -74,7 +82,9 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         return true;
     }
 
-    /** 滑动窗口计数：返回是否超限 */
+    /**
+     * 滑动窗口计数：返回是否超限
+     */
     private boolean limited(String scope, String path, String key, int limit) {
         String rkey = "rl:" + scope + ":" + path + ":" + key;
         long now = System.currentTimeMillis();
@@ -89,7 +99,9 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         return false;
     }
 
-    /** 返回 429 统一错误结构 */
+    /**
+     * 返回 429 统一错误结构
+     */
     private boolean block(HttpServletResponse response) throws Exception {
         response.setStatus(429);
         response.setContentType("application/json;charset=UTF-8");
@@ -97,13 +109,17 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         return false;
     }
 
-    /** 已登录用户的 userKey（未登录返回 null，仅按 IP 限制） */
+    /**
+     * 已登录用户的 userKey（未登录返回 null，仅按 IP 限制）
+     */
     private String userKey() {
         Long uid = UserContext.getUserId();
         return uid == null ? null : String.valueOf(uid);
     }
 
-    /** 解析客户端 IP（优先 X-Forwarded-For） */
+    /**
+     * 解析客户端 IP（优先 X-Forwarded-For）
+     */
     private String resolveIp(HttpServletRequest request) {
         String xff = request.getHeader("X-Forwarded-For");
         if (xff != null && !xff.isBlank()) {

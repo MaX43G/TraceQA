@@ -21,9 +21,10 @@ public class SsePublisher {
     @Resource
     private ObjectMapper objectMapper;
 
-    
 
-    /** 写入一个 SSE 事件（synchronized 保证并行检索推送进度时线程安全） */
+    /**
+     * 写入一个 SSE 事件（synchronized 保证并行检索推送进度时线程安全）
+     */
     public synchronized void send(SseEmitter emitter, String event, Object data) {
         if (emitter == null) {
             return;
@@ -38,7 +39,9 @@ public class SsePublisher {
         }
     }
 
-    /** 完成推送并关闭连接 */
+    /**
+     * 完成推送并关闭连接
+     */
     public void complete(SseEmitter emitter) {
         if (emitter == null) {
             return;
@@ -50,7 +53,9 @@ public class SsePublisher {
         }
     }
 
-    /** 推送错误并关闭连接 */
+    /**
+     * 推送错误并关闭连接
+     */
     public void completeWithError(SseEmitter emitter, Object data) {
         send(emitter, "error", data);
         complete(emitter);

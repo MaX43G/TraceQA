@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+
 import edu.zjut.traceqa.common.convert.DtoMapper;
 
 /**
@@ -33,9 +34,10 @@ public class AdminService {
     @Resource
     private RoleMapper roleMapper;
 
-    
 
-    /** 分页查询用户列表 */
+    /**
+     * 分页查询用户列表
+     */
     public PageResult<AdminUserVO> pageUsers(String keyword, long page, long size) {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<User>()
                 .and(keyword != null && !keyword.isBlank(), w -> w
@@ -47,7 +49,9 @@ public class AdminService {
         return PageResult.of(result, AdminUserVO::of);
     }
 
-    /** 启用/禁用用户（禁用时立即强制注销其全部登录会话，杜绝「禁用后仍可继续使用」） */
+    /**
+     * 启用/禁用用户（禁用时立即强制注销其全部登录会话，杜绝「禁用后仍可继续使用」）
+     */
     public void updateUserStatus(Long id, int status) {
         User user = requireUser(id);
         if (status != 0 && status != 1) {
@@ -78,7 +82,9 @@ public class AdminService {
         }
     }
 
-    /** 变更用户角色 */
+    /**
+     * 变更用户角色
+     */
     public void updateUserRole(Long id, String roleCode) {
         User user = requireUser(id);
         Role role = roleMapper.selectOne(
@@ -91,12 +97,16 @@ public class AdminService {
         log.info("用户角色变更：id={}, role={}", id, roleCode);
     }
 
-    /** 查询全部角色 */
+    /**
+     * 查询全部角色
+     */
     public List<RoleDTO> listRoles() {
         return roleMapper.selectList(null).stream().map(RoleDTO::of).toList();
     }
 
-    /** 更新角色权限 */
+    /**
+     * 更新角色权限
+     */
     public RoleDTO updateRole(Long id, RoleDTO dto) {
         Role role = roleMapper.selectById(id);
         if (role == null) {
@@ -109,7 +119,9 @@ public class AdminService {
         return DtoMapper.INSTANCE.toRoleDTO(role);
     }
 
-    /** 校验用户存在 */
+    /**
+     * 校验用户存在
+     */
     private User requireUser(Long id) {
         User user = userMapper.selectById(id);
         if (user == null) {

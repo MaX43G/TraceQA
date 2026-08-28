@@ -33,7 +33,9 @@ public class GlobalExceptionHandler {
     @Resource
     private MonitorService monitorService;
 
-    /** 业务异常：按自身错误码返回，附带根因详情 */
+    /**
+     * 业务异常：按自身错误码返回，附带根因详情
+     */
     @ExceptionHandler(BizException.class)
     public ApiResponse<Void> handleBiz(BizException e) {
         log.warn("业务异常，traceId={}, code={}, msg={}",
@@ -43,7 +45,9 @@ public class GlobalExceptionHandler {
         return ApiResponse.fail(e.getErrorCode(), e.getMessage(), detail);
     }
 
-    /** sa-token 未登录/登录失效：统一返回 40100 */
+    /**
+     * sa-token 未登录/登录失效：统一返回 40100
+     */
     @ExceptionHandler(NotLoginException.class)
     public ApiResponse<Void> handleNotLogin(NotLoginException e) {
         log.warn("未登录或登录已失效，traceId={}, type={}",
@@ -51,14 +55,18 @@ public class GlobalExceptionHandler {
         return ApiResponse.fail(ErrorCode.UNAUTHORIZED);
     }
 
-    /** sa-token 权限不足（@SaCheckPermission）：统一返回 40300 */
+    /**
+     * sa-token 权限不足（@SaCheckPermission）：统一返回 40300
+     */
     @ExceptionHandler(NotPermissionException.class)
     public ApiResponse<Void> handleNotPermission(NotPermissionException e) {
         log.warn("权限不足，traceId={}, need={}", TraceIdHolder.get(), e.getPermission());
         return ApiResponse.fail(ErrorCode.FORBIDDEN);
     }
 
-    /** 方法参数校验异常（@RequestBody + @Valid） */
+    /**
+     * 方法参数校验异常（@RequestBody + @Valid）
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ApiResponse<Void> handleMethodArgumentNotValid(MethodArgumentNotValidException e) {
         String msg = extractFirstFieldError(e);
@@ -66,7 +74,9 @@ public class GlobalExceptionHandler {
         return ApiResponse.fail(ErrorCode.PARAM_ERROR, msg);
     }
 
-    /** 表单绑定校验异常 */
+    /**
+     * 表单绑定校验异常
+     */
     @ExceptionHandler(BindException.class)
     public ApiResponse<Void> handleBind(BindException e) {
         String msg = extractFirstFieldError(e);
@@ -74,21 +84,27 @@ public class GlobalExceptionHandler {
         return ApiResponse.fail(ErrorCode.PARAM_ERROR, msg);
     }
 
-    /** 缺少请求参数 */
+    /**
+     * 缺少请求参数
+     */
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ApiResponse<Void> handleMissingParam(MissingServletRequestParameterException e) {
         log.warn("缺少请求参数，traceId={}, param={}", TraceIdHolder.get(), e.getParameterName());
         return ApiResponse.fail(ErrorCode.PARAM_ERROR, "缺少参数：" + e.getParameterName());
     }
 
-    /** 请求方法不支持 */
+    /**
+     * 请求方法不支持
+     */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ApiResponse<Void> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
         log.warn("请求方法不支持，traceId={}, method={}", TraceIdHolder.get(), e.getMethod());
         return ApiResponse.fail(ErrorCode.PARAM_ERROR, "不支持的请求方法：" + e.getMethod());
     }
 
-    /** 资源不存在 */
+    /**
+     * 资源不存在
+     */
     @ExceptionHandler(NoResourceFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ApiResponse<Void> handleNoResource(NoResourceFoundException e) {
@@ -96,14 +112,18 @@ public class GlobalExceptionHandler {
         return ApiResponse.fail(ErrorCode.NOT_FOUND, "请求的资源不存在");
     }
 
-    /** 上传文件超出大小限制 */
+    /**
+     * 上传文件超出大小限制
+     */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ApiResponse<Void> handleMaxUpload(MaxUploadSizeExceededException e) {
         log.warn("上传文件超出大小限制，traceId={}", TraceIdHolder.get());
         return ApiResponse.fail(ErrorCode.FILE_ERROR, "上传文件超出大小限制", extractDetail(e));
     }
 
-    /** 兜底异常：捕获所有未预期异常，统一转内部错误码，附带根因详情（不下发完整堆栈） */
+    /**
+     * 兜底异常：捕获所有未预期异常，统一转内部错误码，附带根因详情（不下发完整堆栈）
+     */
     @ExceptionHandler(Exception.class)
     public ApiResponse<Void> handleUnexpected(Exception e) {
         log.error("未预期异常，traceId={}", TraceIdHolder.get(), e);
@@ -111,7 +131,9 @@ public class GlobalExceptionHandler {
         return ApiResponse.fail(ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.getMsg(), extractDetail(e));
     }
 
-    /** 提取根因的紧凑描述（异常类型 + 关键信息），便于直接在下发响应中定位问题 */
+    /**
+     * 提取根因的紧凑描述（异常类型 + 关键信息），便于直接在下发响应中定位问题
+     */
     private String extractDetail(Throwable e) {
         Throwable root = e;
         while (root.getCause() != null && root.getCause() != root) {
@@ -122,7 +144,9 @@ public class GlobalExceptionHandler {
         return (msg == null || msg.isBlank()) ? name : name + ": " + msg;
     }
 
-    /** 提取校验异常中的第一个字段错误信息 */
+    /**
+     * 提取校验异常中的第一个字段错误信息
+     */
     private String extractFirstFieldError(BindException e) {
         FieldError fieldError = e.getBindingResult().getFieldError();
         if (fieldError == null) {

@@ -1,5 +1,5 @@
 <template>
-  <div class="markdown-body" v-html="html" @click="handleClick" />
+  <div class="markdown-body" v-html="html" @click="handleClick"/>
 </template>
 
 <script setup lang="ts">
@@ -9,7 +9,7 @@
  * <p>渲染 AI 回答，并将 {@code [citation:N]} 角标绑定点击事件，
  * 点击后触发 {@code cite-click} 事件供父组件高亮对应引用来源。</p>
  */
-import { renderMarkdown } from '@/utils/markdown'
+import {renderMarkdown} from '@/utils/markdown'
 
 const props = defineProps<{
   /** 原始 Markdown 内容 */

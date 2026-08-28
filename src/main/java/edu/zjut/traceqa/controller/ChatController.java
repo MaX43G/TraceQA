@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+
 import edu.zjut.traceqa.common.convert.DtoMapper;
 
 /**
@@ -69,7 +70,7 @@ public class ChatController {
             cancelled.set(true);
             emitter.complete();
         });
-        emitter.onError(t -> {
+        emitter.onError(_ -> {
             cancelled.set(true);
             emitter.complete();
         });

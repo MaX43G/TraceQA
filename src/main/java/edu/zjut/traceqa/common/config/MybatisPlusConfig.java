@@ -15,7 +15,9 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class MybatisPlusConfig {
 
-    /** 分页插件（按默认数据库类型 MySQL 配置） */
+    /**
+     * 分页插件（按默认数据库类型 MySQL 配置）
+     */
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();

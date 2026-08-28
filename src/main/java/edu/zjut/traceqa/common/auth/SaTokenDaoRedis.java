@@ -176,7 +176,9 @@ public class SaTokenDaoRedis implements SaTokenDao {
         return new ArrayList<>();
     }
 
-    /** JDK 序列化 -> Base64 */
+    /**
+     * JDK 序列化 -> Base64
+     */
     private String serialize(Object object) throws Exception {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         try (ObjectOutputStream oos = new ObjectOutputStream(bos)) {
@@ -185,7 +187,9 @@ public class SaTokenDaoRedis implements SaTokenDao {
         return Base64.getEncoder().encodeToString(bos.toByteArray());
     }
 
-    /** Base64 -> JDK 反序列化 */
+    /**
+     * Base64 -> JDK 反序列化
+     */
     private Object deserialize(String text) throws Exception {
         byte[] bytes = Base64.getDecoder().decode(text);
         try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes))) {

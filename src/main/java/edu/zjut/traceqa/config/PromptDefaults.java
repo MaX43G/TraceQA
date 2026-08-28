@@ -15,11 +15,13 @@ public final class PromptDefaults {
     private PromptDefaults() {
     }
 
-    /** 场景 -> 默认提示词内容 */
+    /**
+     * 场景 -> 默认提示词内容
+     */
     public static final Map<String, String> CONTENT = Map.ofEntries(
             Map.entry("chat", """
                     你是「溯知」——《数据挖掘》课程的智能助教，基于课程教材与 PPT 构建的知识图谱回答问题。
-
+                    
                     要求：
                     1. 使用简体中文回答，逻辑清晰、条理分明；
                     2. 优先依据提供的检索上下文作答，引用时在句末标注 [citation:N]；
@@ -65,17 +67,17 @@ public final class PromptDefaults {
                     """),
             Map.entry("complexity", """
                     判断用户的课程问题是否需要「聚合检索链路」（图谱 + 向量复合检索）。
-
+                    
                     需要聚合，输出 COMPLEX（满足任一）：
                     - 跨文档聚合：答案需要综合多篇文档/多个来源；
                     - 关系推理：需要实体间的关系、影响、因果推导；
                     - 主题级归纳：总结、综述、对比多个主题或方案。
-
+                    
                     不需要聚合，输出 SIMPLE（满足任一）：
                     - 单点事实查询：如「某个参数的阈值/配置是多少」这类明确单一答案；
                     - 文档量很小（几十份内）：直接全文进入上下文即可回答；
                     - 实体边界模糊的领域（纯叙事/主观评论）：图谱抽取质量差，纯向量检索更合适。
-
+                    
                     只输出 SIMPLE 或 COMPLEX，不要任何解释。
                     """),
             Map.entry("keyword", """
@@ -102,7 +104,9 @@ public final class PromptDefaults {
                     """)
     );
 
-    /** 场景显示名（用于种子数据） */
+    /**
+     * 场景显示名（用于种子数据）
+     */
     public static final Map<String, String> NAMES = Map.of(
             "chat", "聊天主提示词",
             "rewrite", "查询重写提示词",

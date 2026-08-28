@@ -16,19 +16,25 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class ObservabilitySessionStore {
 
-    /** 会话有效期（毫秒），默认 1 小时 */
+    /**
+     * 会话有效期（毫秒），默认 1 小时
+     */
     private static final long TTL_MILLIS = 60L * 60 * 1000;
 
     private final Map<String, Long> sessions = new ConcurrentHashMap<>();
 
-    /** 创建并返回一个会话令牌 */
+    /**
+     * 创建并返回一个会话令牌
+     */
     public String create() {
         String token = UUID.randomUUID().toString().replace("-", "");
         sessions.put(token, System.currentTimeMillis() + TTL_MILLIS);
         return token;
     }
 
-    /** 校验会话令牌是否有效（过期则移除） */
+    /**
+     * 校验会话令牌是否有效（过期则移除）
+     */
     public boolean isValid(String token) {
         if (token == null || token.isBlank()) {
             return false;

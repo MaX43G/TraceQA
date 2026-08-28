@@ -8,57 +8,69 @@
         <div class="chat-msg__user-bubble">{{ msg.content }}</div>
         <div class="chat-msg__actions">
           <a-button type="text" size="small" danger @click="emit('delete', <number>msg.id)">
-            <template #icon><DeleteOutlined /></template>
+            <template #icon>
+              <DeleteOutlined/>
+            </template>
             删除
           </a-button>
         </div>
       </template>
       <template v-else>
-        <ThinkingTracePanel v-if="hasThinking" :nodes="msg.thinkingTrace ?? []" />
-        <RetrievalStatsPanel v-if="msg.stats" :stats="msg.stats" />
+        <ThinkingTracePanel v-if="hasThinking" :nodes="msg.thinkingTrace ?? []"/>
+        <RetrievalStatsPanel v-if="msg.stats" :stats="msg.stats"/>
         <div class="chat-msg__ai-bubble">
-          <MarkdownViewer :content="displayContent" :typing="props.streaming" :available-indexes="usedIndexes" @cite-click="handleCite" />
+          <MarkdownViewer :content="displayContent" :typing="props.streaming" :available-indexes="usedIndexes"
+                          @cite-click="handleCite"/>
           <div v-if="props.streaming" class="chat-msg__streaming">正在生成…</div>
         </div>
-        <CitationPanel v-if="hasReferences" ref="citationPanel" :references="msg.references ?? []" :used-indexes="usedIndexes" @view="openViewer" />
+        <CitationPanel v-if="hasReferences" ref="citationPanel" :references="msg.references ?? []"
+                       :used-indexes="usedIndexes" @view="openViewer"/>
         <div v-if="props.msg.followup?.length && !props.streaming" class="chat-msg__followup">
           <span class="chat-msg__followup-label">猜你想问</span>
           <a-tag v-for="(q, i) in props.msg.followup" :key="i" class="chat-msg__followup-tag" @click="emit('ask', q)">
             {{ q }}
           </a-tag>
         </div>
-<div class="chat-msg__actions">
-            <a-space :size="4">
-              <a-tooltip :title="speaking ? '停止朗读' : '朗读本条回答'">
-                <a-button type="text" size="small" :class="{ 'speak-btn--active': speaking }" @click="toggleSpeak">
-                  <template #icon><SoundOutlined :spin="speaking" /></template>
-                  {{ speaking ? '停止' : '朗读' }}
-                </a-button>
-              </a-tooltip>
-              <a-button type="text" size="small" @click="copyContent">
-                <template #icon><CopyOutlined /></template>
-                复制
+        <div class="chat-msg__actions">
+          <a-space :size="4">
+            <a-tooltip :title="speaking ? '停止朗读' : '朗读本条回答'">
+              <a-button type="text" size="small" :class="{ 'speak-btn--active': speaking }" @click="toggleSpeak">
+                <template #icon>
+                  <SoundOutlined :spin="speaking"/>
+                </template>
+                {{ speaking ? '停止' : '朗读' }}
               </a-button>
-              <a-button type="text" size="small" danger @click="emit('delete', msg.id)">
-                <template #icon><DeleteOutlined /></template>
-                删除
-              </a-button>
-            </a-space>
-          </div>
+            </a-tooltip>
+            <a-button type="text" size="small" @click="copyContent">
+              <template #icon>
+                <CopyOutlined/>
+              </template>
+              复制
+            </a-button>
+            <a-button type="text" size="small" danger @click="emit('delete', <number>msg.id)">
+              <template #icon>
+                <DeleteOutlined/>
+              </template>
+              删除
+            </a-button>
+          </a-space>
+        </div>
       </template>
     </div>
   </div>
 
   <!-- 文献全文查看弹窗 -->
-  <a-modal v-model:open="viewerOpen" :title="viewerRef ? `文献${viewerRef.index}：${viewerRef.title || viewerRef.filePath}` : '文献全文'" :footer="null" width="72vw" :body-style="{ padding: '14px 20px 20px' }">
-<div v-if="viewerRef" class="viewer-body">
-        <a-tag color="blue">{{ viewerRef.filePath }}</a-tag>
-        <div v-if="viewerRef.headings?.length" class="viewer-headings">
-          <a-tag v-for="h in viewerRef.headings" :key="h" color="cyan">{{ h }}</a-tag>
-        </div>
-        <div class="viewer-markdown markdown-body" v-html="viewerMarkdown" />
+  <a-modal v-model:open="viewerOpen"
+           :title="viewerRef ? `文献${viewerRef.index}：${viewerRef.title || viewerRef.filePath}` : '文献全文'"
+           :footer="null" width="72vw" :body-style="{ padding: '14px 20px 20px' }">
+    <div v-if="viewerRef" class="viewer-body">
+      <a-tag color="blue">{{ viewerRef.filePath }}</a-tag>
+      <div v-if="viewerRef.headings?.length" class="viewer-headings">
+        <a-tag v-for="h in viewerRef.headings" :key="h" color="cyan">{{ h }}</a-tag>
       </div>
-    </a-modal>
+      <div class="viewer-markdown markdown-body" v-html="viewerMarkdown"/>
+    </div>
+  </a-modal>
 </template>
 
 <script setup lang="ts">
@@ -68,15 +80,15 @@
  * <p>用户消息右侧气泡；AI 消息包含「思考折叠面板 + Markdown 打字机 +
  * 引用溯源角标 + 复制/删除操作」。</p>
  */
-import { CopyOutlined, DeleteOutlined, SoundOutlined } from '@ant-design/icons-vue'
-import { message } from 'ant-design-vue'
+import {CopyOutlined, DeleteOutlined, SoundOutlined} from '@ant-design/icons-vue'
+import {message} from 'ant-design-vue'
 import MarkdownViewer from './MarkdownViewer.vue'
 import ThinkingTracePanel from './ThinkingTracePanel.vue'
 import CitationPanel from './CitationPanel.vue'
 import RetrievalStatsPanel from './RetrievalStatsPanel.vue'
-import { renderMarkdown } from '@/utils/markdown'
-import type { ChatMessageVO, ReferenceVO } from '@/utils/api-types'
-import type { RetrievalStats } from '@/composables/useChatStream'
+import {renderMarkdown} from '@/utils/markdown'
+import type {ChatMessageVO, ReferenceVO} from '@/utils/api-types'
+import type {RetrievalStats} from '@/composables/useChatStream'
 
 const props = defineProps<{
   /** 消息对象（含流式临时消息） */
@@ -105,7 +117,7 @@ const avatarText = computed<string>(() => (isUser.value ? '我' : '溯'))
 
 /** 头像样式 */
 const avatarStyle = computed<Record<string, string>>(() =>
-  isUser.value ? { backgroundColor: '#95de64' } : { backgroundColor: '#1677ff' }
+    isUser.value ? {backgroundColor: '#95de64'} : {backgroundColor: '#1677ff'}
 )
 
 /** 是否存在思考链路 */
@@ -129,7 +141,7 @@ const usedIndexes = computed<Set<number>>(() => {
 
 /** 展示内容：流式阶段取缓冲，否则取正文 */
 const displayContent = computed<string>(() =>
-  props.streaming ? props.msg.buffer ?? '' : props.msg.content ?? ''
+    props.streaming ? props.msg.buffer ?? '' : props.msg.content ?? ''
 )
 
 /** 文献全文查看弹窗状态 */
@@ -167,9 +179,9 @@ async function copyContent(): Promise<void> {
     } else {
       copyWithFallback(text)
     }
-    message.success('已复制')
+    await message.success('已复制')
   } catch {
-    message.error('复制失败')
+    await message.error('复制失败')
   }
 }
 
@@ -182,10 +194,15 @@ function copyWithFallback(text: string): void {
   ta.style.top = '-9999px'
   ta.style.opacity = '0'
   document.body.appendChild(ta)
+  ta.focus()
   ta.select()
-  ta.setSelectionRange(0, text.length)
-  document.execCommand('copy')
-  document.body.removeChild(ta)
+  // setSelectionRange 仅在选中后有效；execCommand 已弃用，仅作 HTTP 兜底
+  try {
+    ;(ta as HTMLTextAreaElement).setSelectionRange(0, text.length)
+    ;(document as unknown as { execCommand: (commandId: string) => boolean }).execCommand('copy')
+  } finally {
+    document.body.removeChild(ta)
+  }
 }
 
 /** 是否正在朗读本条回答 */

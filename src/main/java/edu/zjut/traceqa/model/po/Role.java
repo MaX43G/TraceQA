@@ -15,15 +15,23 @@ import lombok.EqualsAndHashCode;
 @TableName("t_role")
 public class Role extends BaseEntity {
 
-    /** 角色编码（唯一，如 ADMIN / USER） */
+    /**
+     * 角色编码（唯一，如 ADMIN / USER）
+     */
     private String code;
 
-    /** 角色名称 */
+    /**
+     * 角色名称
+     */
     private String name;
 
-    /** 权限码集合，逗号分隔（如 "user:manage,kb:manage,doc:manage"） */
+    /**
+     * 权限码集合，逗号分隔（如 "user:manage,kb:manage,doc:manage"）
+     */
     private String permissions;
 
-    /** 角色描述 */
+    /**
+     * 角色描述
+     */
     private String description;
 }

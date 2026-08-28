@@ -76,7 +76,7 @@ const displayReferences = computed<ReferenceVO[]>(() => {
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => {
     const map: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
-    return map[c]
+    return map[c] ?? c
   })
 }
 
@@ -210,6 +210,7 @@ defineExpose({ highlight })
   margin-top: 6px;
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

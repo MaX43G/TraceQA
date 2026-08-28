@@ -4,6 +4,7 @@ import edu.zjut.traceqa.common.enums.ErrorCode;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -25,17 +26,28 @@ import java.io.Serializable;
 @NoArgsConstructor
 public class ApiResponse<T> implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
-    /** 业务错误码 */
+    /**
+     * 业务错误码
+     */
     private int code;
-    /** 提示信息 */
+    /**
+     * 提示信息
+     */
     private String msg;
-    /** 业务数据 */
+    /**
+     * 业务数据
+     */
     private T data;
-    /** 链路追踪 ID */
+    /**
+     * 链路追踪 ID
+     */
     private String traceId;
-    /** 诊断详情（排障用，可空） */
+    /**
+     * 诊断详情（排障用，可空）
+     */
     private String detail;
 
     public ApiResponse(int code, String msg, T data, String traceId, String detail) {
@@ -46,27 +58,37 @@ public class ApiResponse<T> implements Serializable {
         this.detail = detail;
     }
 
-    /** 构造成功响应 */
+    /**
+     * 构造成功响应
+     */
     public static <T> ApiResponse<T> ok(T data) {
         return new ApiResponse<>(ErrorCode.SUCCESS.getCode(), ErrorCode.SUCCESS.getMsg(), data, TraceIdHolder.get(), null);
     }
 
-    /** 构造无数据成功响应 */
+    /**
+     * 构造无数据成功响应
+     */
     public static ApiResponse<Void> ok() {
         return ok(null);
     }
 
-    /** 构造失败响应 */
+    /**
+     * 构造失败响应
+     */
     public static <T> ApiResponse<T> fail(ErrorCode errorCode) {
         return new ApiResponse<>(errorCode.getCode(), errorCode.getMsg(), null, TraceIdHolder.get(), null);
     }
 
-    /** 构造失败响应（自定义提示） */
+    /**
+     * 构造失败响应（自定义提示）
+     */
     public static <T> ApiResponse<T> fail(ErrorCode errorCode, String msg) {
         return new ApiResponse<>(errorCode.getCode(), msg, null, TraceIdHolder.get(), null);
     }
 
-    /** 构造失败响应（自定义提示 + 诊断详情） */
+    /**
+     * 构造失败响应（自定义提示 + 诊断详情）
+     */
     public static <T> ApiResponse<T> fail(ErrorCode errorCode, String msg, String detail) {
         return new ApiResponse<>(errorCode.getCode(), msg, null, TraceIdHolder.get(), detail);
     }

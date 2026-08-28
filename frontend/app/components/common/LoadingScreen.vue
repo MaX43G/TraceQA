@@ -4,7 +4,7 @@
       <div class="tq-splash__logo">溯</div>
       <div class="tq-splash__title">溯知 · TraceQA</div>
       <div class="tq-splash__bar">
-        <div class="tq-splash__bar-inner" :style="{ width: progress + '%' }" />
+        <div class="tq-splash__bar-inner" :style="{ width: progress + '%' }"/>
       </div>
       <div class="tq-splash__tip">数据挖掘智能问答平台</div>
     </div>
@@ -13,37 +13,49 @@
 
 <script setup lang="ts">
 /**
- * 首屏/路由切换加载遮罩：随 Nuxt 加载指示器进度显示，避免空白等待。
+ * 首屏/路由切换加载遮罩。
  */
 const loading = useLoadingIndicator()
 const visible = ref(false)
 const progress = ref(0)
-const first = ref(true)
+let hideTimer: ReturnType<typeof setTimeout> | null = null
+
+function hideAfter(delay: number): void {
+  if (hideTimer) clearTimeout(hideTimer)
+  hideTimer = setTimeout(() => {
+    visible.value = false
+    hideTimer = null
+  }, delay)
+}
 
 onMounted(() => {
-  // 首次客户端挂载显示一小段品牌首屏
   visible.value = true
-  setTimeout(() => {
-    first.value = false
-    if (!loading.isLoading) {
-      visible.value = false
-    }
-  }, 900)
+  if (document.readyState === 'complete') {
+    hideAfter(300)
+  } else {
+    window.addEventListener('load', () => hideAfter(300), {once: true})
+  }
 })
 
-// 路由切换：显示遮罩并跟踪进度
-watch(() => loading.isLoading, (v) => {
-  if (v) visible.value = true
+// 路由切换（SPA）：加载开始显示，加载结束隐藏
+watch(() => loading.isLoading.value, (v) => {
+  if (v) {
+    visible.value = true
+  } else {
+    hideAfter(150)
+  }
 })
-watch(() => loading.progress, (v) => {
-  progress.value = v
-  if (v >= 100) {
-    setTimeout(() => { visible.value = false }, 250)
+
+// 进度到 100 隐藏
+watch(() => loading.progress.value, (p) => {
+  progress.value = p
+  if (p >= 100) {
+    hideAfter(200)
   }
 })
 
 onBeforeUnmount(() => {
-  first.value = false
+  if (hideTimer) clearTimeout(hideTimer)
 })
 </script>
 

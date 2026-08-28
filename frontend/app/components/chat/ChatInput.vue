@@ -1,27 +1,31 @@
 <template>
   <div class="chat-input">
     <a-textarea
-      v-model:value="text"
-      :auto-size="{ minRows: 2, maxRows: 6 }"
-      :placeholder="placeholder"
-      :disabled="disabled"
-      @keydown="handleKeydown"
+        v-model:value="text"
+        :auto-size="{ minRows: 2, maxRows: 6 }"
+        :placeholder="placeholder"
+        :disabled="disabled"
+        @keydown="handleKeydown"
     />
     <div class="chat-input__footer">
       <span class="chat-input__tip">{{ generating ? 'AI 正在回答，请稍候…' : 'Enter 发送，Shift + Enter 换行' }}</span>
       <a-space>
         <a-tooltip :title="listening ? '正在聆听，点击停止' : '语音输入'">
           <a-button
-            :class="{ 'is-listening': listening }"
-            :disabled="disabled || generating"
-            shape="circle"
-            @click="toggleVoice"
+              :class="{ 'is-listening': listening }"
+              :disabled="disabled || generating"
+              shape="circle"
+              @click="toggleVoice"
           >
-            <template #icon><AudioOutlined /></template>
+            <template #icon>
+              <AudioOutlined/>
+            </template>
           </a-button>
         </a-tooltip>
         <a-button type="primary" :disabled="!text.trim() || disabled || generating" @click="submit">
-          <template #icon><SendOutlined /></template>
+          <template #icon>
+            <SendOutlined/>
+          </template>
           发送
         </a-button>
       </a-space>
@@ -35,8 +39,8 @@
  * 语音输入采用浏览器原生 Web Speech API（SpeechRecognition），前端实时识别并填入输入框，
  * 完全免费、无需后端参与；Chrome/Edge 支持，其它浏览器自动隐藏。
  */
-import { SendOutlined, AudioOutlined } from '@ant-design/icons-vue'
-import { message } from 'ant-design-vue'
+import {SendOutlined, AudioOutlined} from '@ant-design/icons-vue'
+import {message} from 'ant-design-vue'
 
 const props = defineProps<{
   /** 是否禁止输入（生成中） */
@@ -55,9 +59,9 @@ const listening = ref(false)
 
 // 浏览器原生语音识别（免费、前端实时；Chrome/Edge 支持）
 const SpeechRecognition =
-  (typeof window !== 'undefined' && (window as any).SpeechRecognition) ||
-  (typeof window !== 'undefined' && (window as any).webkitSpeechRecognition) ||
-  null
+    (typeof window !== 'undefined' && (window as any).SpeechRecognition) ||
+    (typeof window !== 'undefined' && (window as any).webkitSpeechRecognition) ||
+    null
 const supported = Boolean(SpeechRecognition)
 
 /** 是否希望持续聆听（用户未手动停止） */
@@ -119,7 +123,7 @@ function startRecognition(): void {
 }
 
 const placeholder = computed<string>(() =>
-  props.disabled ? 'AI 正在回答，请稍候…' : '请输入你的问题，例如：什么是 K 均值聚类？'
+    props.disabled ? 'AI 正在回答，请稍候…' : '请输入你的问题，例如：什么是 K 均值聚类？'
 )
 
 /** 回车发送、Shift+回车换行 */
@@ -170,7 +174,7 @@ function clear(): void {
   })
 }
 
-defineExpose({ clear })
+defineExpose({clear})
 </script>
 
 <style scoped>

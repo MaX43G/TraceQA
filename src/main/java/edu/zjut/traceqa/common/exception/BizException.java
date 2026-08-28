@@ -3,6 +3,8 @@ package edu.zjut.traceqa.common.exception;
 import edu.zjut.traceqa.common.enums.ErrorCode;
 import lombok.Getter;
 
+import java.io.Serial;
+
 /**
  * 业务异常。
  *
@@ -12,30 +14,41 @@ import lombok.Getter;
 @Getter
 public class BizException extends RuntimeException {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
-    /** 业务错误码 */
+    /**
+     * 业务错误码
+     */
     private final ErrorCode errorCode;
 
-    /** 以默认错误码构造 */
+    /**
+     * 以默认错误码构造
+     */
     public BizException(String message) {
         super(message);
         this.errorCode = ErrorCode.BIZ_ERROR;
     }
 
-    /** 以指定错误码构造 */
+    /**
+     * 以指定错误码构造
+     */
     public BizException(ErrorCode errorCode) {
         super(errorCode.getMsg());
         this.errorCode = errorCode;
     }
 
-    /** 以指定错误码 + 自定义提示构造 */
+    /**
+     * 以指定错误码 + 自定义提示构造
+     */
     public BizException(ErrorCode errorCode, String message) {
         super(message);
         this.errorCode = errorCode;
     }
 
-    /** 带底层原因构造（原因不会暴露给前端，仅记录日志） */
+    /**
+     * 带底层原因构造（原因不会暴露给前端，仅记录日志）
+     */
     public BizException(ErrorCode errorCode, String message, Throwable cause) {
         super(message, cause);
         this.errorCode = errorCode;

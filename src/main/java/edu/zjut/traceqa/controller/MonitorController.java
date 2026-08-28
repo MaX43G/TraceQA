@@ -84,7 +84,7 @@ public class MonitorController {
         return ApiResponse.ok(lightRagMonitorService.scanDocuments());
     }
 
-@Operation(summary = "获取 LightRAG WebUI 访问会话（签发短期 HttpOnly Cookie，供反向代理鉴权）")
+    @Operation(summary = "获取 LightRAG WebUI 访问会话（签发短期 HttpOnly Cookie，供反向代理鉴权）")
     @SaCheckRole("ADMIN")
     @PostMapping("/lightrag/webui-session")
     public ApiResponse<Void> webuiSession(HttpServletResponse response) {

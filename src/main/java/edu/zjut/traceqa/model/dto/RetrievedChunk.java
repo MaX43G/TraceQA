@@ -1,4 +1,5 @@
 package edu.zjut.traceqa.model.dto;
+
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -11,22 +12,34 @@ import java.util.List;
 @NoArgsConstructor
 public class RetrievedChunk {
 
-    /** LightRAG 引用 ID */
+    /**
+     * LightRAG 引用 ID
+     */
     private String referenceId;
 
-    /** 来源文件路径 */
+    /**
+     * 来源文件路径
+     */
     private String filePath;
 
-    /** 片段内容 */
+    /**
+     * 片段内容
+     */
     private String content;
 
-    /** 融合得分 */
+    /**
+     * 融合得分
+     */
     private double score;
 
-    /** 来源路径（graph 图谱 / vector 向量） */
+    /**
+     * 来源路径（graph 图谱 / vector 向量）
+     */
     private String source;
 
-    /** 章节路径（如 Section 1 → Subsection 1.2），可空 */
+    /**
+     * 章节路径（如 Section 1 → Subsection 1.2），可空
+     */
     private List<String> headings;
 
     public RetrievedChunk(String referenceId, String filePath, String content, double score, String source,

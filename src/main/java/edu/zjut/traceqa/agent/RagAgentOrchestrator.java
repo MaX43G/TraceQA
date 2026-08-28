@@ -71,20 +71,25 @@ public class RagAgentOrchestrator {
     @Resource
     private RedisCacheService redisCacheService;
 
-    /** Spring AI 默认 Base URL 与 API Key（服务端模型切换时使用） */
+    /**
+     * Spring AI 默认 Base URL 与 API Key（服务端模型切换时使用）
+     */
     @Value("${spring.ai.openai.base-url:https://api.siliconflow.cn}")
     private String springAiBaseUrl;
 
     @Value("${spring.ai.openai.api-key:}")
     private String springAiApiKey;
 
-    /** 并行检索时保护 thinking 节点列表与 SSE 进度推送的锁 */
+    /**
+     * 并行检索时保护 thinking 节点列表与 SSE 进度推送的锁
+     */
     private final Object thinkingLock = new Object();
 
-    /** 关键词检索作为首次查询补充：图谱+向量（或向量）命中数达到该阈值时跳过关键词 */
+    /**
+     * 关键词检索作为首次查询补充：图谱+向量（或向量）命中数达到该阈值时跳过关键词
+     */
     private static final int KEYWORD_FALLBACK_THRESHOLD = 4;
 
-    
 
     /**
      * 流式执行完整 Agent 工作流（由 ragExecutor 线程调用）。
@@ -115,7 +120,7 @@ public class RagAgentOrchestrator {
             } else {
                 RetrievalResult result = retrieve(emitter, thinking, request.getContent(), history, modelConfig, cancelled);
                 // 未检索到内容 → 换混合模式(mix)兜底重试一次；仍为空则照常回答（如实说明未检索到）
-                if (result == null || !result.hasContent()) {
+                if (!result.hasContent()) {
                     List<RetrievedChunk> fallback = retrievalService.retryWithStrategy(request.getContent());
                     if (!fallback.isEmpty()) {
                         result = new RetrievalResult(fallback, true);
@@ -138,10 +143,12 @@ public class RagAgentOrchestrator {
         }
     }
 
-    /** 从请求构造模型配置：
-     *  服务端模型（serverModel）用平台默认 Base URL/API Key + 选中模型；
-     *  自定义模型（model+baseUrl+apiKey）用用户提供的配置；
-     *  默认走 Spring AI 自动配置的模型。 */
+    /**
+     * 从请求构造模型配置：
+     * 服务端模型（serverModel）用平台默认 Base URL/API Key + 选中模型；
+     * 自定义模型（model+baseUrl+apiKey）用用户提供的配置；
+     * 默认走 Spring AI 自动配置的模型。
+     */
     private LlmConfig toLlmConfig(ChatStreamRequest request) {
         // 服务端模型切换
         if (request.hasServerModel()) {
@@ -156,7 +163,9 @@ public class RagAgentOrchestrator {
         return null;
     }
 
-    /** 将 Spring AI 的 Base URL（不带 /v1）转为 OpenAI 兼容地址（带 /v1） */
+    /**
+     * 将 Spring AI 的 Base URL（不带 /v1）转为 OpenAI 兼容地址（带 /v1）
+     */
     private String openAiCompatBaseUrl(String springAiBase) {
         String base = springAiBase == null ? "" : springAiBase.trim();
         if (base.isBlank()) {
@@ -288,7 +297,9 @@ public class RagAgentOrchestrator {
         return result;
     }
 
-    /** 推送「检索分析」数据（三路命中数 + 来源文档分布 + 耗时） */
+    /**
+     * 推送「检索分析」数据（三路命中数 + 来源文档分布 + 耗时）
+     */
     private void emitRetrievalStats(SseEmitter emitter, int graphHits, int vectorHits, int keywordHits,
                                     List<RetrievedChunk> fused, long startMs) {
         Map<String, Integer> sourceDocs = new LinkedHashMap<>();
@@ -308,7 +319,9 @@ public class RagAgentOrchestrator {
         ssePublisher.send(emitter, "stats", stats);
     }
 
-    /** 向量检索节点（含 SSE 进度推送） */
+    /**
+     * 向量检索节点（含 SSE 进度推送）
+     */
     private List<RetrievedChunk> runVector(SseEmitter emitter, List<ThinkingNodeVO> thinking, String content,
                                            EnhancedQuery enhanced, AtomicBoolean cancelled) {
         ThinkingNodeVO vectorNode = startThinking(thinking, "向量检索", "vector-agent",
@@ -320,7 +333,9 @@ public class RagAgentOrchestrator {
         return chunks;
     }
 
-    /** 关键词检索节点（含 SSE 进度推送） */
+    /**
+     * 关键词检索节点（含 SSE 进度推送）
+     */
     private List<RetrievedChunk> runKeyword(SseEmitter emitter, List<ThinkingNodeVO> thinking, String content,
                                             LlmConfig config, AtomicBoolean cancelled) {
         ThinkingNodeVO kwNode = startThinking(thinking, "关键词检索", "keyword-agent",
@@ -332,7 +347,9 @@ public class RagAgentOrchestrator {
         return chunks;
     }
 
-    /** 推送检索过程进度（取消时停止推送） */
+    /**
+     * 推送检索过程进度（取消时停止推送）
+     */
     private void pushProgress(SseEmitter emitter, ThinkingNodeVO node, AtomicBoolean cancelled, String progress) {
         if (cancelled != null && cancelled.get()) {
             return;
@@ -341,7 +358,9 @@ public class RagAgentOrchestrator {
                 new ThinkingNodeVO(node.getStage(), node.getAgent(), "running", progress, null));
     }
 
-    /** 截断长文本用于节点详情 */
+    /**
+     * 截断长文本用于节点详情
+     */
     private String shortText(String text) {
         if (text == null) {
             return "无";
@@ -370,7 +389,7 @@ public class RagAgentOrchestrator {
 
         String prompt = buildAnswerPrompt(content, history, result);
         String answer = streamAnswer(emitter, prompt, config, cancelled);
-        if (answer == null || answer.isBlank()) {
+        if (answer.isBlank()) {
             // 最终降级：直接返回纯检索上下文
             answer = degradedAnswer(result);
             ssePublisher.send(emitter, "delta", Map.of("content", answer));
@@ -387,7 +406,7 @@ public class RagAgentOrchestrator {
         ThinkingNodeVO node = startThinking(thinking, "直接应答", "answer-agent", "无需检索，直接应答");
         ssePublisher.send(emitter, "thinking", node);
         String answer = consume(emitter, llmService.callStream("chat", content, config), cancelled);
-        if (answer == null || answer.isBlank()) {
+        if (answer.isBlank()) {
             answer = "您好！我是「溯知」，可以为你解答《数据挖掘》课程相关问题，"
                     + "也可以询问平台的使用方式。请描述你的问题。";
             ssePublisher.send(emitter, "delta", Map.of("content", answer));
@@ -503,7 +522,9 @@ public class RagAgentOrchestrator {
         return refs;
     }
 
-    /** 从用户问题提取用于片段内高亮的术语（规则切分，保留 ≥2 字符 token） */
+    /**
+     * 从用户问题提取用于片段内高亮的术语（规则切分，保留 ≥2 字符 token）
+     */
     private List<String> extractHighlightTerms(String question) {
         if (question == null || question.isBlank()) {
             return List.of();
@@ -586,7 +607,9 @@ public class RagAgentOrchestrator {
         }
     }
 
-    /** SHA-256 摘要（缓存 key 用，Hutool） */
+    /**
+     * SHA-256 摘要（缓存 key 用，Hutool）
+     */
     private String sha256(String text) {
         return SecureUtil.sha256(text);
     }

@@ -1,6 +1,9 @@
 package edu.zjut.traceqa.model.vo;
+
 import edu.zjut.traceqa.model.po.User;
+
 import java.util.List;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -27,7 +30,9 @@ public class UserInfo {
 
     private String avatar;
 
-/** 由用户实体与权限码集合组装 */
+    /**
+     * 由用户实体与权限码集合组装
+     */
     public static UserInfo of(User user, List<String> permissions) {
         return new UserInfo(
                 user.getId(),

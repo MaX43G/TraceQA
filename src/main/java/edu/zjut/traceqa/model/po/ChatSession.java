@@ -15,18 +15,28 @@ import lombok.EqualsAndHashCode;
 @TableName("t_chat_session")
 public class ChatSession extends BaseEntity {
 
-    /** 所属用户 ID */
+    /**
+     * 所属用户 ID
+     */
     private Long userId;
 
-    /** 会话标题（默认取首条用户消息） */
+    /**
+     * 会话标题（默认取首条用户消息）
+     */
     private String title;
 
-    /** 绑定的知识库 ID（可空，空表示全局检索） */
+    /**
+     * 绑定的知识库 ID（可空，空表示全局检索）
+     */
     private Long knowledgeBaseId;
 
-    /** 置顶标记：1 置顶，0 普通 */
+    /**
+     * 置顶标记：1 置顶，0 普通
+     */
     private Integer pinned;
 
-    /** 会话状态：1 正常，0 归档 */
+    /**
+     * 会话状态：1 正常，0 归档
+     */
     private Integer status;
 }

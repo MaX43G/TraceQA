@@ -136,8 +136,8 @@ public class LightRagClient {
      */
     public void deleteDocument(String docId) {
         try {
-            restClient.delete().uri("/documents/{docId}", docId).retrieve();
-            log.info("已清理 LightRAG 失败记录：docId={}", docId);
+            RestClient.ResponseSpec retrieve = restClient.delete().uri("/documents/{docId}", docId).retrieve();
+            log.info("已清理 LightRAG 失败记录：docId={}，response={}", docId, retrieve);
         } catch (Exception e) {
             log.warn("LightRAG 文档删除失败：docId={}, err={}", docId, e.getMessage());
         }

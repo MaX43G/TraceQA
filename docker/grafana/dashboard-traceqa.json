@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -21,225 +24,528 @@
     {
       "title": "JVM 堆内存 (bytes)",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
       "targets": [
-        { "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})", "legendFormat": "used" },
-        { "expr": "sum(jvm_memory_max_bytes{area=\"heap\"})", "legendFormat": "max" },
-        { "expr": "sum(jvm_memory_committed_bytes{area=\"heap\"})", "legendFormat": "committed" }
+        {
+          "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})",
+          "legendFormat": "used"
+        },
+        {
+          "expr": "sum(jvm_memory_max_bytes{area=\"heap\"})",
+          "legendFormat": "max"
+        },
+        {
+          "expr": "sum(jvm_memory_committed_bytes{area=\"heap\"})",
+          "legendFormat": "committed"
+        }
       ]
     },
     {
       "title": "HTTP 请求速率 (rps)",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
       "targets": [
-        { "expr": "sum(rate(http_server_requests_seconds_count[1m])) by (uri)", "legendFormat": "{{uri}}" }
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count[1m])) by (uri)",
+          "legendFormat": "{{uri}}"
+        }
       ]
     },
     {
       "title": "JVM 非堆内存 (bytes)",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
       "targets": [
-        { "expr": "sum(jvm_memory_used_bytes{area=\"nonheap\"}) by (id)", "legendFormat": "{{id}}" }
+        {
+          "expr": "sum(jvm_memory_used_bytes{area=\"nonheap\"}) by (id)",
+          "legendFormat": "{{id}}"
+        }
       ]
     },
     {
       "title": "HTTP 延迟 P95 (ms)",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
       "targets": [
-        { "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket[1m])) by (le, uri)) * 1000", "legendFormat": "p95 {{uri}}" }
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket[1m])) by (le, uri)) * 1000",
+          "legendFormat": "p95 {{uri}}"
+        }
       ]
     },
     {
       "title": "活跃线程数",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
       "targets": [
-        { "expr": "jvm_threads_live_threads", "legendFormat": "live" },
-        { "expr": "jvm_threads_daemon_threads", "legendFormat": "daemon" },
-        { "expr": "jvm_threads_peak_threads", "legendFormat": "peak" }
+        {
+          "expr": "jvm_threads_live_threads",
+          "legendFormat": "live"
+        },
+        {
+          "expr": "jvm_threads_daemon_threads",
+          "legendFormat": "daemon"
+        },
+        {
+          "expr": "jvm_threads_peak_threads",
+          "legendFormat": "peak"
+        }
       ]
     },
     {
       "title": "GC 暂停速率 (ms/s)",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
       "targets": [
-        { "expr": "sum(rate(jvm_gc_pause_seconds_sum[1m])) by (cause) * 1000", "legendFormat": "{{cause}}" }
+        {
+          "expr": "sum(rate(jvm_gc_pause_seconds_sum[1m])) by (cause) * 1000",
+          "legendFormat": "{{cause}}"
+        }
       ]
     },
     {
       "title": "数据库连接池 (HikariCP)",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
       "targets": [
-        { "expr": "hikaricp_connections_active", "legendFormat": "active" },
-        { "expr": "hikaricp_connections_idle", "legendFormat": "idle" },
-        { "expr": "hikaricp_connections_max", "legendFormat": "max" },
-        { "expr": "hikaricp_connections_pending", "legendFormat": "pending" }
+        {
+          "expr": "hikaricp_connections_active",
+          "legendFormat": "active"
+        },
+        {
+          "expr": "hikaricp_connections_idle",
+          "legendFormat": "idle"
+        },
+        {
+          "expr": "hikaricp_connections_max",
+          "legendFormat": "max"
+        },
+        {
+          "expr": "hikaricp_connections_pending",
+          "legendFormat": "pending"
+        }
       ]
     },
     {
       "title": "HTTP 状态码速率 (rps)",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
       "targets": [
-        { "expr": "sum(rate(http_server_requests_seconds_count[1m])) by (status)", "legendFormat": "{{status}}" }
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count[1m])) by (status)",
+          "legendFormat": "{{status}}"
+        }
       ]
     },
     {
       "title": "CPU 使用率",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
       "targets": [
-        { "expr": "process_cpu_usage", "legendFormat": "process" },
-        { "expr": "system_cpu_usage", "legendFormat": "system" }
+        {
+          "expr": "process_cpu_usage",
+          "legendFormat": "process"
+        },
+        {
+          "expr": "system_cpu_usage",
+          "legendFormat": "system"
+        }
       ]
     },
     {
       "title": "日志事件速率 (条/s)",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
       "targets": [
-        { "expr": "sum(rate(logback_events_total[1m])) by (level)", "legendFormat": "{{level}}" }
+        {
+          "expr": "sum(rate(logback_events_total[1m])) by (level)",
+          "legendFormat": "{{level}}"
+        }
       ]
     },
     {
       "title": "系统负载 (1m)",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
       "targets": [
-        { "expr": "system_load_average_1m", "legendFormat": "load1" },
-        { "expr": "system_cpu_count", "legendFormat": "cpu count" }
+        {
+          "expr": "system_load_average_1m",
+          "legendFormat": "load1"
+        },
+        {
+          "expr": "system_cpu_count",
+          "legendFormat": "cpu count"
+        }
       ]
     },
     {
       "title": "GC 内存分配/晋升 (bytes/s)",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
       "targets": [
-        { "expr": "rate(jvm_gc_memory_allocated_bytes_total[1m])", "legendFormat": "allocated" },
-        { "expr": "rate(jvm_gc_memory_promoted_bytes_total[1m])", "legendFormat": "promoted" }
+        {
+          "expr": "rate(jvm_gc_memory_allocated_bytes_total[1m])",
+          "legendFormat": "allocated"
+        },
+        {
+          "expr": "rate(jvm_gc_memory_promoted_bytes_total[1m])",
+          "legendFormat": "promoted"
+        }
       ]
     },
     {
       "title": "JVM 缓冲区 (bytes)",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 48
+      },
       "targets": [
-        { "expr": "sum(jvm_buffer_memory_used_bytes) by (id)", "legendFormat": "{{id}}" }
+        {
+          "expr": "sum(jvm_buffer_memory_used_bytes) by (id)",
+          "legendFormat": "{{id}}"
+        }
       ]
     },
     {
       "title": "类加载",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 48
+      },
       "targets": [
-        { "expr": "jvm_classes_loaded_classes", "legendFormat": "loaded" },
-        { "expr": "rate(jvm_classes_unloaded_classes_total[1m])", "legendFormat": "unloaded/s" }
+        {
+          "expr": "jvm_classes_loaded_classes",
+          "legendFormat": "loaded"
+        },
+        {
+          "expr": "rate(jvm_classes_unloaded_classes_total[1m])",
+          "legendFormat": "unloaded/s"
+        }
       ]
     },
     {
       "title": "线程池 (Executor)",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 56 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 56
+      },
       "targets": [
-        { "expr": "executor_pool_size_threads", "legendFormat": "pool size" },
-        { "expr": "executor_active_threads", "legendFormat": "active" },
-        { "expr": "executor_queued_tasks", "legendFormat": "queued" },
-        { "expr": "executor_pool_max_threads", "legendFormat": "max" }
+        {
+          "expr": "executor_pool_size_threads",
+          "legendFormat": "pool size"
+        },
+        {
+          "expr": "executor_active_threads",
+          "legendFormat": "active"
+        },
+        {
+          "expr": "executor_queued_tasks",
+          "legendFormat": "queued"
+        },
+        {
+          "expr": "executor_pool_max_threads",
+          "legendFormat": "max"
+        }
       ]
     },
     {
       "title": "HTTP 出站请求速率 (rps)",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 56 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 56
+      },
       "targets": [
-        { "expr": "sum(rate(http_client_requests_seconds_count[1m])) by (uri)", "legendFormat": "{{uri}}" }
+        {
+          "expr": "sum(rate(http_client_requests_seconds_count[1m])) by (uri)",
+          "legendFormat": "{{uri}}"
+        }
       ]
     },
     {
       "title": "Redis (Lettuce) 请求速率 (rps)",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 64 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 64
+      },
       "targets": [
-        { "expr": "sum(rate(lettuce_seconds_count[1m]))", "legendFormat": "redis/s" }
+        {
+          "expr": "sum(rate(lettuce_seconds_count[1m]))",
+          "legendFormat": "redis/s"
+        }
       ]
     },
     {
       "title": "文件句柄",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 64 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 64
+      },
       "targets": [
-        { "expr": "process_files_open_files", "legendFormat": "open" },
-        { "expr": "process_files_max_files", "legendFormat": "max" }
+        {
+          "expr": "process_files_open_files",
+          "legendFormat": "open"
+        },
+        {
+          "expr": "process_files_max_files",
+          "legendFormat": "max"
+        }
       ]
     },
     {
       "title": "磁盘使用 (bytes)",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 72 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 72
+      },
       "targets": [
-        { "expr": "disk_free_bytes", "legendFormat": "free" },
-        { "expr": "disk_total_bytes", "legendFormat": "total" }
+        {
+          "expr": "disk_free_bytes",
+          "legendFormat": "free"
+        },
+        {
+          "expr": "disk_total_bytes",
+          "legendFormat": "total"
+        }
       ]
     },
     {
       "title": "线程状态分布",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 72 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 72
+      },
       "targets": [
-        { "expr": "sum(jvm_threads_states_threads) by (state)", "legendFormat": "{{state}}" }
+        {
+          "expr": "sum(jvm_threads_states_threads) by (state)",
+          "legendFormat": "{{state}}"
+        }
       ]
     },
     {
       "title": "Tomcat 会话",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 80 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 80
+      },
       "targets": [
-        { "expr": "tomcat_sessions_active_current_sessions", "legendFormat": "active" },
-        { "expr": "rate(tomcat_sessions_created_sessions_total[1m])", "legendFormat": "created/s" }
+        {
+          "expr": "tomcat_sessions_active_current_sessions",
+          "legendFormat": "active"
+        },
+        {
+          "expr": "rate(tomcat_sessions_created_sessions_total[1m])",
+          "legendFormat": "created/s"
+        }
       ]
     },
     {
       "title": "进程运行时长 (s)",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "PROM" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 80 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 80
+      },
       "targets": [
-        { "expr": "process_uptime_seconds", "legendFormat": "uptime" },
-        { "expr": "process_start_time_seconds", "legendFormat": "start (epoch)" }
+        {
+          "expr": "process_uptime_seconds",
+          "legendFormat": "uptime"
+        },
+        {
+          "expr": "process_start_time_seconds",
+          "legendFormat": "start (epoch)"
+        }
       ]
     }
   ],
   "refresh": "10s",
   "schemaVersion": 39,
-  "tags": ["traceqa"],
-  "templating": { "list": [] },
-  "time": { "from": "now-1h", "to": "now" },
+  "tags": [
+    "traceqa"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "browser",
   "title": "TraceQA 运行大盘",

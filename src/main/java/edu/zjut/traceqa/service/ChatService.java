@@ -41,9 +41,10 @@ public class ChatService {
 
     private static final int TITLE_MAX_LENGTH = 20;
 
-    
 
-    /** 创建会话 */
+    /**
+     * 创建会话
+     */
     public ChatSession createSession(Long userId, String title, Long knowledgeBaseId) {
         ChatSession session = new ChatSession();
         session.setUserId(userId);
@@ -55,7 +56,9 @@ public class ChatService {
         return session;
     }
 
-    /** 获取或创建会话（首条消息时自动创建，标题取消息摘要） */
+    /**
+     * 获取或创建会话（首条消息时自动创建，标题取消息摘要）
+     */
     public ChatSession getOrCreateSession(Long userId, Long sessionId, Long knowledgeBaseId, String firstMessage) {
         if (sessionId != null) {
             ChatSession session = requireOwnedSession(userId, sessionId);
@@ -69,7 +72,9 @@ public class ChatService {
         return createSession(userId, buildTitle(firstMessage), knowledgeBaseId);
     }
 
-    /** 查询用户全部会话（未删除） */
+    /**
+     * 查询用户全部会话（未删除）
+     */
     public List<SessionVO> listSessions(Long userId) {
         return sessionMapper.selectList(
                         new LambdaQueryWrapper<ChatSession>()
@@ -79,7 +84,9 @@ public class ChatService {
                 .stream().map(SessionVO::of).toList();
     }
 
-    /** 查询会话消息列表 */
+    /**
+     * 查询会话消息列表
+     */
     public List<ChatMessageVO> listMessages(Long userId, Long sessionId) {
         requireOwnedSession(userId, sessionId);
         return messageMapper.selectList(
@@ -89,7 +96,9 @@ public class ChatService {
                 .stream().map(this::toVO).toList();
     }
 
-    /** 逻辑删除会话（级联删除消息） */
+    /**
+     * 逻辑删除会话（级联删除消息）
+     */
     public void deleteSession(Long userId, Long sessionId) {
         requireOwnedSession(userId, sessionId);
         sessionMapper.deleteById(sessionId);
@@ -120,7 +129,9 @@ public class ChatService {
         messageMapper.deleteById(messageId);
     }
 
-    /** 在会话消息列表中寻找与目标消息配对的相邻消息 ID */
+    /**
+     * 在会话消息列表中寻找与目标消息配对的相邻消息 ID
+     */
     private Long findPairId(ChatMessage message, List<ChatMessage> siblings) {
         int idx = -1;
         for (int i = 0; i < siblings.size(); i++) {
@@ -150,25 +161,30 @@ public class ChatService {
         return null;
     }
 
-    /** 置顶/取消置顶会话 */
+    /**
+     * 置顶/取消置顶会话
+     */
     public void togglePin(Long userId, Long sessionId, boolean pinned) {
         ChatSession session = requireOwnedSession(userId, sessionId);
         session.setPinned(pinned ? 1 : 0);
         sessionMapper.updateById(session);
     }
 
-    /** 保存用户消息 */
-    public ChatMessage saveUserMessage(Long sessionId, String content) {
+    /**
+     * 保存用户消息
+     */
+    public void saveUserMessage(Long sessionId, String content) {
         ChatMessage message = new ChatMessage();
         message.setSessionId(sessionId);
         message.setRole(ChatRole.USER.name());
         message.setContent(content);
         message.setStatus(1);
         messageMapper.insert(message);
-        return message;
     }
 
-    /** 保存 AI 消息（含思考链路与引用 JSON） */
+    /**
+     * 保存 AI 消息（含思考链路与引用 JSON）
+     */
     public ChatMessage saveAssistantMessage(Long sessionId, String content,
                                             List<ThinkingNodeVO> thinkingTrace,
                                             List<ReferenceVO> references,
@@ -185,7 +201,9 @@ public class ChatService {
         return message;
     }
 
-    /** 导出会话为 Markdown */
+    /**
+     * 导出会话为 Markdown
+     */
     public String exportMarkdown(Long userId, Long sessionId) {
         ChatSession session = requireOwnedSession(userId, sessionId);
         List<ChatMessage> messages = messageMapper.selectList(
@@ -212,7 +230,9 @@ public class ChatService {
         return sb.toString();
     }
 
-    /** 校验会话归属并返回 */
+    /**
+     * 校验会话归属并返回
+     */
     public ChatSession requireOwnedSession(Long userId, Long sessionId) {
         ChatSession session = sessionMapper.selectById(sessionId);
         if (session == null) {
@@ -224,7 +244,9 @@ public class ChatService {
         return session;
     }
 
-    /** 构建最近 N 条对话历史文本（用于多轮上下文注入，按时间正序） */
+    /**
+     * 构建最近 N 条对话历史文本（用于多轮上下文注入，按时间正序）
+     */
     public String buildHistoryText(Long sessionId, int limit) {
         // 用 Page 分页替代手写 LIMIT，符合「杜绝手写原生 SQL」约定
         List<ChatMessage> messages = messageMapper.selectPage(
@@ -248,14 +270,18 @@ public class ChatService {
         return sb.toString();
     }
 
-    /** 消息实体转 DTO（解析思考链路与引用） */
+    /**
+     * 消息实体转 DTO（解析思考链路与引用）
+     */
     private ChatMessageVO toVO(ChatMessage message) {
         List<ThinkingNodeVO> thinking = jsonUtils.parseList(message.getThinkingTrace(), ThinkingNodeVO.class);
         List<ReferenceVO> references = jsonUtils.parseList(message.getReferences(), ReferenceVO.class);
-            return ChatMessageVO.of(message, thinking, references);
+        return ChatMessageVO.of(message, thinking, references);
     }
 
-    /** 由首条消息生成会话标题 */
+    /**
+     * 由首条消息生成会话标题
+     */
     private String buildTitle(String message) {
         if (message == null || message.isBlank()) {
             return "新对话";

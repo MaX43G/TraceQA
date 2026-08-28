@@ -24,14 +24,19 @@ public class RagAgents {
     @Resource
     private SystemPromptService systemPromptService;
 
-    /** 意图识别 Agent（懒加载缓存） */
+    /**
+     * 意图识别 Agent（懒加载缓存）
+     */
     private volatile ReactAgent intentAgent;
-    /** 总结生成 Agent（懒加载缓存） */
+    /**
+     * 总结生成 Agent（懒加载缓存）
+     */
     private volatile ReactAgent answerAgent;
 
-    
 
-    /** 获取意图识别 Agent */
+    /**
+     * 获取意图识别 Agent
+     */
     public ReactAgent intentAgent() {
         if (intentAgent == null) {
             synchronized (this) {
@@ -44,7 +49,9 @@ public class RagAgents {
         return intentAgent;
     }
 
-    /** 获取总结生成 Agent */
+    /**
+     * 获取总结生成 Agent
+     */
     public ReactAgent answerAgent() {
         if (answerAgent == null) {
             synchronized (this) {
@@ -57,7 +64,9 @@ public class RagAgents {
         return answerAgent;
     }
 
-    /** 构建 ReAct Agent */
+    /**
+     * 构建 ReAct Agent
+     */
     private ReactAgent buildAgent(String name, String description, String systemPrompt) {
         try {
             return ReactAgent.builder()
@@ -72,7 +81,9 @@ public class RagAgents {
         }
     }
 
-    /** 读取系统提示词，缺失时返回默认值（优雅降级） */
+    /**
+     * 读取系统提示词，缺失时返回默认值（优雅降级）
+     */
     private String promptOrDefault(String scenario, String defaultPrompt) {
         var prompt = systemPromptService.getActive(scenario);
         if (prompt != null && prompt.getContent() != null && !prompt.getContent().isBlank()) {

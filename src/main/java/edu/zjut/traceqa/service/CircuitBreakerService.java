@@ -37,8 +37,10 @@ public class CircuitBreakerService {
     private long openMillis;
     private int halfOpenMaxCalls;
 
-    /** 熔断状态 */
-    public enum State { CLOSED, OPEN, HALF_OPEN }
+    /**
+     * 熔断状态
+     */
+    public enum State {CLOSED, OPEN, HALF_OPEN}
 
     @PostConstruct
     private void init() {
@@ -48,7 +50,9 @@ public class CircuitBreakerService {
         this.halfOpenMaxCalls = cfg.getHalfOpenMaxCalls();
     }
 
-    /** 判断当前是否允许发起 LLM 调用 */
+    /**
+     * 判断当前是否允许发起 LLM 调用
+     */
     public boolean allowRequest() {
         State state = currentState();
         // 半开状态：限制试探调用并发数
@@ -58,7 +62,9 @@ public class CircuitBreakerService {
         return state == State.CLOSED;
     }
 
-    /** 记录一次 LLM 调用成功 */
+    /**
+     * 记录一次 LLM 调用成功
+     */
     public void recordSuccess() {
         try {
             HashOperations<String, Object, Object> ops = stringRedisTemplate.opsForHash();
@@ -70,7 +76,9 @@ public class CircuitBreakerService {
         }
     }
 
-    /** 记录一次 LLM 调用失败，可能触发熔断 */
+    /**
+     * 记录一次 LLM 调用失败，可能触发熔断
+     */
     public void recordFailure() {
         try {
             HashOperations<String, Object, Object> ops = stringRedisTemplate.opsForHash();
@@ -84,7 +92,9 @@ public class CircuitBreakerService {
         }
     }
 
-    /** 计算当前熔断状态 */
+    /**
+     * 计算当前熔断状态
+     */
     public State currentState() {
         long opened = readOpenedAt();
         // 从未熔断
@@ -98,7 +108,9 @@ public class CircuitBreakerService {
         return State.OPEN;
     }
 
-    /** 半开状态试探调用计数自增 */
+    /**
+     * 半开状态试探调用计数自增
+     */
     private long halfOpenIncrement() {
         try {
             return stringRedisTemplate.opsForHash().increment(CB_KEY, F_HALF_OPEN, 1);
@@ -108,7 +120,9 @@ public class CircuitBreakerService {
         }
     }
 
-    /** 读取熔断打开时间（Redis 不可用时视为未熔断） */
+    /**
+     * 读取熔断打开时间（Redis 不可用时视为未熔断）
+     */
     private long readOpenedAt() {
         try {
             Object v = stringRedisTemplate.opsForHash().get(CB_KEY, F_OPENED_AT);

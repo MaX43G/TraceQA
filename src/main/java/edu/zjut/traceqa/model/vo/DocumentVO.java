@@ -1,6 +1,9 @@
 package edu.zjut.traceqa.model.vo;
+
 import edu.zjut.traceqa.model.po.Document;
+
 import java.time.LocalDateTime;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -41,7 +44,9 @@ public class DocumentVO {
 
     private LocalDateTime updateTime;
 
-/** 由文档实体组装 */
+    /**
+     * 由文档实体组装
+     */
     public static DocumentVO of(Document doc) {
         return new DocumentVO(
                 doc.getId(),

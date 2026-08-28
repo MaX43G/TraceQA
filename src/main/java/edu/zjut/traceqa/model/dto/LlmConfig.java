@@ -1,4 +1,5 @@
 package edu.zjut.traceqa.model.dto;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -15,16 +16,24 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class LlmConfig {
 
-    /** OpenAI 兼容接口地址（如 https://api.openai.com/v1） */
+    /**
+     * OpenAI 兼容接口地址
+     */
     private String baseUrl;
 
-    /** API Key（仅本次请求使用） */
+    /**
+     * API Key（仅本次请求使用）
+     */
     private String apiKey;
 
-    /** 模型名称 */
+    /**
+     * 模型名称
+     */
     private String model;
 
-/** 判断是否为有效配置 */
+    /**
+     * 判断是否为有效配置
+     */
     public boolean isValid() {
         return baseUrl != null && !baseUrl.isBlank()
                 && apiKey != null && !apiKey.isBlank()

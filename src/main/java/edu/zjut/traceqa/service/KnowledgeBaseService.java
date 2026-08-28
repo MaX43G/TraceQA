@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+
 import edu.zjut.traceqa.common.convert.DtoMapper;
 
 /**
@@ -31,7 +32,9 @@ public class KnowledgeBaseService {
     @Resource
     private DocumentMapper documentMapper;
 
-    /** 查询全部知识库 */
+    /**
+     * 查询全部知识库
+     */
     public List<KnowledgeBaseDTO> list() {
         return knowledgeBaseMapper.selectList(
                         new LambdaQueryWrapper<KnowledgeBase>()
@@ -39,7 +42,9 @@ public class KnowledgeBaseService {
                 .stream().map(KnowledgeBaseDTO::of).toList();
     }
 
-    /** 创建知识库 */
+    /**
+     * 创建知识库
+     */
     public KnowledgeBaseDTO create(KnowledgeBaseDTO dto) {
         KnowledgeBase kb = new KnowledgeBase();
         kb.setName(dto.getName());
@@ -50,7 +55,9 @@ public class KnowledgeBaseService {
         return DtoMapper.INSTANCE.toKnowledgeBaseDTO(kb);
     }
 
-    /** 更新知识库 */
+    /**
+     * 更新知识库
+     */
     public KnowledgeBaseDTO update(Long id, KnowledgeBaseDTO dto) {
         KnowledgeBase kb = requireById(id);
         kb.setName(dto.getName());
@@ -60,7 +67,9 @@ public class KnowledgeBaseService {
         return DtoMapper.INSTANCE.toKnowledgeBaseDTO(kb);
     }
 
-    /** 删除知识库（同时逻辑删除其下文档） */
+    /**
+     * 删除知识库（同时逻辑删除其下文档）
+     */
     public void delete(Long id) {
         requireById(id);
         // 逻辑删除文档
@@ -70,7 +79,9 @@ public class KnowledgeBaseService {
         log.info("删除知识库：{}", id);
     }
 
-    /** 校验知识库存在 */
+    /**
+     * 校验知识库存在
+     */
     public KnowledgeBase requireById(Long id) {
         KnowledgeBase kb = knowledgeBaseMapper.selectById(id);
         if (kb == null) {

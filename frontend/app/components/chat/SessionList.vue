@@ -1,28 +1,30 @@
 <template>
   <div class="session-list">
     <a-button type="primary" block class="session-list__new" @click="emit('new')">
-      <template #icon><PlusOutlined /></template>
+      <template #icon>
+        <PlusOutlined/>
+      </template>
       新建对话
     </a-button>
 
     <a-menu
-      mode="inline"
-      :selected-keys="selectedKeys"
-      class="session-list__menu"
-      @click="handleClick"
+        mode="inline"
+        :selected-keys="selectedKeys"
+        class="session-list__menu"
+        @click="handleClick"
     >
       <a-menu-item v-for="session in sessions" :key="String(session.id)">
         <div class="session-item">
           <span class="session-item__title">
-            <PushpinFilled v-if="session.pinned === 1" style="color: #faad14" />
+            <PushpinFilled v-if="session.pinned === 1" style="color: #faad14"/>
             {{ session.title }}
           </span>
           <a-space v-if="session.id === currentSessionId" class="session-item__ops" :size="0">
             <a-tooltip :title="session.pinned === 1 ? '取消置顶' : '置顶'">
-              <PushpinOutlined @click.stop="emit('pin', session)" />
+              <PushpinOutlined @click.stop="emit('pin', session)"/>
             </a-tooltip>
             <a-tooltip title="删除会话">
-              <DeleteOutlined @click.stop="emit('remove', session)" />
+              <DeleteOutlined @click.stop="emit('remove', session)"/>
             </a-tooltip>
           </a-space>
         </div>
@@ -37,8 +39,8 @@
 /**
  * 会话列表面板：新建对话、切换会话、置顶与逻辑删除。
  */
-import { PlusOutlined, DeleteOutlined, PushpinOutlined, PushpinFilled } from '@ant-design/icons-vue'
-import type { SessionVO } from '@/utils/api-types'
+import {PlusOutlined, DeleteOutlined, PushpinOutlined, PushpinFilled} from '@ant-design/icons-vue'
+import type {SessionVO} from '@/utils/api-types'
 
 const props = defineProps<{
   /** 会话列表 */
@@ -55,10 +57,10 @@ const emit = defineEmits<{
 }>()
 
 const selectedKeys = computed<string[]>(() =>
-  props.currentSessionId ? [String(props.currentSessionId)] : []
+    props.currentSessionId ? [String(props.currentSessionId)] : []
 )
 
-function handleClick({ key }: { key: string | number }): void {
+function handleClick({key}: { key: string | number }): void {
   // 注意：雪花 ID 为 19 位数字，必须原样透传字符串，禁止 Number() 转换（会丢失精度）
   emit('select', key)
 }

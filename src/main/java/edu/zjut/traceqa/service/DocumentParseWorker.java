@@ -44,9 +44,13 @@ public class DocumentParseWorker {
     @Resource
     private DocumentProgressStore progressStore;
 
-    /** 切分阈值：PDF 超过该字节数才切分 */
+    /**
+     * 切分阈值：PDF 超过该字节数才切分
+     */
     private static final long SPLIT_THRESHOLD_BYTES = 2L * 1024 * 1024;
-    /** PDF 每块目标字节数（约 4MB） */
+    /**
+     * PDF 每块目标字节数（约 4MB）
+     */
     private static final long TARGET_PART_BYTES = 4L * 1024 * 1024;
     /**
      * 文本（md/txt）切分阈值：低于该字节数的文档不切分、整体提交为一个 LightRAG 文档。
@@ -56,16 +60,26 @@ public class DocumentParseWorker {
      * 总计百余次 LLM 抽取），这是「小文档上传极慢」的根因。仅对真正的大文档切块。</p>
      */
     private static final long TEXT_SPLIT_THRESHOLD_BYTES = 1024L * 1024;
-    /** 文本（md/txt）每块目标字节数（大文档切块时使用） */
+    /**
+     * 文本（md/txt）每块目标字节数（大文档切块时使用）
+     */
     private static final long TEXT_PART_BYTES = 1024L * 1024;
-    /** 文本切分最大块数 */
+    /**
+     * 文本切分最大块数
+     */
     private static final int MAX_TEXT_PARTS = 8;
-    /** 最大切分块数（防止切得过碎） */
+    /**
+     * 最大切分块数（防止切得过碎）
+     */
     private static final int MAX_PARTS = 50;
-    /** 块与块之间的提交限速间隔（毫秒），仅在大文档多块时生效，避免不必要等待 */
+    /**
+     * 块与块之间的提交限速间隔（毫秒），仅在大文档多块时生效，避免不必要等待
+     */
     private static final long PART_INTERVAL_MS = 1000L;
 
-    /** 单个子块：内容 + 文件名 */
+    /**
+     * 单个子块：内容 + 文件名
+     */
     private record PartChunk(byte[] bytes, String name) {
     }
 
@@ -97,7 +111,7 @@ public class DocumentParseWorker {
                 doc.setPartDone(i + 1);
                 documentMapper.updateById(doc);
                 if (i < total - 1) {
-                    sleepQuietly(PART_INTERVAL_MS);
+                    sleepQuietly();
                 }
             }
             progressStore.putTrackIds(doc.getId(), trackIds);
@@ -175,7 +189,9 @@ public class DocumentParseWorker {
         return DocumentVO.of(doc);
     }
 
-    /** 清理 LightRAG 中该文档的失败记录（重试前删除，避免内容去重拦截） */
+    /**
+     * 清理 LightRAG 中该文档的失败记录（重试前删除，避免内容去重拦截）
+     */
     private void cleanupFailedLightRag(Document doc) {
         if (doc.getTrackId() == null || doc.getTrackId().isBlank()) {
             return;
@@ -194,7 +210,9 @@ public class DocumentParseWorker {
         }
     }
 
-    /** 切分文件为多个子块；md/txt 仅超大时切分，PDF 仅超大时切分 */
+    /**
+     * 切分文件为多个子块；md/txt 仅超大时切分，PDF 仅超大时切分
+     */
     private List<PartChunk> splitParts(byte[] content, String filename) throws IOException {
         String ext = extensionOf(filename);
         if (("md".equals(ext) || "txt".equals(ext)) && content.length > TEXT_SPLIT_THRESHOLD_BYTES) {
@@ -207,7 +225,9 @@ public class DocumentParseWorker {
         return List.of(new PartChunk(content, filename));
     }
 
-    /** 按页切分 PDF，每块约 TARGET_PART_BYTES */
+    /**
+     * 按页切分 PDF，每块约 TARGET_PART_BYTES
+     */
     private List<PartChunk> splitPdf(byte[] content, String filename) throws IOException {
         List<PartChunk> parts = new ArrayList<>();
         try (PDDocument pdf = Loader.loadPDF(content)) {
@@ -231,7 +251,9 @@ public class DocumentParseWorker {
         return parts;
     }
 
-    /** 估算每块页数：按字节比例 + 限制总块数 */
+    /**
+     * 估算每块页数：按字节比例 + 限制总块数
+     */
     private int estimatePagesPerPart(long bytes, int totalPages) {
         long pagesPerPart = Math.max(1L, Math.round((double) totalPages * TARGET_PART_BYTES / Math.max(1L, bytes)));
         long parts = (long) Math.ceil(totalPages / (double) pagesPerPart);
@@ -241,7 +263,9 @@ public class DocumentParseWorker {
         return (int) pagesPerPart;
     }
 
-    /** 按字符切分纯文本（md/txt），确保每块都是合法 UTF-8（避免切断多字节字符） */
+    /**
+     * 按字符切分纯文本（md/txt），确保每块都是合法 UTF-8（避免切断多字节字符）
+     */
     private List<PartChunk> splitText(byte[] content, String filename) {
         if (content.length == 0) {
             return List.of(new PartChunk(content, filename));
@@ -260,7 +284,9 @@ public class DocumentParseWorker {
         return parts;
     }
 
-    /** 提取文件扩展名（小写，不含点） */
+    /**
+     * 提取文件扩展名（小写，不含点）
+     */
     private String extensionOf(String filename) {
         if (filename == null || !filename.contains(".")) {
             return "";
@@ -268,7 +294,9 @@ public class DocumentParseWorker {
         return filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
     }
 
-    /** 生成安全的子块文件名（不含空格/方括号，避免触发 LightRAG 安全校验） */
+    /**
+     * 生成安全的子块文件名（不含空格/方括号，避免触发 LightRAG 安全校验）
+     */
     private String safePartName(String filename, int index, int total) {
         int dot = filename == null ? -1 : filename.lastIndexOf('.');
         String base = dot > 0 ? filename.substring(0, dot) : (filename == null ? "file" : filename);
@@ -276,7 +304,9 @@ public class DocumentParseWorker {
         return base + "_part" + index + "of" + total + ext;
     }
 
-    /** 从 LightRAG 状态响应中解析文档状态（取 documents 数组首个元素） */
+    /**
+     * 从 LightRAG 状态响应中解析文档状态（取 documents 数组首个元素）
+     */
     private String resolveDocState(Map<String, Object> status) {
         Object docs = status.get("documents");
         if (docs instanceof List<?> documentList && !documentList.isEmpty()) {
@@ -289,7 +319,9 @@ public class DocumentParseWorker {
         return state == null ? "processing" : String.valueOf(state);
     }
 
-    /** 取 LightRAG 状态响应 documents 数组首个元素，无则返回 null */
+    /**
+     * 取 LightRAG 状态响应 documents 数组首个元素，无则返回 null
+     */
     private Map<?, ?> firstDocMap(Map<String, Object> status) {
         Object docs = status.get("documents");
         if (docs instanceof List<?> documentList && !documentList.isEmpty()) {
@@ -301,18 +333,24 @@ public class DocumentParseWorker {
         return null;
     }
 
-    /** 判断是否为完成状态 */
+    /**
+     * 判断是否为完成状态
+     */
     private boolean isDoneState(String state) {
         return "processed".equalsIgnoreCase(state) || "completed".equalsIgnoreCase(state)
                 || "success".equalsIgnoreCase(state);
     }
 
-    /** 判断是否为失败状态 */
+    /**
+     * 判断是否为失败状态
+     */
     private boolean isFailedState(String state) {
         return "failed".equalsIgnoreCase(state) || "error".equalsIgnoreCase(state);
     }
 
-    /** 标记解析失败 */
+    /**
+     * 标记解析失败
+     */
     private void failDocument(Document doc, String message) {
         doc.setStatus(DocumentStatus.FAILED.name());
         doc.setErrorMsg(message);
@@ -320,7 +358,9 @@ public class DocumentParseWorker {
         log.warn("文档解析失败：{}，原因：{}", doc.getOriginalName(), message);
     }
 
-    /** 安全获取整数 */
+    /**
+     * 安全获取整数
+     */
     private int intOf(Object value) {
         if (value instanceof Number number) {
             return number.intValue();
@@ -328,10 +368,12 @@ public class DocumentParseWorker {
         return 0;
     }
 
-    /** 静默睡眠 */
-    private void sleepQuietly(long millis) {
+    /**
+     * 静默睡眠
+     */
+    private void sleepQuietly() {
         try {
-            Thread.sleep(millis);
+            Thread.sleep(DocumentParseWorker.PART_INTERVAL_MS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

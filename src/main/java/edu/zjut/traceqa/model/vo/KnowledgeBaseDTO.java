@@ -1,7 +1,10 @@
 package edu.zjut.traceqa.model.vo;
+
 import edu.zjut.traceqa.model.po.KnowledgeBase;
 import jakarta.validation.constraints.NotBlank;
+
 import java.time.LocalDateTime;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -25,7 +28,9 @@ public class KnowledgeBaseDTO {
 
     private LocalDateTime createTime;
 
-/** 由实体组装 */
+    /**
+     * 由实体组装
+     */
     public static KnowledgeBaseDTO of(KnowledgeBase kb) {
         return new KnowledgeBaseDTO(kb.getId(), kb.getName(), kb.getDescription(),
                 kb.getCourse(), kb.getCreateTime());

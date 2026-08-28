@@ -5,34 +5,41 @@
         <a-select-option v-for="kb in kbs" :key="kb.id" :value="kb.id">{{ kb.name }}</a-select-option>
       </a-select>
       <a-upload
-        :show-upload-list="false"
-        :disabled="!selectedKbId"
-        accept=".md,.txt"
-        :before-upload="handleBeforeUpload"
-        :custom-request="handleUpload"
+          :show-upload-list="false"
+          :disabled="!selectedKbId"
+          accept=".md,.txt"
+          :before-upload="handleBeforeUpload"
+          :custom-request="handleUpload"
       >
-        <a-tooltip title="支持 Markdown(.md) / 文本(.txt)。PDF、PPT、Word、图片等格式请先用 MinerU 等工具转换为 Markdown 后再上传">
+        <a-tooltip
+            title="支持 Markdown(.md) / 文本(.txt)。PDF、PPT、Word、图片等格式请先用 MinerU 等工具转换为 Markdown 后再上传">
           <a-button type="primary" :disabled="!selectedKbId" :loading="uploading">
-            <template #icon><UploadOutlined /></template>
+            <template #icon>
+              <UploadOutlined/>
+            </template>
             上传文档
           </a-button>
         </a-tooltip>
       </a-upload>
       <a-upload
-        :show-upload-list="false"
-        :disabled="!selectedKbId"
-        accept=".zip"
-        :custom-request="handleBatchUpload"
+          :show-upload-list="false"
+          :disabled="!selectedKbId"
+          accept=".zip"
+          :custom-request="handleBatchUpload"
       >
         <a-tooltip title="批量导入：上传 zip 压缩包，自动解压其中的全部 .md/.txt 文档">
           <a-button :disabled="!selectedKbId" :loading="uploading">
-            <template #icon><FileZipOutlined /></template>
+            <template #icon>
+              <FileZipOutlined/>
+            </template>
             批量导入
           </a-button>
         </a-tooltip>
       </a-upload>
       <a-button :disabled="!docs.length" :loading="refreshing" @click="handleRefreshAll">
-        <template #icon><ReloadOutlined /></template>
+        <template #icon>
+          <ReloadOutlined/>
+        </template>
         刷新
       </a-button>
     </div>
@@ -51,7 +58,7 @@
           </a-tooltip>
         </template>
         <template v-else-if="column.key === 'action'">
-          <ConfirmDelete title="确定删除该文档？" @confirm="handleDelete(record)" />
+          <ConfirmDelete title="确定删除该文档？" @confirm="handleDelete(record)"/>
         </template>
       </template>
     </a-table>
@@ -63,22 +70,22 @@
  * 文档管理（管理员）：上传后异步解析（202 Accepted），
  * 状态列仅以标签展示（解析中/已完成/失败等）；顶部「刷新状态」按钮一键刷新整表。
  */
-import { UploadOutlined, FileZipOutlined, ReloadOutlined } from '@ant-design/icons-vue'
-import { message } from 'ant-design-vue'
+import {UploadOutlined, FileZipOutlined, ReloadOutlined} from '@ant-design/icons-vue'
+import {message} from 'ant-design-vue'
 import ConfirmDelete from '@/components/common/ConfirmDelete.vue'
-import { list1 as apiListKbs } from '@/api/traceqa/zhishiku'
-import { upload, refresh as apiRefresh, delete2 as apiDeleteDoc, listByKb } from '@/api/traceqa/wendang'
-import { getAuthHeaders } from '@/utils/request'
-import type { KnowledgeBaseDTO, DocumentVO } from '@/utils/api-types'
+import {list1 as apiListKbs} from '@/api/traceqa/zhishiku'
+import {upload, refresh as apiRefresh, delete2 as apiDeleteDoc, listByKb} from '@/api/traceqa/wendang'
+import {getAuthHeaders} from '@/utils/request'
+import type {KnowledgeBaseDTO, DocumentVO} from '@/utils/api-types'
 
 const columns = [
-  { title: '文件名', dataIndex: 'originalName', key: 'originalName' },
-  { title: '类型', dataIndex: 'fileType', key: 'fileType' },
-  { title: '大小', dataIndex: 'fileSize', key: 'fileSize' },
-  { title: '状态', key: 'status' },
-  { title: '解析统计', key: 'stats' },
-  { title: '错误信息', key: 'error' },
-  { title: '操作', key: 'action' }
+  {title: '文件名', dataIndex: 'originalName', key: 'originalName'},
+  {title: '类型', dataIndex: 'fileType', key: 'fileType'},
+  {title: '大小', dataIndex: 'fileSize', key: 'fileSize'},
+  {title: '状态', key: 'status'},
+  {title: '解析统计', key: 'stats'},
+  {title: '错误信息', key: 'error'},
+  {title: '操作', key: 'action'}
 ]
 
 const kbs = ref<KnowledgeBaseDTO[]>([])
@@ -105,7 +112,7 @@ async function loadDocs(): Promise<void> {
   }
   loading.value = true
   try {
-    const res = await listByKb({ knowledgeBaseId: selectedKbId.value })
+    const res = await listByKb({knowledgeBaseId: selectedKbId.value})
     docs.value = res.data ?? []
   } finally {
     loading.value = false
@@ -131,15 +138,15 @@ async function handleUpload(options: Record<string, unknown>): Promise<void> {
   }
   uploading.value = true
   try {
-    const res = await upload({ knowledgeBaseId: kbId }, {}, file)
+    const res = await upload({knowledgeBaseId: kbId}, {}, file)
     const uploadData = res.data
     if (!uploadData) {
       throw new Error('上传失败')
     }
-    message.success('上传成功，正在后台解析，可点击「刷新」查看进度')
+    await message.success('上传成功，正在后台解析，可点击「刷新」查看进度')
     await loadDocs()
   } catch (err) {
-    message.error((err as Error).message || '上传失败')
+    await message.error((err as Error).message || '上传失败')
   } finally {
     uploading.value = false
   }
@@ -152,10 +159,10 @@ async function handleRefreshAll(): Promise<void> {
   }
   refreshing.value = true
   try {
-    await Promise.all(docs.value.map((d) => apiRefresh({ id: d.id || 0 }).catch(() => null)))
-    message.success('状态已刷新')
+    await Promise.all(docs.value.map((d) => apiRefresh({id: d.id || 0}).catch(() => null)))
+    await message.success('状态已刷新')
   } catch {
-    message.error('刷新失败，请稍后重试')
+    await message.error('刷新失败，请稍后重试')
   } finally {
     refreshing.value = false
     await loadDocs()
@@ -184,16 +191,16 @@ async function handleBatchUpload(options: Record<string, unknown>): Promise<void
       data?: { successCount?: number; failedCount?: number; errors?: string[] }
     }
     if (json.code === 200 && json.data) {
-      message.success(`批量导入完成：成功 ${json.data.successCount ?? 0}，失败 ${json.data.failedCount ?? 0}`)
+      await message.success(`批量导入完成：成功 ${json.data.successCount ?? 0}，失败 ${json.data.failedCount ?? 0}`)
       if (json.data.errors?.length) {
-        message.warning(json.data.errors.slice(0, 5).join('；'))
+        await message.warning(json.data.errors.slice(0, 5).join('；'))
       }
     } else {
-      message.error(json.msg || '批量导入失败')
+      await message.error(json.msg || '批量导入失败')
     }
     await loadDocs()
   } catch {
-    message.error('批量导入失败，请确认上传的是 zip 压缩包')
+    await message.error('批量导入失败，请确认上传的是 zip 压缩包')
   } finally {
     uploading.value = false
   }
@@ -201,11 +208,11 @@ async function handleBatchUpload(options: Record<string, unknown>): Promise<void
 
 async function handleDelete(record: DocumentVO): Promise<void> {
   try {
-    await apiDeleteDoc({ id: record.id || 0 })
-    message.success('已删除')
+    await apiDeleteDoc({id: record.id || 0})
+    await message.success('已删除')
     await loadDocs()
   } catch (err) {
-    message.error((err as Error).message || '删除失败')
+    await message.error((err as Error).message || '删除失败')
   }
 }
 

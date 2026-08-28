@@ -15,15 +15,23 @@ import lombok.EqualsAndHashCode;
 @TableName("t_knowledge_base")
 public class KnowledgeBase extends BaseEntity {
 
-    /** 知识库名称 */
+    /**
+     * 知识库名称
+     */
     private String name;
 
-    /** 知识库描述 */
+    /**
+     * 知识库描述
+     */
     private String description;
 
-    /** 所属课程 */
+    /**
+     * 所属课程
+     */
     private String course;
 
-    /** 状态：1 启用，0 停用 */
+    /**
+     * 状态：1 启用，0 停用
+     */
     private Integer status;
 }

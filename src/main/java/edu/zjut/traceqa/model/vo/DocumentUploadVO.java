@@ -1,4 +1,5 @@
 package edu.zjut.traceqa.model.vo;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -12,7 +13,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class DocumentUploadVO {
 
-    /** 文档记录 ID（用于查询列表与进度追踪） */
+    /**
+     * 文档记录 ID（用于查询列表与进度追踪）
+     */
     private Long documentId;
 
 }

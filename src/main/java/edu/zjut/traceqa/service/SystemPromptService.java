@@ -26,15 +26,18 @@ public class SystemPromptService {
     @Resource
     private SystemPromptMapper systemPromptMapper;
 
-    
 
-    /** 分页查询提示词列表 */
+    /**
+     * 分页查询提示词列表
+     */
     public List<SystemPrompt> list() {
         return systemPromptMapper.selectList(
                 new LambdaQueryWrapper<SystemPrompt>().orderByAsc(SystemPrompt::getScenario));
     }
 
-    /** 按场景获取启用中的提示词，数据库缺失时回退到默认模板（保证始终有系统提示词） */
+    /**
+     * 按场景获取启用中的提示词，数据库缺失时回退到默认模板（保证始终有系统提示词）
+     */
     public SystemPrompt getActive(String scenario) {
         SystemPrompt prompt = systemPromptMapper.selectOne(
                 new LambdaQueryWrapper<SystemPrompt>()
@@ -47,7 +50,9 @@ public class SystemPromptService {
         return buildDefault(scenario);
     }
 
-    /** 从默认模板构造兜底提示词（不落库，仅用于运行时） */
+    /**
+     * 从默认模板构造兜底提示词（不落库，仅用于运行时）
+     */
     private SystemPrompt buildDefault(String scenario) {
         String content = PromptDefaults.CONTENT.get(scenario);
         if (content == null) {
@@ -61,7 +66,9 @@ public class SystemPromptService {
         return fallback;
     }
 
-    /** 更新提示词 */
+    /**
+     * 更新提示词
+     */
     public SystemPrompt update(SystemPrompt prompt) {
         SystemPrompt exist = systemPromptMapper.selectById(prompt.getId());
         if (exist == null) {
@@ -71,7 +78,9 @@ public class SystemPromptService {
         return prompt;
     }
 
-    /** 启用指定提示词，并停用同场景其他提示词 */
+    /**
+     * 启用指定提示词，并停用同场景其他提示词
+     */
     public void enable(Long id) {
         SystemPrompt prompt = requireById(id);
         // 停用同场景所有提示词
@@ -83,7 +92,9 @@ public class SystemPromptService {
         systemPromptMapper.updateById(prompt);
     }
 
-    /** 查询指定提示词，不存在抛业务异常 */
+    /**
+     * 查询指定提示词，不存在抛业务异常
+     */
     private SystemPrompt requireById(Long id) {
         SystemPrompt prompt = systemPromptMapper.selectById(id);
         if (prompt == null) {

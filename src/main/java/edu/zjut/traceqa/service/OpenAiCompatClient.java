@@ -36,7 +36,9 @@ public class OpenAiCompatClient {
         this.webClient = WebClient.builder().build();
     }
 
-    /** 同步调用（非流式） */
+    /**
+     * 同步调用（非流式）
+     */
     public String call(LlmConfig config, String systemPrompt, String userContent) {
         try {
             String body = webClient.post()
@@ -54,7 +56,9 @@ public class OpenAiCompatClient {
         }
     }
 
-    /** 流式调用（SSE 增量输出） */
+    /**
+     * 流式调用（SSE 增量输出）
+     */
     public Flux<String> stream(LlmConfig config, String systemPrompt, String userContent) {
         return webClient.post()
                 .uri(resolveUri(config) + "/chat/completions")
@@ -72,7 +76,9 @@ public class OpenAiCompatClient {
                 });
     }
 
-    /** 组装 Chat Completions 请求体 */
+    /**
+     * 组装 Chat Completions 请求体
+     */
     private Map<String, Object> buildRequest(LlmConfig config, String systemPrompt, String userContent, boolean stream) {
         List<Map<String, String>> messages = new ArrayList<>();
         if (systemPrompt != null && !systemPrompt.isBlank()) {
@@ -86,7 +92,9 @@ public class OpenAiCompatClient {
         );
     }
 
-    /** 拼接 /chat/completions 完整地址 */
+    /**
+     * 拼接 /chat/completions 完整地址
+     */
     private String resolveUri(LlmConfig config) {
         String base = config.getBaseUrl().trim();
         if (base.endsWith("/")) {
@@ -95,7 +103,9 @@ public class OpenAiCompatClient {
         return base;
     }
 
-    /** 从非流式响应中提取 content */
+    /**
+     * 从非流式响应中提取 content
+     */
     private String extractContent(String body) {
         if (body == null || body.isBlank()) {
             return null;
@@ -109,7 +119,9 @@ public class OpenAiCompatClient {
         }
     }
 
-    /** 解析 SSE 行，提取 delta.content（兼容带/不带 data: 前缀两种格式） */
+    /**
+     * 解析 SSE 行，提取 delta.content（兼容带/不带 data: 前缀两种格式）
+     */
     private List<String> parseSse(String line) {
         if (line == null || line.isBlank()) {
             return List.of();

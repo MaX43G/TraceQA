@@ -1,9 +1,9 @@
 <template>
   <a-config-provider :locale="zhCN">
     <NuxtLayout>
-      <NuxtPage />
+      <NuxtPage/>
     </NuxtLayout>
-    <LoadingScreen />
+    <LoadingScreen/>
   </a-config-provider>
 </template>
 

@@ -22,23 +22,29 @@ public class AnnouncementService {
     @Resource
     private AnnouncementMapper announcementMapper;
 
-    /** 公开获取所有启用的公告（按更新时间倒序，最多 20 条） */
+    /**
+     * 公开获取所有启用的公告（按更新时间倒序，最多 20 条）
+     */
     public List<Map<String, Object>> active() {
         return announcementMapper.selectList(new LambdaQueryWrapper<Announcement>()
-                .eq(Announcement::getEnabled, 1).eq(Announcement::getDeleted, 0)
-                .orderByDesc(Announcement::getUpdateTime).last("LIMIT 20"))
+                        .eq(Announcement::getEnabled, 1).eq(Announcement::getDeleted, 0)
+                        .orderByDesc(Announcement::getUpdateTime).last("LIMIT 20"))
                 .stream().map(this::view).toList();
     }
 
-    /** 管理员获取全部公告 */
+    /**
+     * 管理员获取全部公告
+     */
     public List<Map<String, Object>> listAll() {
         requireAdmin();
         return announcementMapper.selectList(new LambdaQueryWrapper<Announcement>()
-                .eq(Announcement::getDeleted, 0).orderByDesc(Announcement::getId))
+                        .eq(Announcement::getDeleted, 0).orderByDesc(Announcement::getId))
                 .stream().map(this::view).toList();
     }
 
-    /** 管理员新增/修改公告 */
+    /**
+     * 管理员新增/修改公告
+     */
     public Map<String, Object> save(Long id, String title, String content, Integer enabled) {
         requireAdmin();
         if (title == null || title.isBlank()) {
@@ -65,7 +71,9 @@ public class AnnouncementService {
         return view(a);
     }
 
-    /** 管理员删除公告 */
+    /**
+     * 管理员删除公告
+     */
     public void delete(Long id) {
         requireAdmin();
         Announcement a = announcementMapper.selectById(id);

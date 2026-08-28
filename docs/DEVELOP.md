@@ -4,19 +4,19 @@
 
 ## 1. 技术栈
 
-| 层次 | 技术 |
-| --- | --- |
-| 前端 | Nuxt 4（SSR）、Vue 3、TypeScript、Pinia、Ant Design Vue、markdown-it |
-| API 契约 | 后端 springdoc 生成 OpenAPI → 前端 `@umijs/openapi` 生成 TS 客户端 |
-| 后端 | Spring Boot 4.1、Java 25、Spring AI Alibaba Agent、springdoc-openapi |
-| ORM | MyBatis-Plus |
-| 数据库 | MySQL 8（单库） |
-| 对象存储 | MinIO（统一管理用户上传文件，如头像；S3 兼容，公开端口 6116） |
-| 缓存/队列 | Redis（查询与 Agent 决策缓存、文档解析任务队列 Redis Stream；AOF 落盘持久化、无内存上限） |
-| 检索 | LightRAG（图谱 + 向量 + 关键词），Agentic 策略规划 / 查询重写 / HyDE / 查询分解 / 三路检索 / RRF 融合 / ReRead / 语义重排（bge-reranker-v2-m3，可选） |
-| 可观测性 | Spring Boot Actuator + Micrometer/Prometheus + Prometheus + Grafana（管理员专属） |
-| 部署 | Docker Compose（mysql + redis + lightrag + minio + backend + frontend + caddy + prometheus + grafana） |
-| HTTPS | Caddy 反向代理前端 `:6115`；无域名用自签证书（`tls internal`，自动管理/续期）提供安全上下文以放行浏览器麦克风；有域名改 Caddyfile 的 `tls` 即可自动申请 Let's Encrypt |
+| 层次      | 技术                                                                                                                                                                  |
+|-----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 前端      | Nuxt 4（SSR）、Vue 3、TypeScript、Pinia、Ant Design Vue、markdown-it                                                                                                  |
+| API 契约  | 后端 springdoc 生成 OpenAPI → 前端 `@umijs/openapi` 生成 TS 客户端                                                                                                    |
+| 后端      | Spring Boot 4.1、Java 25、Spring AI Alibaba Agent、springdoc-openapi                                                                                                  |
+| ORM       | MyBatis-Plus                                                                                                                                                          |
+| 数据库    | MySQL 8（单库）                                                                                                                                                       |
+| 对象存储  | MinIO（统一管理用户上传文件，如头像；S3 兼容，公开端口 6116）                                                                                                         |
+| 缓存/队列 | Redis（查询与 Agent 决策缓存、文档解析任务队列 Redis Stream；AOF 落盘持久化、无内存上限）                                                                             |
+| 检索      | LightRAG（图谱 + 向量 + 关键词），Agentic 策略规划 / 查询重写 / HyDE / 查询分解 / 三路检索 / RRF 融合 / ReRead / 语义重排（bge-reranker-v2-m3，可选）                 |
+| 可观测性  | Spring Boot Actuator + Micrometer/Prometheus + Prometheus + Grafana（管理员专属）                                                                                     |
+| 部署      | Docker Compose（mysql + redis + lightrag + minio + backend + frontend + caddy + prometheus + grafana）                                                                |
+| HTTPS     | Caddy 反向代理前端 `:6115`；无域名用自签证书（`tls internal`，自动管理/续期）提供安全上下文以放行浏览器麦克风；有域名改 Caddyfile 的 `tls` 即可自动申请 Let's Encrypt |
 
 ## 2. 目录结构
 
@@ -72,7 +72,8 @@ docker run -d --name lightrag -p 9621:9621 \
   ghcr.io/hkuds/lightrag:latest
 ```
 
-> 本地运行时按需调参：`LLM_TIMEOUT`（单次抽取超时，硅基流动小模型慢，900s 较稳）、`EMBEDDING_TIMEOUT`（嵌入超时，默认 30s 偏紧）、`OPENAI_LLM_MAX_TOKENS`（抽取输出上限，防无限生成触发超时）、`MAX_ASYNC_LLM`（抽取并发，越高越快但更易限流）。
+> 本地运行时按需调参：`LLM_TIMEOUT`（单次抽取超时，硅基流动小模型慢，900s 较稳）、`EMBEDDING_TIMEOUT`（嵌入超时，默认 30s 偏紧）、
+> `OPENAI_LLM_MAX_TOKENS`（抽取输出上限，防无限生成触发超时）、`MAX_ASYNC_LLM`（抽取并发，越高越快但更易限流）。
 
 > Redis 不可用时系统自动降级（无缓存、文档任务改为直接解析），不影响核心功能。
 
@@ -96,23 +97,25 @@ cd frontend && pnpm gen:api   # 依据 http://localhost:8080/v3/api-docs 生成 
 
 ## 5. 检索增强链路（RetrievalService）
 
-| 步骤 | 说明 |
-| --- | --- |
-| 复杂度判定 | LLM（scenario=complexity）+ 快速预检 + 规则兜底，结果缓存 |
-| 查询重写 / HyDE | 结合多轮历史消解指代，并行生成；结果缓存 |
-| 查询分解 | 对比/比较类问题按连接词拆分子问题，并入向量多查询 |
-| 图谱检索 | `local`（实体局部图）+ `global`（关系全局图）并行，结果缓存 |
-| 向量检索 | 原问题 + 重写 + HyDE + 子问题多查询并行，`naive` 模式，结果缓存 |
-| 关键词检索 | scenario=keyword 提取术语，`hl_keywords` 检索（术语/编号类问题更准） |
-| RRF 融合 | 三路结果按倒数排名融合去重 |
-| ReRead | 从片段提取关键术语二次检索补全 |
-| 语义重排 | 优先调用外部 Rerank 模型（`BAAI/bge-reranker-v2-m3`）按相关度排序；失败/未配置时回退 LLM 精排 |
+| 步骤            | 说明                                                                                          |
+|-----------------|-----------------------------------------------------------------------------------------------|
+| 复杂度判定      | LLM（scenario=complexity）+ 快速预检 + 规则兜底，结果缓存                                     |
+| 查询重写 / HyDE | 结合多轮历史消解指代，并行生成；结果缓存                                                      |
+| 查询分解        | 对比/比较类问题按连接词拆分子问题，并入向量多查询                                             |
+| 图谱检索        | `local`（实体局部图）+ `global`（关系全局图）并行，结果缓存                                   |
+| 向量检索        | 原问题 + 重写 + HyDE + 子问题多查询并行，`naive` 模式，结果缓存                               |
+| 关键词检索      | scenario=keyword 提取术语，`hl_keywords` 检索（术语/编号类问题更准）                          |
+| RRF 融合        | 三路结果按倒数排名融合去重                                                                    |
+| ReRead          | 从片段提取关键术语二次检索补全                                                                |
+| 语义重排        | 优先调用外部 Rerank 模型（`BAAI/bge-reranker-v2-m3`）按相关度排序；失败/未配置时回退 LLM 精排 |
 
-> **Agentic 检索策略**：`RetrievalService.classifyQueryAgentic` 让 LLM 动态决定检索策略（SIMPLE=向量 / DEFINITION=向量+关键词 / COMPLEX=图谱+向量+关键词），结果缓存 30 分钟；LLM 失败时回退 `classifyQuery` 规则。Rerank 通过 `app.rerank.*` 配置（默认关闭）。
+> **Agentic 检索策略**：`RetrievalService.classifyQueryAgentic` 让 LLM 动态决定检索策略（SIMPLE=向量 /
+> DEFINITION=向量+关键词 / COMPLEX=图谱+向量+关键词），结果缓存 30 分钟；LLM 失败时回退 `classifyQuery` 规则。Rerank 通过
+> `app.rerank.*` 配置（默认关闭）。
 
 > 查询/决策结果经 `RedisCacheService` 短 TTL 缓存；Redis 不可用时自动降级。
 >
-> **知识库粒度**：检索基于单一 LightRAG 全局索引，**不区分知识库、不做按库选择或隔离**——所有已入库文档都会参与检索。上传时指定知识库仅用于归档与管理。
+> **知识库粒度**：检索基于单一 LightRAG 全局索引， **不区分知识库、不做按库选择或隔离**——所有已入库文档都会参与检索。上传时指定知识库仅用于归档与管理。
 
 ### 5.1 用户禁用
 
@@ -122,25 +125,25 @@ cd frontend && pnpm gen:api   # 依据 http://localhost:8080/v3/api-docs 生成 
 ## 6. 模型体系
 
 - **服务端模型**：`app.models` 配置（默认 GLM-4-9B + 其余 5 个），共享硅基流动 Key/URL，前端一键切换（`serverModel` 字段）。
-- **自定义模型**：用户填 OpenAI 兼容 Base URL/Key/模型名，**仅存浏览器 localStorage**，随请求发送（不持久化）。
+- **自定义模型**：用户填 OpenAI 兼容 Base URL/Key/模型名， **仅存浏览器 localStorage**，随请求发送（不持久化）。
 - 模型路由（`RagAgentOrchestrator.toLlmConfig`）：
-  - `serverModel` → 平台默认 URL/Key + 选中模型（OpenAiCompatClient）
-  - `model+baseUrl+apiKey` → 自定义（OpenAiCompatClient）
-  - 默认 → Spring AI ChatClient
+    - `serverModel` → 平台默认 URL/Key + 选中模型（OpenAiCompatClient）
+    - `model+baseUrl+apiKey` → 自定义（OpenAiCompatClient）
+    - 默认 → Spring AI ChatClient
 
 ## 7. 统一响应与错误码
 
 所有 REST 接口返回 `{code, msg, data, traceId, detail?}`；前端仅按 `code` 判断，`detail` 为排障根因（仅出错时存在，不含堆栈）。
 
-| code | 含义 |
-| --- | --- |
-| 200 | 成功 |
-| 40001 | 参数错误 |
-| 40100 / 40101 | 未登录 / Token 失效 |
-| 40300 | 无权限（RBAC） |
-| 40400 | 资源不存在 |
+| code          | 含义                     |
+|---------------|--------------------------|
+| 200           | 成功                     |
+| 40001         | 参数错误                 |
+| 40100 / 40101 | 未登录 / Token 失效      |
+| 40300         | 无权限（RBAC）           |
+| 40400         | 资源不存在               |
 | 50000 / 50001 | 业务异常 / AI 服务不可用 |
-| 50003 | 系统繁忙 |
+| 50003         | 系统繁忙                 |
 
 - 全局异常处理器统一拦截，严禁外泄堆栈。
 - LLM 调用带熔断（`CircuitBreakerService`），逐级降级：Agent → ChatClient → 纯检索上下文 → 友好提示。
@@ -162,18 +165,22 @@ t_announcement (系统公告：title/content/enabled)
 
 ### 8.2 头像与 MinIO 对象存储
 
-- `MinioConfig` 提供 `MinioClient`；`FileStorageService` 负责建桶、上传并返回公开 URL，自动设置**桶公共只读策略**解决对象直链 403。
-- `AuthService.updateAvatar` 接收前端裁剪后的图片写入 MinIO 并回写 `t_user.avatar`；前端 `AvatarCropperModal` 基于 cropperjs 高级裁剪后上传。
+- `MinioConfig` 提供 `MinioClient`；`FileStorageService` 负责建桶、上传并返回公开 URL，自动设置 **桶公共只读策略**解决对象直链
+  403。
+- `AuthService.updateAvatar` 接收前端裁剪后的图片写入 MinIO 并回写 `t_user.avatar`；前端 `AvatarCropperModal` 基于
+  cropperjs 高级裁剪后上传。
 - `app.minio.*` 配置（Docker 内网连 `minio:9000`，对外公开 URL 用 `MINIO_PUBLIC_URL`）。
 
 ### 8.3 语音输入与「猜你想问」
 
-- **语音输入**：`ChatInput` 调用浏览器原生 **Web Speech API**（`SpeechRecognition`/`webkitSpeechRecognition`），`continuous + interimResults` 前端实时识别并填入输入框，自动重启保持持续聆听（免费、无需后端参与）。
+- **语音输入**：`ChatInput` 调用浏览器原生 **Web Speech API**（`SpeechRecognition`/`webkitSpeechRecognition`），
+  `continuous + interimResults` 前端实时识别并填入输入框，自动重启保持持续聆听（免费、无需后端参与）。
 - **猜你想问**：`POST /api/chat/followup` 由 AI 解读当前问答，推荐 1-2 个最可能追问的问题；回答完成后前端调用并展示在回答下方，点击即发送。
 
 ### 8.1 文档切分与入库（DocumentParseWorker）
 
-- 文本（md/txt）仅当文件 **> 1MB** 才切块（`TEXT_SPLIT_THRESHOLD_BYTES`），小文档整体提交为一个 LightRAG 文档——避免按 100KB 无脑切块导致 LLM 抽取调用成倍放大（700KB 文档曾因切 7 块导致上百次抽取，单次超时即失败）。
+- 文本（md/txt）仅当文件 **> 1MB** 才切块（`TEXT_SPLIT_THRESHOLD_BYTES`），小文档整体提交为一个 LightRAG 文档——避免按 100KB
+  无脑切块导致 LLM 抽取调用成倍放大（700KB 文档曾因切 7 块导致上百次抽取，单次超时即失败）。
 - PDF 仅 > 2MB 才切块；其余格式整体上传。
 - 块间隔 `PART_INTERVAL_MS=1000` 限速；单块轮询 `MAX_POLL_TIMES×POLL_INTERVAL_MS≈30 分钟`。
 - 大文档用 `MAX_PARALLEL_INSERT`（Docker 默认 2）限制并行入库，避免瞬时打爆 LLM 限流。
@@ -188,20 +195,24 @@ t_announcement (系统公告：title/content/enabled)
 
 ## 10. 可观测性（Actuator + Prometheus + Grafana，仅管理员）
 
-后端基于 **Spring Boot Actuator + Micrometer/Prometheus** 暴露指标，配合 **Prometheus + Grafana** 实现时间序列可视化管理员大盘；所有指标与大屏均经**后端反向代理统一鉴权**访问。
+后端基于 **Spring Boot Actuator + Micrometer/Prometheus** 暴露指标，配合 **Prometheus + Grafana**
+实现时间序列可视化管理员大盘；所有指标与大屏均经 **后端反向代理统一鉴权**访问。
 
 ### 10.1 组件与路径
 
-| 组件 | 内部地址 | 对外路径 | 鉴权 |
-| --- | --- | --- | --- |
-| Actuator | `backend:8080/actuator/*` | 宿主 `:6114/actuator/*` | ADMIN 角色；`/actuator/prometheus` 另接受 `X-Scrape-Token` |
-| Prometheus | `prometheus:9090`（子路径 `/prometheus`） | 宿主 `:6112/prometheus`、代理 `/prometheus/**` | 无（代理层需管理员 Cookie，直连靠防火墙） |
-| Grafana | `grafana:3000`（子路径 `/grafana`） | 宿主 `:6113`、代理 `/grafana/**` | 匿名 Admin（免登录）+ 代理层管理员 Cookie |
+| 组件       | 内部地址                                  | 对外路径                                       | 鉴权                                                       |
+|------------|-------------------------------------------|------------------------------------------------|------------------------------------------------------------|
+| Actuator   | `backend:8080/actuator/*`                 | 宿主 `:6114/actuator/*`                        | ADMIN 角色；`/actuator/prometheus` 另接受 `X-Scrape-Token` |
+| Prometheus | `prometheus:9090`（子路径 `/prometheus`） | 宿主 `:6112/prometheus`、代理 `/prometheus/**` | 无（代理层需管理员 Cookie，直连靠防火墙）                  |
+| Grafana    | `grafana:3000`（子路径 `/grafana`）       | 宿主 `:6113`、代理 `/grafana/**`               | 匿名 Admin（免登录）+ 代理层管理员 Cookie                  |
 
-- **代理过滤**：`ObservabilityProxyFilter` 拦截 `/grafana/**`、`/prometheus/**`，校验 `tq_obs` 管理员 Cookie 后转发内网；`POST /api/monitor/observability/session` 签发该 Cookie（仅 ADMIN）。
+- **代理过滤**：`ObservabilityProxyFilter` 拦截 `/grafana/**`、`/prometheus/**`，校验 `tq_obs` 管理员 Cookie 后转发内网；
+  `POST /api/monitor/observability/session` 签发该 Cookie（仅 ADMIN）。
 - **前端入口**：管理后台 → 系统监控，点「打开 Grafana / Prometheus」先取会话 Cookie 再打开代理路径。
-- **子路径部署**：Prometheus 用 `--web.external-url=/prometheus --web.route-prefix=/prometheus`；Grafana 用 `GF_SERVER_SERVE_FROM_SUB_PATH=true` + `GF_SERVER_ROOT_URL=/grafana`，二者自行生成子路径资源引用，代理即可透传。
-- **Actuator 鉴权**：`WebConfig` 的 SaInterceptor 对 `/actuator/**` 要求 `ADMIN`；`/actuator/prometheus` 若带合法 `X-Scrape-Token`（`app.observability.scrape-token`）则放行供 Prometheus 抓取。
+- **子路径部署**：Prometheus 用 `--web.external-url=/prometheus --web.route-prefix=/prometheus`；Grafana 用
+  `GF_SERVER_SERVE_FROM_SUB_PATH=true` + `GF_SERVER_ROOT_URL=/grafana`，二者自行生成子路径资源引用，代理即可透传。
+- **Actuator 鉴权**：`WebConfig` 的 SaInterceptor 对 `/actuator/**` 要求 `ADMIN`；`/actuator/prometheus` 若带合法
+  `X-Scrape-Token`（`app.observability.scrape-token`）则放行供 Prometheus 抓取。
 
 ### 10.2 关键配置
 
@@ -222,13 +233,16 @@ app:
     prometheus-base-url: ${OBSERVABILITY_PROMETHEUS_BASE_URL:http://prometheus:9090}
 ```
 
-Prometheus 抓取令牌经 `docker-compose` 的 `sed` 注入 `docker/prometheus.yml` 的 `__SCRAPE_TOKEN__` 占位符（`OBSERVABILITY_SCRAPE_TOKEN`）。
+Prometheus 抓取令牌经 `docker-compose` 的 `sed` 注入 `docker/prometheus.yml` 的 `__SCRAPE_TOKEN__` 占位符（
+`OBSERVABILITY_SCRAPE_TOKEN`）。
 
 ### 10.3 自定义监控指标
 
-除 Actuator/Micrometer 自动指标外，`MonitorService` 额外采集：请求量、延迟分位（P50/P95/P99）、HTTP 状态分布、慢请求（≥2000ms）、路径错误率、JVM 运行时、最近异常日志，经 `/api/monitor` 供前端「系统监控」页展示。
+除 Actuator/Micrometer 自动指标外，`MonitorService` 额外采集：请求量、延迟分位（P50/P95/P99）、HTTP
+状态分布、慢请求（≥2000ms）、路径错误率、JVM 运行时、最近异常日志，经 `/api/monitor` 供前端「系统监控」页展示。
 
 ### 10.4 安全提示
 
-- Grafana 为**匿名管理员**、Prometheus **无鉴权**，二者均对外暴露端口（`:6113`、`:6112`）。**务必配置服务器防火墙仅放行可信来源**；管理端主入口一律走经后端代理的 `/grafana/`、`/prometheus/`。
+- Grafana 为 **匿名管理员**、Prometheus **无鉴权**，二者均对外暴露端口（`:6113`、`:6112`）。
+  **务必配置服务器防火墙仅放行可信来源**；管理端主入口一律走经后端代理的 `/grafana/`、`/prometheus/`。
 - `OBSERVABILITY_SCRAPE_TOKEN` 与 `GRAFANA_ADMIN_PASSWORD` 部署前请改为强随机值。

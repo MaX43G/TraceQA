@@ -17,7 +17,9 @@ import java.util.concurrent.Executor;
 @Configuration
 public class AsyncConfig {
 
-    /** 聊天 RAG 编排线程池 */
+    /**
+     * 聊天 RAG 编排线程池
+     */
     @Bean("ragExecutor")
     public Executor ragExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();

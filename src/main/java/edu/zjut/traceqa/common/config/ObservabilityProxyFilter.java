@@ -38,14 +38,20 @@ public class ObservabilityProxyFilter extends OncePerRequestFilter {
     private static final String PROMETHEUS_PREFIX = "/prometheus";
     private static final String SESSION_COOKIE = "tq_obs";
 
-    /** 不透传到上游的头 */
+    /**
+     * 不透传到上游的头
+     */
     private static final Set<String> SKIP_REQUEST_HEADERS = Set.of(
             "host", "content-length", "connection", "transfer-encoding", "cookie", "upgrade");
-    /** 不回写客户端的响应头 */
+    /**
+     * 不回写客户端的响应头
+     */
     private static final Set<String> SKIP_RESPONSE_HEADERS = Set.of(
             "content-length", "transfer-encoding", "connection", "keep-alive", "set-cookie", "upgrade");
 
-    /** 匹配 HTML 中的根相对资源引用（href/src/action/url） */
+    /**
+     * 匹配 HTML 中的根相对资源引用（href/src/action/url）
+     */
     private static final Pattern ROOT_RESOURCE_REF = Pattern.compile(
             "(?i)(href|src|action|url)\\s*(=|:)\\s*[\"']");
 
@@ -66,7 +72,9 @@ public class ObservabilityProxyFilter extends OncePerRequestFilter {
                 || (!matchesPrefix(path, GRAFANA_PREFIX) && !matchesPrefix(path, PROMETHEUS_PREFIX));
     }
 
-    /** 匹配前缀（兼容有/无尾部斜杠，如 /grafana 与 /grafana/） */
+    /**
+     * 匹配前缀（兼容有/无尾部斜杠，如 /grafana 与 /grafana/）
+     */
     private boolean matchesPrefix(String path, String prefix) {
         return path.startsWith(prefix + "/") || path.equals(prefix);
     }
@@ -96,7 +104,9 @@ public class ObservabilityProxyFilter extends OncePerRequestFilter {
         return false;
     }
 
-    /** 将请求转发至内网 Grafana / Prometheus 并流式回写响应 */
+    /**
+     * 将请求转发至内网 Grafana / Prometheus 并流式回写响应
+     */
     private void proxy(HttpServletRequest request, HttpServletResponse response) {
         String path = request.getRequestURI();
         boolean isPrometheus = matchesPrefix(path, PROMETHEUS_PREFIX);
@@ -162,10 +172,12 @@ public class ObservabilityProxyFilter extends OncePerRequestFilter {
         }
     }
 
-    /** 改写 HTML 中根相对资源引用，为其加上子路径前缀；已带前缀或协议相对（//）的引用保持不变 */
+    /**
+     * 改写 HTML 中根相对资源引用，为其加上子路径前缀；已带前缀或协议相对（//）的引用保持不变
+     */
     private String rewriteRootRelativeUrls(String html, String prefix) {
         Matcher matcher = ROOT_RESOURCE_REF.matcher(html);
-        StringBuffer sb = new StringBuffer(html.length() + 64);
+        StringBuilder sb = new StringBuilder(html.length() + 64);
         while (matcher.find()) {
             int pathStart = matcher.end();
             boolean rootRelative = pathStart < html.length()
@@ -182,7 +194,9 @@ public class ObservabilityProxyFilter extends OncePerRequestFilter {
         return sb.toString();
     }
 
-    /** 组装请求体：GET/HEAD/DELETE 无体，其余读取原始字节转发 */
+    /**
+     * 组装请求体：GET/HEAD/DELETE 无体，其余读取原始字节转发
+     */
     private HttpRequest.BodyPublisher bodyPublisher(HttpServletRequest request) throws IOException {
         String method = request.getMethod();
         if ("GET".equalsIgnoreCase(method) || "HEAD".equalsIgnoreCase(method)

@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import cn.hutool.crypto.SecureUtil;
+
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -56,9 +57,13 @@ public class RetrievalService {
     @Resource
     private RerankClient rerankClient;
 
-    /** RRF 融合常数 */
+    /**
+     * RRF 融合常数
+     */
     private static final double RRF_K = 60.0;
-    /** 每路保留的最大结果数 */
+    /**
+     * 每路保留的最大结果数
+     */
     private static final int MAX_PER_PATH = 12;
 
     /**
@@ -90,7 +95,9 @@ public class RetrievalService {
         return result;
     }
 
-    /** 拼接对话历史与当前问题（无历史时仅当前问题） */
+    /**
+     * 拼接对话历史与当前问题（无历史时仅当前问题）
+     */
     private String buildQueryInput(String question, String history) {
         if (history == null || history.isBlank()) {
             return question;
@@ -98,7 +105,9 @@ public class RetrievalService {
         return "对话历史：\n" + history + "当前问题：" + question;
     }
 
-    /** 对比/比较类问题按连接词拆分为子问题（用于多查询向量检索） */
+    /**
+     * 对比/比较类问题按连接词拆分为子问题（用于多查询向量检索）
+     */
     private List<String> decomposeSubqueries(String question) {
         if (question == null
                 || (!question.contains("对比") && !question.contains("比较") && !question.contains("区别")
@@ -220,7 +229,9 @@ public class RetrievalService {
         }
     }
 
-    /** 提取检索关键词：LLM 优先，失败回退英文 token 规则 */
+    /**
+     * 提取检索关键词：LLM 优先，失败回退英文 token 规则
+     */
     private List<String> extractKeywords(String question, LlmConfig config) {
         try {
             String raw = llmService.call("keyword", question, config);
@@ -240,7 +251,9 @@ public class RetrievalService {
         return extractKeywordsFallback(question);
     }
 
-    /** 关键词规则兜底：提取英文 token */
+    /**
+     * 关键词规则兜底：提取英文 token
+     */
     private List<String> extractKeywordsFallback(String question) {
         if (question == null) {
             return List.of();
@@ -259,14 +272,16 @@ public class RetrievalService {
     public RetrievalResult fuseAndSupplement(String question, List<RetrievedChunk> graphChunks,
                                              List<RetrievedChunk> vectorChunks, List<RetrievedChunk> keywordChunks,
                                              EnhancedQuery enhanced, LlmConfig config) {
-List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
+        List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
         List<RetrievedChunk> supplemented = reread(fused, config);
         List<RetrievedChunk> reranked = rerankWithModel(question, supplemented, config);
         boolean degraded = enhanced.getRewritten() == null && enhanced.getHyde() == null;
         return new RetrievalResult(reranked, degraded);
     }
 
-    /** 语义重排：优先调用外部 Rerank 模型（如 bge-reranker-v2-m3），失败回退 LLM 精排 */
+    /**
+     * 语义重排：优先调用外部 Rerank 模型（如 bge-reranker-v2-m3），失败回退 LLM 精排
+     */
     private List<RetrievedChunk> rerankWithModel(String question, List<RetrievedChunk> chunks, LlmConfig config) {
         if (chunks == null || chunks.size() <= 3) {
             return chunks;
@@ -288,7 +303,9 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
         return rerank(question, chunks, config);
     }
 
-    /** 合并多路片段（按 reference_id+content 去重，保留首现） */
+    /**
+     * 合并多路片段（按 reference_id+content 去重，保留首现）
+     */
     @SafeVarargs
     private List<RetrievedChunk> mergeChunks(List<RetrievedChunk>... sources) {
         Map<String, RetrievedChunk> merged = new LinkedHashMap<>();
@@ -341,7 +358,9 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
         return result;
     }
 
-    /** 规则判定：复杂逻辑词 / 多实体 / 长问题 */
+    /**
+     * 规则判定：复杂逻辑词 / 多实体 / 长问题
+     */
     private boolean ruleComplex(String question) {
         if (question == null || question.isBlank()) {
             return false;
@@ -349,7 +368,9 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
         return hasComplexSignal(question) || question.trim().length() > 40;
     }
 
-    /** 是否包含复杂信号（逻辑词或多实体分隔符） */
+    /**
+     * 是否包含复杂信号（逻辑词或多实体分隔符）
+     */
     private boolean hasComplexSignal(String question) {
         String[] complexWords = {
                 "对比", "比较", "区别", "差异", "关系", "关联", "联系", "影响", "总结", "综述",
@@ -368,13 +389,21 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
      * 问题类型（查询意图路由依据）。
      */
     public enum QueryType {
-        /** 术语/概念定义（"什么是K均值"）→ 仅关键词 + 向量，最快 */
+        /**
+         * 术语/概念定义（"什么是K均值"）→ 仅关键词 + 向量，最快
+         */
         DEFINITION,
-        /** 对比/比较类（"A和B的区别"）→ 查询分解 + 全链路 */
+        /**
+         * 对比/比较类（"A和B的区别"）→ 查询分解 + 全链路
+         */
         COMPARE,
-        /** 一般简单问题 → 仅向量 */
+        /**
+         * 一般简单问题 → 仅向量
+         */
         SIMPLE,
-        /** 一般复杂问题 → 全链路（图谱 + 向量 + 关键词） */
+        /**
+         * 一般复杂问题 → 全链路（图谱 + 向量 + 关键词）
+         */
         COMPLEX
     }
 
@@ -437,7 +466,9 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
         return type;
     }
 
-    /** 是否对比/比较类问题 */
+    /**
+     * 是否对比/比较类问题
+     */
     private boolean isCompareQuestion(String q) {
         String[] words = {"对比", "比较", "区别", "差异", "不同之处", "vs", "VS", "versus", "相较于", "和...相比", "哪个更好"};
         for (String w : words) {
@@ -448,7 +479,9 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
         return q.matches(".*(与|和|及).*(区别|差异|不同).*");
     }
 
-    /** 是否术语定义类问题 */
+    /**
+     * 是否术语定义类问题
+     */
     private boolean isDefinitionQuestion(String q) {
         return q.matches("^(什么是|何为|啥是|何谓|解释一下什么是|简单解释)\\s?.*")
                 || q.matches("^.{0,12}是.{0,6}(吗|吧|的意思|概念|原理)$")
@@ -456,7 +489,9 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
                 && !hasComplexSignal(q) && !q.matches(".*(为什么|如何|怎样|怎么).*"));
     }
 
-    /** 推送进度回调（空回调时忽略） */
+    /**
+     * 推送进度回调（空回调时忽略）
+     */
     private void notify(Consumer<String> progress, String message) {
         if (progress != null) {
             try {
@@ -467,7 +502,9 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
         }
     }
 
-    /** 执行单路径检索（图谱/向量，流式查询实时回调进度） */
+    /**
+     * 执行单路径检索（图谱/向量，流式查询实时回调进度）
+     */
     private List<RetrievedChunk> queryPath(String query, String mode, String source, Consumer<String> progress) {
         try {
             List<Map<String, Object>> refs = lightRagClient.queryStream(query, mode, null, progress);
@@ -480,7 +517,9 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
         }
     }
 
-    /** 从 LightRAG 引用列表解析检索片段 */
+    /**
+     * 从 LightRAG 引用列表解析检索片段
+     */
     private List<RetrievedChunk> parseReferenceList(List<Map<String, Object>> refs, String source) {
         List<RetrievedChunk> chunks = new ArrayList<>();
         int rank = 1;
@@ -503,7 +542,9 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
         return chunks;
     }
 
-    /** 从 LightRAG 响应中解析引用片段 */
+    /**
+     * 从 LightRAG 响应中解析引用片段
+     */
     private List<RetrievedChunk> parseReferences(Map<String, Object> response, String source) {
         List<RetrievedChunk> chunks = new ArrayList<>();
         Object refs = response.get("references");
@@ -532,7 +573,9 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
         return chunks;
     }
 
-    /** 提取引用的片段内容列表 */
+    /**
+     * 提取引用的片段内容列表
+     */
     private List<String> extractContents(Map<?, ?> refMap) {
         Object content = refMap.get("content");
         if (content instanceof List<?> contentList) {
@@ -544,7 +587,9 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
         return List.of();
     }
 
-    /** 提取引用片段的章节路径（LightRAG 返回 content_headings/headings，可空） */
+    /**
+     * 提取引用片段的章节路径（LightRAG 返回 content_headings/headings，可空）
+     */
     private List<String> extractHeadings(Map<?, ?> refMap) {
         Object raw = refMap.get("content_headings");
         if (raw == null) {
@@ -559,7 +604,9 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
         return List.of();
     }
 
-    /** RRF 倒数排名融合：多路结果合并去重（varargs，供编排器定义类问题复用） */
+    /**
+     * RRF 倒数排名融合：多路结果合并去重（varargs，供编排器定义类问题复用）
+     */
     @SafeVarargs
     public final List<RetrievedChunk> fuse(List<RetrievedChunk>... sources) {
         Map<String, RetrievedChunk> merged = new LinkedHashMap<>();
@@ -573,7 +620,9 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
                 .toList();
     }
 
-    /** 将单路径结果并入融合表（同 ID 累加 RRF 得分） */
+    /**
+     * 将单路径结果并入融合表（同 ID 累加 RRF 得分）
+     */
     private void mergePath(Map<String, RetrievedChunk> merged, List<RetrievedChunk> chunks) {
         int rank = 1;
         for (RetrievedChunk chunk : chunks) {
@@ -656,7 +705,9 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
         }
     }
 
-    /** 截断片段文本（精排提示词用，控制 token） */
+    /**
+     * 截断片段文本（精排提示词用，控制 token）
+     */
     private String shorten(String text) {
         if (text == null) {
             return "";
@@ -665,7 +716,9 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
         return oneLine.length() > 200 ? oneLine.substring(0, 200) + "…" : oneLine;
     }
 
-    /** 从 LLM 输出的术语文本中提取顿号/逗号分隔的检索串 */
+    /**
+     * 从 LLM 输出的术语文本中提取顿号/逗号分隔的检索串
+     */
     private String extractTerms(String terms) {
         if (terms == null || terms.isBlank()) {
             return null;
@@ -676,12 +729,16 @@ List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
         return joined.isBlank() ? null : joined;
     }
 
-    /** SHA-256 摘要（缓存 key 用，Hutool） */
+    /**
+     * SHA-256 摘要（缓存 key 用，Hutool）
+     */
     private String sha256(String text) {
         return SecureUtil.sha256(text);
     }
 
-    /** 安全转字符串 */
+    /**
+     * 安全转字符串
+     */
     private String str(Object value) {
         return value == null ? "" : String.valueOf(value);
     }

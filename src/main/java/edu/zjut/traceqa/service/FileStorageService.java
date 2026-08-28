@@ -24,7 +24,9 @@ import java.util.UUID;
 @Service
 public class FileStorageService {
 
-    /** 桶公共只读策略（anonymous 读对象） */
+    /**
+     * 桶公共只读策略（anonymous 读对象）
+     */
     private static final String PUBLIC_READ_POLICY = "{\"Version\":\"2012-10-17\",\"Statement\":["
             + "{\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Action\":[\"s3:GetObject\"],"
             + "\"Resource\":[\"arn:aws:s3:::%BUCKET%/*\"]}]}";
@@ -35,7 +37,9 @@ public class FileStorageService {
     @Resource
     private AppProperties properties;
 
-    /** 上传头像（裁剪后的图片字节），返回可访问 URL */
+    /**
+     * 上传头像（裁剪后的图片字节），返回可访问 URL
+     */
     public String uploadAvatar(byte[] data, String contentType) {
         if (data == null || data.length == 0) {
             throw new BizException(ErrorCode.PARAM_ERROR, "图片为空");
@@ -60,7 +64,9 @@ public class FileStorageService {
         return url;
     }
 
-    /** 确保桶存在并设置公共只读策略 */
+    /**
+     * 确保桶存在并设置公共只读策略
+     */
     public void ensureBucketConfigured() {
         AppProperties.Minio cfg = properties.getMinio();
         try {

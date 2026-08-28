@@ -1,155 +1,154 @@
 /* 全局基础样式（与 Ant Design Vue 配合使用，只做必要的全局约定） */
 :root {
-  --tq-primary: #1677ff;
-  --tq-bg-chat: #f5f7fa;
+    --tq-primary: #1677ff;
+    --tq-bg-chat: #f5f7fa;
 }
 
 html,
 body,
 #__nuxt {
-  height: 100%;
-  margin: 0;
-  padding: 0;
+    height: 100%;
+    margin: 0;
+    padding: 0;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
     'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-  background: var(--tq-bg-chat);
+    background: var(--tq-bg-chat);
 }
 
 /* 代码块样式 */
 .markdown-body pre {
-  background: #1e1e1e;
-  color: #d4d4d4;
-  border-radius: 6px;
-  padding: 12px 16px;
-  overflow-x: auto;
-  font-size: 13px;
-  line-height: 1.6;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border-radius: 6px;
+    padding: 12px 16px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.6;
 }
 
 .markdown-body code {
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
 }
 
 .markdown-body :not(pre) > code {
-  background: rgba(0, 0, 0, 0.06);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 0.9em;
+    background: rgba(0, 0, 0, 0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
 }
 
 /* 引用角标 */
 .tq-cite {
-  cursor: pointer;
-  color: #1677ff;
-  font-weight: 600;
-  padding: 0 3px;
-  border-radius: 3px;
-  background: rgba(22, 119, 255, 0.1);
-  user-select: none;
-  white-space: nowrap;
+    cursor: pointer;
+    color: #1677ff;
+    font-weight: 600;
+    padding: 0 3px;
+    border-radius: 3px;
+    background: rgba(22, 119, 255, 0.1);
+    user-select: none;
+    white-space: nowrap;
 }
 
 .tq-cite:hover {
-  background: rgba(22, 119, 255, 0.25);
+    background: rgba(22, 119, 255, 0.25);
 }
 
 /* 打字机光标 */
 .typing-cursor::after {
-  content: '▌';
-  color: #1677ff;
-  animation: blink 1s step-end infinite;
+    content: '▌';
+    color: #1677ff;
+    animation: blink 1s step-end infinite;
 }
 
 @keyframes blink {
-  50% {
-    opacity: 0;
-  }
+    50% {
+        opacity: 0;
+    }
 }
 
 /* ---- 页面切换渐变过渡动画 ---- */
 .page-enter-active,
 .page-leave-active {
-  transition:
-    opacity 0.3s ease,
+    transition: opacity 0.3s ease,
     transform 0.3s ease;
 }
 
 .page-enter-from {
-  opacity: 0;
-  transform: translateY(10px);
+    opacity: 0;
+    transform: translateY(10px);
 }
 
 .page-leave-to {
-  opacity: 0;
-  transform: translateY(-6px);
+    opacity: 0;
+    transform: translateY(-6px);
 }
 
 /* ---- 全局常用动画 ---- */
 @keyframes tqFadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 @keyframes tqSlideUp {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .tq-fade-in {
-  animation: tqFadeIn 0.4s ease both;
+    animation: tqFadeIn 0.4s ease both;
 }
 
 .tq-slide-up {
-  animation: tqSlideUp 0.4s ease both;
+    animation: tqSlideUp 0.4s ease both;
 }
 
 /* 公式块样式 */
 .katex-block {
-  overflow-x: auto;
-  padding: 6px 0;
-  margin: 8px 0;
+    overflow-x: auto;
+    padding: 6px 0;
+    margin: 8px 0;
 }
 
 .katex-inline {
-  display: inline-block;
+    display: inline-block;
 }
 
 /* ---- Windows 11 风格：磨玻璃 + 渐变 ---- */
 .tq-glass {
-  background: rgba(255, 255, 255, 0.62);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.12);
+    background: rgba(255, 255, 255, 0.62);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.12);
 }
 
 .tq-gradient-text {
-  background: linear-gradient(135deg, #1677ff, #06b6d4);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+    background: linear-gradient(135deg, #1677ff, #06b6d4);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
 }
 
 .tq-gradient-bg {
-  background: linear-gradient(135deg, #1677ff, #06b6d4);
+    background: linear-gradient(135deg, #1677ff, #06b6d4);
 }
 
 /* 全局圆角与柔和过渡 */
 .ant-card,
 .ant-modal-content,
 .ant-tabs-tabpane {
-  border-radius: 14px;
+    border-radius: 14px;
 }

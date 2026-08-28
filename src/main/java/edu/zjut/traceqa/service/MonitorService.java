@@ -29,13 +29,21 @@ import java.util.concurrent.atomic.AtomicLong;
 @Component
 public class MonitorService {
 
-    /** 慢请求阈值（毫秒） */
+    /**
+     * 慢请求阈值（毫秒）
+     */
     private static final long SLOW_REQUEST_THRESHOLD_MS = 2000L;
-    /** 慢请求环形缓冲上限 */
+    /**
+     * 慢请求环形缓冲上限
+     */
     private static final int SLOW_REQUEST_MAX = 20;
-    /** 延迟分位样本环形缓冲上限 */
+    /**
+     * 延迟分位样本环形缓冲上限
+     */
     private static final int LATENCY_SAMPLES_MAX = 1000;
-    /** 慢请求时间格式化 */
+    /**
+     * 慢请求时间格式化
+     */
     private static final DateTimeFormatter TIME_FMT =
             DateTimeFormatter.ofPattern("MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
 
@@ -46,9 +54,13 @@ public class MonitorService {
     private final Map<String, AtomicLong> methodCounts = new ConcurrentHashMap<>();
     private final Map<String, AtomicLong> statusCounts = new ConcurrentHashMap<>();
     private final Map<String, AtomicLong> pathErrorCounts = new ConcurrentHashMap<>();
-    /** 延迟样本（环形缓冲，用于分位统计） */
+    /**
+     * 延迟样本（环形缓冲，用于分位统计）
+     */
     private final ConcurrentLinkedQueue<Long> latencySamples = new ConcurrentLinkedQueue<>();
-    /** 慢请求（环形缓冲，保留最近若干条） */
+    /**
+     * 慢请求（环形缓冲，保留最近若干条）
+     */
     private final ConcurrentLinkedQueue<Map<String, Object>> slowRequests = new ConcurrentLinkedQueue<>();
 
     // ---- 异常日志（环形缓冲，保留最近 50 条）----
@@ -63,27 +75,33 @@ public class MonitorService {
     @Resource
     private DocumentQueueWorker documentQueueWorker;
 
-    /** 请求开始时间（ThreadLocal） */
+    /**
+     * 请求开始时间（ThreadLocal）
+     */
     private static final ThreadLocal<Long> REQUEST_START = new ThreadLocal<>();
 
-    /** 记录请求开始（由 TraceIdFilter 调用） */
+    /**
+     * 记录请求开始（由 TraceIdFilter 调用）
+     */
     public void startRequest(String path, String method) {
         REQUEST_START.set(System.currentTimeMillis());
         totalRequests.incrementAndGet();
-        pathCounts.computeIfAbsent(path, k -> new AtomicLong()).incrementAndGet();
-        methodCounts.computeIfAbsent(method, k -> new AtomicLong()).incrementAndGet();
+        pathCounts.computeIfAbsent(path, _ -> new AtomicLong()).incrementAndGet();
+        methodCounts.computeIfAbsent(method, _ -> new AtomicLong()).incrementAndGet();
     }
 
-    /** 记录请求结束（由 TraceIdFilter 调用） */
+    /**
+     * 记录请求结束（由 TraceIdFilter 调用）
+     */
     public void endRequest(String path, String method, int status, long costMs) {
         REQUEST_START.remove();
         totalLatencyMs.addAndGet(costMs);
         // 状态码桶（2xx/3xx/4xx/5xx）
         String bucket = (status / 100) + "xx";
-        statusCounts.computeIfAbsent(bucket, k -> new AtomicLong()).incrementAndGet();
+        statusCounts.computeIfAbsent(bucket, _ -> new AtomicLong()).incrementAndGet();
         // 错误率按路径统计
         if (status >= 400) {
-            pathErrorCounts.computeIfAbsent(path, k -> new AtomicLong()).incrementAndGet();
+            pathErrorCounts.computeIfAbsent(path, _ -> new AtomicLong()).incrementAndGet();
         }
         // 延迟分位样本
         latencySamples.offer(costMs);
@@ -105,7 +123,9 @@ public class MonitorService {
         }
     }
 
-    /** 计算延迟分位（P50/P95/P99），样本为空时返回 0 */
+    /**
+     * 计算延迟分位（P50/P95/P99），样本为空时返回 0
+     */
     private Map<String, Long> latencyPercentiles() {
         List<Long> sorted = new ArrayList<>(latencySamples);
         sorted.sort(Comparator.naturalOrder());
@@ -121,29 +141,35 @@ public class MonitorService {
             return 0;
         }
         int idx = (int) Math.ceil(p / 100.0 * sorted.size()) - 1;
-        idx = Math.max(0, Math.min(idx, sorted.size() - 1));
+        idx = Math.clamp(idx, 0, sorted.size() - 1);
         return sorted.get(idx);
     }
 
-    /** 汇总各 HTTP 方法计数 */
+    /**
+     * 汇总各 HTTP 方法计数
+     */
     private Map<String, Long> methodCountsMap() {
         Map<String, Long> out = new LinkedHashMap<>();
         methodCounts.entrySet().stream()
-                .sorted((a, b) -> a.getKey().compareTo(b.getKey()))
+                .sorted(Map.Entry.comparingByKey())
                 .forEach(e -> out.put(e.getKey(), e.getValue().get()));
         return out;
     }
 
-    /** 汇总各状态码桶 */
+    /**
+     * 汇总各状态码桶
+     */
     private Map<String, Long> statusCounts() {
         Map<String, Long> out = new LinkedHashMap<>();
         statusCounts.entrySet().stream()
-                .sorted((a, b) -> a.getKey().compareTo(b.getKey()))
+                .sorted(Map.Entry.comparingByKey())
                 .forEach(e -> out.put(e.getKey(), e.getValue().get()));
         return out;
     }
 
-    /** 路径错误率（Top 10，仅含出现过错误的路径） */
+    /**
+     * 路径错误率（Top 10，仅含出现过错误的路径）
+     */
     private Map<String, Long> pathErrors() {
         Map<String, Long> out = new LinkedHashMap<>();
         pathErrorCounts.entrySet().stream()
@@ -153,7 +179,9 @@ public class MonitorService {
         return out;
     }
 
-    /** JVM 运行时信息（进程级健康参考） */
+    /**
+     * JVM 运行时信息（进程级健康参考）
+     */
     private Map<String, Object> runtime() {
         Runtime rt = Runtime.getRuntime();
         ThreadMXBean tm = ManagementFactory.getThreadMXBean();
@@ -169,17 +197,23 @@ public class MonitorService {
     private static final AtomicLong CACHE_HITS = new AtomicLong();
     private static final AtomicLong CACHE_MISSES = new AtomicLong();
 
-    /** 记录缓存命中（由 RedisCacheService 调用，静态） */
+    /**
+     * 记录缓存命中（由 RedisCacheService 调用，静态）
+     */
     public static void recordCacheHit() {
         CACHE_HITS.incrementAndGet();
     }
 
-    /** 记录缓存未命中（由 RedisCacheService 调用，静态） */
+    /**
+     * 记录缓存未命中（由 RedisCacheService 调用，静态）
+     */
     public static void recordCacheMiss() {
         CACHE_MISSES.incrementAndGet();
     }
 
-    /** 记录异常日志（由全局异常处理器调用） */
+    /**
+     * 记录异常日志（由全局异常处理器调用）
+     */
     public void recordError(String message) {
         recentErrors.offer(message);
         if (recentErrors.size() > 50) {
@@ -187,7 +221,9 @@ public class MonitorService {
         }
     }
 
-    /** 组装监控快照 */
+    /**
+     * 组装监控快照
+     */
     public Map<String, Object> snapshot() {
         Map<String, Object> data = new LinkedHashMap<>();
         long total = totalRequests.get();
@@ -233,7 +269,9 @@ public class MonitorService {
         return data;
     }
 
-    /** 统计 Redis 中活跃 sa-token 会话数（不精确，作参考） */
+    /**
+     * 统计 Redis 中活跃 sa-token 会话数（不精确，作参考）
+     */
     private long countActiveSessions() {
         try {
             var keys = stringRedisTemplate.keys("satoken:login:token:*");

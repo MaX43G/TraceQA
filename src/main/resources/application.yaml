@@ -23,15 +23,9 @@ spring:
     openai:
       base-url: ${LLM_BASE_URL:https://api.siliconflow.cn}
       api-key: ${LLM_API_KEY:}
-      # 快速失败：超时 15s、不重试，保证熔断降级链路及时生效
-      timeout: 30s
-      max-retries: 1
       chat:
-        timeout: 30s
-        max-retries: 1
         options:
           model: ${LLM_MODEL:THUDM/GLM-4-9B-0414}
-          temperature: 0.3
 
 # sa-token 认证配置
 sa-token:
@@ -137,8 +131,6 @@ management:
   endpoint:
     health:
       show-details: always
-    prometheus:
-      enabled: true
   metrics:
     tags:
       application: ${spring.application.name}

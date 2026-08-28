@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;
 import java.util.function.Function;
@@ -21,18 +22,29 @@ import java.util.function.Function;
 @AllArgsConstructor
 public class PageResult<T> implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
-    /** 当前页码（从 1 开始） */
+    /**
+     * 当前页码（从 1 开始）
+     */
     private long page;
-    /** 每页大小 */
+    /**
+     * 每页大小
+     */
     private long size;
-    /** 总记录数 */
+    /**
+     * 总记录数
+     */
     private long total;
-    /** 当前页数据 */
+    /**
+     * 当前页数据
+     */
     private List<T> records;
 
-    /** 分页对象 + 元素类型转换器（用于 DTO 映射） */
+    /**
+     * 分页对象 + 元素类型转换器（用于 DTO 映射）
+     */
     public static <S, T> PageResult<T> of(IPage<S> pageResult, Function<S, T> converter) {
         List<T> records = pageResult.getRecords().stream().map(converter).toList();
         return new PageResult<>(pageResult.getCurrent(), pageResult.getSize(),

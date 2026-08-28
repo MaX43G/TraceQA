@@ -47,13 +47,19 @@ public class LightRagWebuiProxyFilter extends OncePerRequestFilter {
     private static final Pattern ROOT_RESOURCE_REF = Pattern.compile(
             "(?i)(href|src|action|url)\\s*(=|:)\\s*[\"']");
 
-    /** 根绝对路径前缀（用于判断资源是否已被加前缀，避免重复前缀） */
+    /**
+     * 根绝对路径前缀（用于判断资源是否已被加前缀，避免重复前缀）
+     */
     private static final String PREFIXED_ROOT = WEBUI_PREFIX;
 
-    /** 不透传到上游的头（host/长度/连接/流式/我们的鉴权 cookie） */
+    /**
+     * 不透传到上游的头（host/长度/连接/流式/我们的鉴权 cookie）
+     */
     private static final Set<String> SKIP_REQUEST_HEADERS = Set.of(
             "host", "content-length", "connection", "transfer-encoding", "cookie", "upgrade");
-    /** 不回写客户端的响应头（长度/连接/上游 cookie） */
+    /**
+     * 不回写客户端的响应头（长度/连接/上游 cookie）
+     */
     private static final Set<String> SKIP_RESPONSE_HEADERS = Set.of(
             "content-length", "transfer-encoding", "connection", "keep-alive", "set-cookie", "upgrade");
 
@@ -85,7 +91,9 @@ public class LightRagWebuiProxyFilter extends OncePerRequestFilter {
         proxy(request, response);
     }
 
-    /** 校验请求携带的 tq_webui Cookie 是否有效 */
+    /**
+     * 校验请求携带的 tq_webui Cookie 是否有效
+     */
     private boolean hasValidSession(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
@@ -99,7 +107,9 @@ public class LightRagWebuiProxyFilter extends OncePerRequestFilter {
         return false;
     }
 
-    /** 将请求转发至 LightRAG 并流式回写响应 */
+    /**
+     * 将请求转发至 LightRAG 并流式回写响应
+     */
     private void proxy(HttpServletRequest request, HttpServletResponse response) {
         String target = properties.getLightrag().getBaseUrl() + request.getRequestURI()
                 + (request.getQueryString() == null ? "" : "?" + request.getQueryString());
@@ -168,7 +178,7 @@ public class LightRagWebuiProxyFilter extends OncePerRequestFilter {
      */
     private String rewriteRootRelativeUrls(String html) {
         Matcher matcher = ROOT_RESOURCE_REF.matcher(html);
-        StringBuffer sb = new StringBuffer(html.length() + 64);
+        StringBuilder sb = new StringBuilder(html.length() + 64);
         while (matcher.find()) {
             int pathStart = matcher.end();
             boolean rootRelative = pathStart < html.length()
@@ -185,7 +195,9 @@ public class LightRagWebuiProxyFilter extends OncePerRequestFilter {
         return sb.toString();
     }
 
-    /** 组装请求体：GET/HEAD/DELETE 无体，其余读取原始字节转发 */
+    /**
+     * 组装请求体：GET/HEAD/DELETE 无体，其余读取原始字节转发
+     */
     private HttpRequest.BodyPublisher bodyPublisher(HttpServletRequest request) throws IOException {
         String method = request.getMethod();
         if ("GET".equalsIgnoreCase(method) || "HEAD".equalsIgnoreCase(method)

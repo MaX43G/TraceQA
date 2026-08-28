@@ -19,21 +19,33 @@ import lombok.experimental.SuperBuilder;
 @TableName("t_user")
 public class User extends BaseEntity {
 
-    /** 登录账号（唯一） */
+    /**
+     * 登录账号（唯一）
+     */
     private String username;
 
-    /** BCrypt 加密后的密码 */
+    /**
+     * BCrypt 加密后的密码
+     */
     private String password;
 
-    /** 昵称（展示名） */
+    /**
+     * 昵称（展示名）
+     */
     private String nickname;
 
-    /** 角色编码（关联 t_role.code） */
+    /**
+     * 角色编码（关联 t_role.code）
+     */
     private String roleCode;
 
-    /** 用户状态：1 启用，0 禁用 */
+    /**
+     * 用户状态：1 启用，0 禁用
+     */
     private Integer status;
 
-    /** 头像地址（MinIO 对象存储公开 URL） */
+    /**
+     * 头像地址（MinIO 对象存储公开 URL）
+     */
     private String avatar;
 }

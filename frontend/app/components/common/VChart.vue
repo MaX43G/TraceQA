@@ -1,5 +1,5 @@
 <template>
-  <div ref="el" class="v-chart" :style="{ height: height || '260px' }" />
+  <div ref="el" class="v-chart" :style="{ height: height || '260px' }"/>
 </template>
 
 <script setup lang="ts">
@@ -8,6 +8,7 @@
  * 传入 option 即可渲染；容器尺寸变化自动 resize，组件销毁时释放实例。
  */
 import * as echarts from 'echarts'
+import type {EChartsOption} from 'echarts'
 
 const props = defineProps<{
   option: object
@@ -25,7 +26,7 @@ function render(): void {
   if (!chart) {
     chart = echarts.init(el.value)
   }
-  chart.setOption(props.option, true)
+  chart.setOption(props.option as EChartsOption, true)
 }
 
 onMounted(() => {
@@ -36,7 +37,7 @@ onMounted(() => {
   }
 })
 
-watch(() => props.option, render, { deep: true })
+watch(() => props.option, render, {deep: true})
 
 onBeforeUnmount(() => {
   observer?.disconnect()
@@ -44,7 +45,7 @@ onBeforeUnmount(() => {
   chart = null
 })
 
-defineExpose({ getChart: () => chart })
+defineExpose({getChart: () => chart})
 </script>
 
 <style scoped>

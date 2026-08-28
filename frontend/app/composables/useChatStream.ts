@@ -5,177 +5,177 @@
  * {@code thinking} 思考节点、{@code delta} 内容增量、{@code references} 引用、
  * {@code done} 结束、{@code error} 错误。此处逐行解析并分发回调。</p>
  */
-import { getAuthHeaders, ApiError, handleAuthFailure } from '@/utils/request'
-import type { ThinkingNodeVO, ReferenceVO } from '@/utils/api-types'
+import {getAuthHeaders, ApiError, handleAuthFailure} from '@/utils/request'
+import type {ThinkingNodeVO, ReferenceVO} from '@/utils/api-types'
 
 /** SSE 事件回调集合 */
 export interface ChatStreamHandlers {
-  /** 思考节点（running/done/failed 均通过该回调） */
-  onThinking?: (node: ThinkingNodeVO) => void
-  /** 内容增量 */
-  onDelta?: (content: string) => void
-  /** 引用来源 */
-  onReferences?: (references: ReferenceVO[]) => void
-  /** 检索分析（三路命中数 / 来源文档分布 / 耗时） */
-  onStats?: (stats: RetrievalStats) => void
-  /** 结束（携带会话/消息 ID） */
-  onDone?: (payload: { sessionId?: number; messageId?: number; title?: string }) => void
-  /** 服务端错误 */
-  onError?: (error: { code?: number; msg?: string }) => void
-  /** 流结束（无论成功失败均触发） */
-  onEnd?: () => void
+    /** 思考节点（running/done/failed 均通过该回调） */
+    onThinking?: (node: ThinkingNodeVO) => void
+    /** 内容增量 */
+    onDelta?: (content: string) => void
+    /** 引用来源 */
+    onReferences?: (references: ReferenceVO[]) => void
+    /** 检索分析（三路命中数 / 来源文档分布 / 耗时） */
+    onStats?: (stats: RetrievalStats) => void
+    /** 结束（携带会话/消息 ID） */
+    onDone?: (payload: { sessionId?: number; messageId?: number; title?: string }) => void
+    /** 服务端错误 */
+    onError?: (error: { code?: number; msg?: string }) => void
+    /** 流结束（无论成功失败均触发） */
+    onEnd?: () => void
 }
 
 /** 检索分析数据（来自后端 stats 事件） */
 export interface RetrievalStats {
-  graphHits?: number
-  vectorHits?: number
-  keywordHits?: number
-  fusedCount?: number
-  elapsedMs?: number
-  sourceDocs?: Record<string, number>
+    graphHits?: number
+    vectorHits?: number
+    keywordHits?: number
+    fusedCount?: number
+    elapsedMs?: number
+    sourceDocs?: Record<string, number>
 }
 
 /** 发起流式对话请求并消费事件 */
 export async function streamChat(
-  body: {
-    sessionId?: number | null
-    knowledgeBaseId?: number | null
-    content: string
-    /** 选中的服务端模型名（平台默认 Key/URL） */
-    serverModel?: string
-    /** 自定义模型：OpenAI 兼容地址 / API Key / 模型名（仅本次请求） */
-    model?: string
-    baseUrl?: string
-    apiKey?: string
-  },
-  handlers: ChatStreamHandlers,
-  signal?: AbortSignal
+    body: {
+        sessionId?: number | null
+        knowledgeBaseId?: number | null
+        content: string
+        /** 选中的服务端模型名（平台默认 Key/URL） */
+        serverModel?: string
+        /** 自定义模型：OpenAI 兼容地址 / API Key / 模型名（仅本次请求） */
+        model?: string
+        baseUrl?: string
+        apiKey?: string
+    },
+    handlers: ChatStreamHandlers,
+    signal?: AbortSignal
 ): Promise<void> {
-  let res: Response | undefined
-  try {
-    res = await fetch('/api/chat/stream', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-      body: JSON.stringify(body),
-      signal
-    })
-  } catch (err) {
-    handlers.onError?.({ msg: '网络异常，请检查后端服务是否可用' })
-    handlers.onEnd?.()
-    return
-  }
-
-  const contentType = res.headers.get('content-type') || ''
-
-  // 后端返回非 SSE（如鉴权失败/业务错误），统一按 JSON 错误结构处理
-  if (!res || !res.ok || !res.body || !contentType.includes('text/event-stream')) {
-    let msg = `请求失败(${res?.status ?? '未知'})`
-    let code: number | undefined
+    let res: Response | undefined
     try {
-      const json = await res?.json()
-      msg = json?.msg || msg
-      code = json?.code
-      handlers.onError?.({ code, msg })
-    } catch {
-      handlers.onError?.({ msg })
+        res = await fetch('/api/chat/stream', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
+            body: JSON.stringify(body),
+            signal
+        })
+    } catch (err) {
+        handlers.onError?.({msg: '网络异常，请检查后端服务是否可用'})
+        handlers.onEnd?.()
+        return
     }
-    // 账号被禁用 / Token 失效：走统一登出逻辑（清除令牌并跳转登录页）
-    if (code === 40100 || code === 40101) {
-      handleAuthFailure(new ApiError(msg, code, '-'))
-    }
-    handlers.onEnd?.()
-    return
-  }
 
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder('utf-8')
-  let buffer = ''
+    const contentType = res.headers.get('content-type') || ''
 
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) {
-        break
-      }
-      buffer += decoder.decode(value, { stream: true })
-      // 按事件块（空行分隔）解析
-      let sepIndex: number
-      while ((sepIndex = buffer.indexOf('\n\n')) !== -1) {
-        const block = buffer.slice(0, sepIndex)
-        buffer = buffer.slice(sepIndex + 2)
-        dispatchBlock(block, handlers)
-      }
+    // 后端返回非 SSE（如鉴权失败/业务错误），统一按 JSON 错误结构处理
+    if (!res || !res.ok || !res.body || !contentType.includes('text/event-stream')) {
+        let msg = `请求失败(${res?.status ?? '未知'})`
+        let code: number | undefined
+        try {
+            const json = await res?.json()
+            msg = json?.msg || msg
+            code = json?.code
+            handlers.onError?.({code, msg})
+        } catch {
+            handlers.onError?.({msg})
+        }
+        // 账号被禁用 / Token 失效：走统一登出逻辑（清除令牌并跳转登录页）
+        if (code === 40100 || code === 40101) {
+            handleAuthFailure(new ApiError(msg, code, '-'))
+        }
+        handlers.onEnd?.()
+        return
     }
-  } catch (err) {
-    if ((err as Error).name !== 'AbortError') {
-      handlers.onError?.({ msg: '流式连接中断' })
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder('utf-8')
+    let buffer = ''
+
+    try {
+        while (true) {
+            const {done, value} = await reader.read()
+            if (done) {
+                break
+            }
+            buffer += decoder.decode(value, {stream: true})
+            // 按事件块（空行分隔）解析
+            let sepIndex: number
+            while ((sepIndex = buffer.indexOf('\n\n')) !== -1) {
+                const block = buffer.slice(0, sepIndex)
+                buffer = buffer.slice(sepIndex + 2)
+                dispatchBlock(block, handlers)
+            }
+        }
+    } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+            handlers.onError?.({msg: '流式连接中断'})
+        }
+    } finally {
+        handlers.onEnd?.()
     }
-  } finally {
-    handlers.onEnd?.()
-  }
 }
 
 /** 解析单个 SSE 事件块并分发 */
 function dispatchBlock(block: string, handlers: ChatStreamHandlers): void {
-  const lines = block.split('\n')
-  let event = 'message'
-  const dataLines: string[] = []
+    const lines = block.split('\n')
+    let event = 'message'
+    const dataLines: string[] = []
 
-  for (const line of lines) {
-    if (line.startsWith('event:')) {
-      event = line.slice(6).trim()
-    } else if (line.startsWith('data:')) {
-      dataLines.push(line.slice(5).trimStart())
-    }
-  }
-  if (dataLines.length === 0) {
-    return
-  }
-
-  // 合并可能跨行的 data，尝试解析 JSON
-  const raw = dataLines.join('\n')
-  let payload: unknown
-  try {
-    payload = JSON.parse(raw)
-  } catch {
-    payload = raw
-  }
-
-  switch (event) {
-    case 'thinking':
-      handlers.onThinking?.(payload as ThinkingNodeVO)
-      break
-    case 'delta': {
-      const p = payload as { content?: string }
-      if (p && p.content) {
-        handlers.onDelta?.(p.content)
-      }
-      break
-    }
-    case 'references':
-      handlers.onReferences?.((payload as { references?: ReferenceVO[] })?.references ?? [])
-      break
-    case 'stats':
-      handlers.onStats?.(payload as RetrievalStats)
-      break
-    case 'done':
-      handlers.onDone?.(payload as { sessionId?: number; messageId?: number; title?: string })
-      break
-    case 'error':
-      handlers.onError?.(payload as { code?: number; msg?: string })
-      break
-    default: {
-      // 后端以 JSON 错误结构返回（非 SSE 事件）时按错误处理：
-      // 兼容鉴权被拦截（如账号禁用）在 content-type 判定失效的场景
-      const p = payload as { code?: number; msg?: string } | null
-      if (p && typeof p.code === 'number' && p.code !== 200) {
-        handlers.onError?.({ code: p.code, msg: p.msg })
-        if (p.code === 40100 || p.code === 40101) {
-          handleAuthFailure(new ApiError(p.msg || '登录已失效', p.code, '-'))
+    for (const line of lines) {
+        if (line.startsWith('event:')) {
+            event = line.slice(6).trim()
+        } else if (line.startsWith('data:')) {
+            dataLines.push(line.slice(5).trimStart())
         }
-      }
-      break
     }
-  }
+    if (dataLines.length === 0) {
+        return
+    }
+
+    // 合并可能跨行的 data，尝试解析 JSON
+    const raw = dataLines.join('\n')
+    let payload: unknown
+    try {
+        payload = JSON.parse(raw)
+    } catch {
+        payload = raw
+    }
+
+    switch (event) {
+        case 'thinking':
+            handlers.onThinking?.(payload as ThinkingNodeVO)
+            break
+        case 'delta': {
+            const p = payload as { content?: string }
+            if (p && p.content) {
+                handlers.onDelta?.(p.content)
+            }
+            break
+        }
+        case 'references':
+            handlers.onReferences?.((payload as { references?: ReferenceVO[] })?.references ?? [])
+            break
+        case 'stats':
+            handlers.onStats?.(payload as RetrievalStats)
+            break
+        case 'done':
+            handlers.onDone?.(payload as { sessionId?: number; messageId?: number; title?: string })
+            break
+        case 'error':
+            handlers.onError?.(payload as { code?: number; msg?: string })
+            break
+        default: {
+            // 后端以 JSON 错误结构返回（非 SSE 事件）时按错误处理：
+            // 兼容鉴权被拦截（如账号禁用）在 content-type 判定失效的场景
+            const p = payload as { code?: number; msg?: string } | null
+            if (p && typeof p.code === 'number' && p.code !== 200) {
+                handlers.onError?.({code: p.code, msg: p.msg})
+                if (p.code === 40100 || p.code === 40101) {
+                    handleAuthFailure(new ApiError(p.msg || '登录已失效', p.code, '-'))
+                }
+            }
+            break
+        }
+    }
 }

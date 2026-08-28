@@ -14,7 +14,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 @Configuration
 public class SecurityBeans {
 
-    /** BCrypt 密码编码器 */
+    /**
+     * BCrypt 密码编码器
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

@@ -44,7 +44,9 @@ import java.util.zip.ZipInputStream;
 @Service
 public class DocumentService {
 
-    /** 允许上传的文件扩展名集合（仅文本格式；PDF/PPT/Word 等需先转换为 Markdown） */
+    /**
+     * 允许上传的文件扩展名集合（仅文本格式；PDF/PPT/Word 等需先转换为 Markdown）
+     */
     private static final Set<String> ALLOWED_TYPES = Set.of("md", "txt");
 
     @Resource
@@ -73,7 +75,9 @@ public class DocumentService {
         }
     }
 
-    /** 批量导入：解压 zip 内所有 .md/.txt，逐个入库解析 */
+    /**
+     * 批量导入：解压 zip 内所有 .md/.txt，逐个入库解析
+     */
     public BatchUploadVO batchUpload(MultipartFile zipFile, Long knowledgeBaseId) {
         knowledgeBaseService.requireById(knowledgeBaseId);
         byte[] archive;
@@ -120,7 +124,9 @@ public class DocumentService {
         return new BatchUploadVO(success, failed, errors);
     }
 
-    /** 校验是否标准 zip 归档：本地文件头 PK\x03\x04，或空压缩包 PK\x05\x06 */
+    /**
+     * 校验是否标准 zip 归档：本地文件头 PK\x03\x04，或空压缩包 PK\x05\x06
+     */
     private boolean isZipArchive(byte[] data) {
         if (data == null || data.length < 4) {
             return false;
@@ -132,7 +138,9 @@ public class DocumentService {
         return localHeader || emptyArchive;
     }
 
-    /** 核心上传逻辑（单文件/批量共用）：校验 -> 指纹去重 -> 落盘 -> 入库 -> 异步解析 */
+    /**
+     * 核心上传逻辑（单文件/批量共用）：校验 -> 指纹去重 -> 落盘 -> 入库 -> 异步解析
+     */
     private DocumentUploadVO uploadContent(String originalName, byte[] content, Long knowledgeBaseId) {
         knowledgeBaseService.requireById(knowledgeBaseId);
         String fileType = resolveFileType(originalName);
@@ -164,7 +172,9 @@ public class DocumentService {
         return new DocumentUploadVO(doc.getId());
     }
 
-    /** 分页查询文档列表（查询时同步 LightRAG 刷新解析状态并回写数据库） */
+    /**
+     * 分页查询文档列表（查询时同步 LightRAG 刷新解析状态并回写数据库）
+     */
     public PageResult<DocumentVO> page(Long knowledgeBaseId, long page, long size) {
         LambdaQueryWrapper<Document> wrapper = new LambdaQueryWrapper<Document>()
                 .eq(knowledgeBaseId != null, Document::getKnowledgeBaseId, knowledgeBaseId)
@@ -174,7 +184,9 @@ public class DocumentService {
         return new PageResult<>(result.getCurrent(), result.getSize(), result.getTotal(), records);
     }
 
-    /** 查询某知识库下的全部文档（查询时同步 LightRAG 刷新解析状态并回写数据库） */
+    /**
+     * 查询某知识库下的全部文档（查询时同步 LightRAG 刷新解析状态并回写数据库）
+     */
     public List<DocumentVO> listByKnowledgeBase(Long knowledgeBaseId) {
         return documentMapper.selectList(
                         new LambdaQueryWrapper<Document>()
@@ -183,7 +195,9 @@ public class DocumentService {
                 .stream().map(parseWorker::refresh).toList();
     }
 
-    /** 逻辑删除文档并清理本地文件 */
+    /**
+     * 逻辑删除文档并清理本地文件
+     */
     public void delete(Long id) {
         Document doc = documentMapper.selectById(id);
         if (doc == null) {
@@ -195,7 +209,9 @@ public class DocumentService {
         log.info("文档已删除：{}", doc.getOriginalName());
     }
 
-    /** 按需刷新文档解析状态（前端「刷新」按钮触发），返回最新文档信息 */
+    /**
+     * 按需刷新文档解析状态（前端「刷新」按钮触发），返回最新文档信息
+     */
     public DocumentVO refreshProgress(Long id) {
         Document doc = documentMapper.selectById(id);
         if (doc == null) {
@@ -204,12 +220,16 @@ public class DocumentService {
         return parseWorker.refresh(doc);
     }
 
-    /** 解析队列统计（待处理/处理中/死信），供管理后台可视化 */
+    /**
+     * 解析队列统计（待处理/处理中/死信），供管理后台可视化
+     */
     public Map<String, Object> queueStats() {
         return documentQueueWorker.queueStats();
     }
 
-    /** 判断内容指纹是否已存在（去重） */
+    /**
+     * 判断内容指纹是否已存在（去重）
+     */
     private boolean existsContentHash(String hash) {
         if (hash == null || hash.isBlank()) {
             return false;
@@ -218,7 +238,9 @@ public class DocumentService {
                 new LambdaQueryWrapper<Document>().eq(Document::getContentHash, hash)) > 0;
     }
 
-    /** 存储文件到本地文件系统 */
+    /**
+     * 存储文件到本地文件系统
+     */
     private Path storeFile(byte[] content, String originalName, Long knowledgeBaseId) {
         try {
             Path dir = Paths.get(properties.getStorage().getRoot()).resolve(String.valueOf(knowledgeBaseId));
@@ -234,7 +256,9 @@ public class DocumentService {
         }
     }
 
-    /** 清理本地文件 */
+    /**
+     * 清理本地文件
+     */
     private void deleteLocalFile(String storedPath) {
         try {
             Files.deleteIfExists(Paths.get(storedPath));
@@ -243,7 +267,9 @@ public class DocumentService {
         }
     }
 
-    /** 提取并规整文件扩展名 */
+    /**
+     * 提取并规整文件扩展名
+     */
     private String resolveFileType(String filename) {
         if (filename == null || !filename.contains(".")) {
             throw new BizException(ErrorCode.PARAM_ERROR, "文件名不合法");
@@ -251,13 +277,17 @@ public class DocumentService {
         return filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
     }
 
-    /** 文件名清洗（去路径分隔符） */
+    /**
+     * 文件名清洗（去路径分隔符）
+     */
     private String sanitizeFilename(String name) {
         String safe = name == null ? "file" : name.replaceAll("[/\\\\]", "_");
         return safe.isBlank() ? "file" : safe;
     }
 
-    /** 内容 SHA-256 指纹（Hutool） */
+    /**
+     * 内容 SHA-256 指纹（Hutool）
+     */
     private String sha256(byte[] content) {
         return SecureUtil.sha256(new String(content, StandardCharsets.UTF_8));
     }

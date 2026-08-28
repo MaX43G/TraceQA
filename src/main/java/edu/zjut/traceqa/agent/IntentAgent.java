@@ -25,7 +25,6 @@ public class IntentAgent {
     @Resource
     private LlmService llmService;
 
-    
 
     /**
      * 识别用户消息意图（支持多轮历史）。
@@ -56,7 +55,9 @@ public class IntentAgent {
         }
     }
 
-    /** 拼接对话历史与当前消息（无历史时仅当前消息） */
+    /**
+     * 拼接对话历史与当前消息（无历史时仅当前消息）
+     */
     private String buildContextInput(String message, String history) {
         if (history == null || history.isBlank()) {
             return message;
@@ -64,7 +65,9 @@ public class IntentAgent {
         return "对话历史：\n" + history + "当前用户消息：" + message;
     }
 
-    /** 解析模型输出的意图编码 */
+    /**
+     * 解析模型输出的意图编码
+     */
     private IntentType parseIntent(String raw) {
         if (raw == null || raw.isBlank()) {
             return IntentType.UNKNOWN;

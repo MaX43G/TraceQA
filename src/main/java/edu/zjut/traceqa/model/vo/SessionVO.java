@@ -1,6 +1,9 @@
 package edu.zjut.traceqa.model.vo;
+
 import edu.zjut.traceqa.model.po.ChatSession;
+
 import java.time.LocalDateTime;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -25,7 +28,9 @@ public class SessionVO {
 
     private LocalDateTime updateTime;
 
-/** 由会话实体组装 */
+    /**
+     * 由会话实体组装
+     */
     public static SessionVO of(ChatSession session) {
         return new SessionVO(
                 session.getId(),

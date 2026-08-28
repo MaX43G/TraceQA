@@ -1,15 +1,20 @@
 <template>
   <div class="lightrag-manager">
-    <a-alert v-if="!loading && !lightrag" type="warning" show-icon message="LightRAG 面板加载失败" style="margin-bottom: 12px" />
+    <a-alert v-if="!loading && !lightrag" type="warning" show-icon message="LightRAG 面板加载失败"
+             style="margin-bottom: 12px"/>
 
     <!-- 顶部操作条 -->
     <a-space style="margin-bottom: 12px">
       <a-button type="primary" :loading="webuiLoading" @click="openWebui">
-        <template #icon><GlobalOutlined /></template>
+        <template #icon>
+          <GlobalOutlined/>
+        </template>
         打开 LightRAG WebUI
       </a-button>
       <a-button :loading="refreshing" @click="load(true)">
-        <template #icon><ReloadOutlined /></template>
+        <template #icon>
+          <ReloadOutlined/>
+        </template>
         刷新
       </a-button>
     </a-space>
@@ -25,15 +30,20 @@
               <a-descriptions-item label="当前任务">{{ pipeline?.job_name || '-' }}</a-descriptions-item>
               <a-descriptions-item label="批次进度">
                 <a-progress
-                  :percent="batchPercent"
-                  size="small"
-                  :status="pipeline?.busy ? 'active' : 'normal'"
+                    :percent="batchPercent"
+                    size="small"
+                    :status="pipeline?.busy ? 'active' : 'normal'"
                 />
-                <span class="lightrag-sub">第 {{ pipeline?.cur_batch ?? 0 }} / {{ pipeline?.batchs ?? 0 }} 批，待索引 {{ pipeline?.docs ?? 0 }} 篇</span>
+                <span class="lightrag-sub">第 {{ pipeline?.cur_batch ?? 0 }} / {{
+                    pipeline?.batchs ?? 0
+                  }} 批，待索引 {{ pipeline?.docs ?? 0 }} 篇</span>
               </a-descriptions-item>
               <a-descriptions-item label="最近消息">{{ pipeline?.latest_message || '-' }}</a-descriptions-item>
               <a-descriptions-item label="恢复状态">
-                <a-tag v-if="pipeline?.recovery_required" color="red">需恢复（{{ pipeline?.recovery_kind || '未知' }}）</a-tag>
+                <a-tag v-if="pipeline?.recovery_required" color="red">需恢复（{{
+                    pipeline?.recovery_kind || '未知'
+                  }}）
+                </a-tag>
                 <a-tag v-else color="green">正常</a-tag>
               </a-descriptions-item>
               <a-descriptions-item v-if="pipeline?.recovery_required && pipeline?.recovery_message" label="恢复说明">
@@ -70,16 +80,16 @@
           <a-card size="small" title="抽取进度">
             <template v-if="extractionStats.totalChunks">
               <a-progress
-                :percent="extractionPercent"
-                size="small"
-                :status="pipeline?.busy ? 'active' : 'normal'"
+                  :percent="extractionPercent"
+                  size="small"
+                  :status="pipeline?.busy ? 'active' : 'normal'"
               />
               <span class="lightrag-sub">
                 已处理 {{ extractionStats.processedChunks }} / {{ extractionStats.totalChunks }} 块，
                 共抽取 {{ extractionStats.entities }} 实体 + {{ extractionStats.relations }} 关系
               </span>
             </template>
-            <a-empty v-else description="暂无抽取任务" :image="false" />
+            <a-empty v-else description="暂无抽取任务" :image="false"/>
           </a-card>
         </a-col>
       </a-row>
@@ -90,19 +100,21 @@
             <template v-if="popularLabels.length">
               <a-tag v-for="label in popularLabels.slice(0, 20)" :key="label" class="label-chip">{{ label }}</a-tag>
             </template>
-            <a-empty v-else description="暂无实体" :image="false" />
+            <a-empty v-else description="暂无实体" :image="false"/>
           </a-card>
         </a-col>
         <a-col :span="12">
           <a-card size="small" title="运维操作">
             <div class="ops-row">
-              <a-popconfirm title="确认重试 LightRAG 中解析失败的文档？" @confirm="runOp('reprocess-failed', '重试失败文档')">
+              <a-popconfirm title="确认重试 LightRAG 中解析失败的文档？"
+                            @confirm="runOp('reprocess-failed', '重试失败文档')">
                 <a-button>重试失败文档</a-button>
               </a-popconfirm>
               <a-popconfirm title="确认清空 LightRAG 全部缓存？" @confirm="runOp('clear-cache', '清空缓存')">
                 <a-button>清空缓存</a-button>
               </a-popconfirm>
-              <a-popconfirm title="确认取消当前索引流水线？文档将被标记为失败" @confirm="runOp('cancel-pipeline', '取消流水线')">
+              <a-popconfirm title="确认取消当前索引流水线？文档将被标记为失败"
+                            @confirm="runOp('cancel-pipeline', '取消流水线')">
                 <a-button>取消流水线</a-button>
               </a-popconfirm>
               <a-popconfirm title="确认触发目录扫描？" @confirm="runOp('scan', '触发扫描')">
@@ -119,14 +131,15 @@
         <template v-if="recentMessages.length">
           <div class="log-console">
             <div
-              v-for="(msg, i) in recentMessages"
-              :key="i"
-              class="log-line"
-              :class="{ 'log-error': isErrorMsg(msg) }"
-            >{{ msg }}</div>
+                v-for="(msg, i) in recentMessages"
+                :key="i"
+                class="log-line"
+                :class="{ 'log-error': isErrorMsg(msg) }"
+            >{{ msg }}
+            </div>
           </div>
         </template>
-        <a-empty v-else description="暂无日志" :image="false" />
+        <a-empty v-else description="暂无日志" :image="false"/>
       </a-card>
     </template>
   </div>
@@ -137,9 +150,10 @@
  * LightRAG 管理页：展示引擎流水线状态、文档状态分布、模型信息、图谱实体，
  * 并提供运维操作与「打开 WebUI」入口。数据来自 /api/monitor/lightrag（后端带短缓存）。
  */
-import { getAuthHeaders } from '@/utils/request'
-import { GlobalOutlined, ReloadOutlined } from '@ant-design/icons-vue'
-import { message } from 'ant-design-vue'
+import {getAuthHeaders} from '@/utils/request'
+import {GlobalOutlined, ReloadOutlined} from '@ant-design/icons-vue'
+import {useIntervalFn} from '@vueuse/core'
+import {message} from 'ant-design-vue'
 
 interface PipelineStatus {
   busy?: boolean
@@ -190,9 +204,9 @@ const statusList = computed<{ status: string; count: number }[]>(() => {
   // 其中 all 为合计，不单独展示
   const counts = lightrag.value?.statusCounts?.status_counts ?? {}
   return Object.entries(counts)
-    .filter(([status]) => status !== 'all')
-    .map(([status, count]) => ({ status, count: Number(count) || 0 }))
-    .sort((a, b) => statusOrder(a.status) - statusOrder(b.status))
+      .filter(([status]) => status !== 'all')
+      .map(([status, count]) => ({status, count: Number(count) || 0}))
+      .sort((a, b) => statusOrder(a.status) - statusOrder(b.status))
 })
 
 const runningModelList = computed<string[]>(() => {
@@ -223,11 +237,11 @@ const extractionStats = computed(() => {
       relations += Number(m[4])
     }
   }
-  return { processedChunks, totalChunks, entities, relations }
+  return {processedChunks, totalChunks, entities, relations}
 })
 
 const extractionPercent = computed<number>(() => {
-  const { processedChunks, totalChunks } = extractionStats.value
+  const {processedChunks, totalChunks} = extractionStats.value
   if (!totalChunks) {
     return 0
   }
@@ -239,7 +253,7 @@ const recentMessages = computed<string[]>(() => [...(pipeline.value.history_mess
 
 /** 运行日志错误行标记 */
 function isErrorMsg(msg: string): boolean {
-  return /^(Failed|Traceback|Error|\[purge\])/i.test(msg) || /RateLimit|error|exception/i.test(msg)
+  return /^(Failed|Traceback|Error|\[purge])/i.test(msg) || /RateLimit|error|exception/i.test(msg)
 }
 
 function statusOrder(status: string): number {
@@ -278,7 +292,7 @@ async function load(manual = false): Promise<void> {
     refreshing.value = true
   }
   try {
-    const res = await fetch('/api/monitor/lightrag', { headers: getAuthHeaders() })
+    const res = await fetch('/api/monitor/lightrag', {headers: getAuthHeaders()})
     const json = (await res.json()) as { code?: number; data?: LightragPanel }
     if (json.code === 200 && json.data) {
       lightrag.value = json.data
@@ -301,11 +315,12 @@ async function openWebui(): Promise<void> {
     })
     const json = (await res.json()) as { code?: number; msg?: string }
     if (json.code !== 200) {
-      throw new Error(json.msg || '获取访问会话失败')
+      await message.error(json.msg || '获取访问会话失败')
+      return
     }
     window.open('/lightrag-webui/webui/', '_blank', 'noopener')
   } catch (err) {
-    message.error((err as Error).message || '打开 WebUI 失败')
+    await message.error((err as Error).message || '打开 WebUI 失败')
   } finally {
     webuiLoading.value = false
   }
@@ -317,20 +332,22 @@ async function runOp(action: string, label: string): Promise<void> {
   try {
     const res = await fetch(`/api/monitor/lightrag/${action}`, {
       method: 'POST',
-      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' }
+      headers: {...getAuthHeaders(), 'Content-Type': 'application/json'}
     })
     const json = (await res.json()) as { code?: number; msg?: string; data?: { message?: string; status?: string } }
     if (json.code === 200) {
       const text = json.data?.message || json.data?.status || '操作已提交'
       opMsg.value = `${label}：${text}`
-      message.success(`${label}成功`)
+      await message.success(`${label}成功`)
       await load()
     } else {
-      throw new Error(json.msg || '操作失败')
+      const msg = json.msg || '操作失败'
+      opMsg.value = `${label}失败：${msg}`
+      await message.error(opMsg.value)
     }
   } catch (err) {
     opMsg.value = `${label}失败：${(err as Error).message}`
-    message.error(opMsg.value)
+    await message.error(opMsg.value)
   }
 }
 
@@ -346,14 +363,17 @@ onMounted(() => {
   font-size: 12px;
   color: #86909c;
 }
+
 .label-chip {
   margin: 2px;
 }
+
 .ops-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
+
 .log-console {
   max-height: 320px;
   overflow-y: auto;
@@ -366,9 +386,11 @@ onMounted(() => {
   white-space: pre-wrap;
   word-break: break-all;
 }
+
 .log-line {
   color: #c9cdd4;
 }
+
 .log-line.log-error {
   color: #ff7875;
 }

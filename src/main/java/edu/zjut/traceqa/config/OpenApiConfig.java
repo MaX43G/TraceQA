@@ -18,15 +18,19 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiConfig {
 
-    /** 组装 OpenAPI 文档元信息与 JWT 认证声明 */
+    /**
+     * 组装 OpenAPI 文档元信息与 JWT 认证声明
+     */
     @Bean
     public OpenAPI traceQaOpenApi() {
         String schemeName = "bearerAuth";
         return new OpenAPI()
                 .info(new Info()
                         .title("溯知 / TraceQA API")
-                        .description("《数据挖掘》课程 RAG 智能问答平台接口规范\n\n"
-                                + "统一响应结构：code/msg/data/traceId。前端仅依据 code 判断成功或失败。")
+                        .description("""
+                                《数据挖掘》课程 RAG 智能问答平台接口规范
+                                
+                                统一响应结构：code/msg/data/traceId。前端仅依据 code 判断成功或失败。""")
                         .version("1.0.0"))
                 .components(new Components().addSecuritySchemes(schemeName,
                         new SecurityScheme()

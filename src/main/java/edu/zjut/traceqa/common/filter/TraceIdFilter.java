@@ -8,6 +8,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -29,14 +30,16 @@ import java.util.UUID;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class TraceIdFilter extends OncePerRequestFilter {
 
-    /** 上游透传 traceId 的请求头名称 */
+    /**
+     * 上游透传 traceId 的请求头名称
+     */
     public static final String TRACE_HEADER = "X-Trace-Id";
 
     @Resource
     private MonitorService monitorService;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+    protected void doFilterInternal(@NonNull HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String traceId = resolveTraceId(request);
         TraceIdHolder.set(traceId);
@@ -56,7 +59,9 @@ public class TraceIdFilter extends OncePerRequestFilter {
         }
     }
 
-    /** 解析 traceId：优先沿用上游透传值，否则生成新值 */
+    /**
+     * 解析 traceId：优先沿用上游透传值，否则生成新值
+     */
     private String resolveTraceId(HttpServletRequest request) {
         String upstream = request.getHeader(TRACE_HEADER);
         if (upstream != null && !upstream.isBlank()) {

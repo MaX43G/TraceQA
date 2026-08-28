@@ -21,9 +21,13 @@ import java.util.function.Supplier;
 @Service
 public class LightRagMonitorService {
 
-    /** 只读面板数据缓存有效期（毫秒） */
+    /**
+     * 只读面板数据缓存有效期（毫秒）
+     */
     private static final long CACHE_TTL_MS = 8000L;
-    /** 图谱热门标签数量 */
+    /**
+     * 图谱热门标签数量
+     */
     private static final int POPULAR_LABELS_LIMIT = 50;
 
     @Resource
@@ -32,7 +36,9 @@ public class LightRagMonitorService {
     private volatile Map<String, Object> cached;
     private volatile long cacheExpireAt = 0L;
 
-    /** 组装 LightRAG 只读信息面板（带短缓存） */
+    /**
+     * 组装 LightRAG 只读信息面板（带短缓存）
+     */
     public Map<String, Object> snapshot() {
         long now = System.currentTimeMillis();
         if (cached != null && now < cacheExpireAt) {
@@ -49,27 +55,37 @@ public class LightRagMonitorService {
         return data;
     }
 
-    /** 重试 LightRAG 中解析失败的文档 */
+    /**
+     * 重试 LightRAG 中解析失败的文档
+     */
     public Map<String, Object> reprocessFailed() {
         return lightRagClient.reprocessFailed();
     }
 
-    /** 清空 LightRAG 缓存 */
+    /**
+     * 清空 LightRAG 缓存
+     */
     public Map<String, Object> clearCache() {
         return lightRagClient.clearCache();
     }
 
-    /** 取消当前运行的索引流水线 */
+    /**
+     * 取消当前运行的索引流水线
+     */
     public Map<String, Object> cancelPipeline() {
         return lightRagClient.cancelPipeline();
     }
 
-    /** 触发 LightRAG 目录扫描 */
+    /**
+     * 触发 LightRAG 目录扫描
+     */
     public Map<String, Object> scanDocuments() {
         return lightRagClient.scanDocuments();
     }
 
-    /** 单点查询失败时降级为空，不拖垮整个面板 */
+    /**
+     * 单点查询失败时降级为空，不拖垮整个面板
+     */
     private Map<String, Object> safeGet(Supplier<Map<String, Object>> supplier) {
         try {
             Map<String, Object> result = supplier.get();
@@ -80,7 +96,9 @@ public class LightRagMonitorService {
         }
     }
 
-    /** 列表型查询失败时降级为空列表 */
+    /**
+     * 列表型查询失败时降级为空列表
+     */
     private List<String> safeGetList(Supplier<List<String>> supplier) {
         try {
             List<String> result = supplier.get();

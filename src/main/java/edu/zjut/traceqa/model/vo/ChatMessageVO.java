@@ -1,7 +1,10 @@
 package edu.zjut.traceqa.model.vo;
+
 import edu.zjut.traceqa.model.po.ChatMessage;
+
 import java.time.LocalDateTime;
 import java.util.List;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -30,7 +33,9 @@ public class ChatMessageVO {
 
     private LocalDateTime createTime;
 
-/** 由消息实体 + 已解析列表组装 */
+    /**
+     * 由消息实体 + 已解析列表组装
+     */
     public static ChatMessageVO of(ChatMessage message,
                                    List<ThinkingNodeVO> thinkingTrace,
                                    List<ReferenceVO> references) {

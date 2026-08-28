@@ -71,13 +71,13 @@
           </a-space>
         </div>
         <template v-else>
-<ChatMessageItem
-            v-for="msg in chat.messages"
-            :key="msg.id"
-            :msg="msg"
-            :streaming="isStreamingMsg(msg)"
-            @delete="handleDeleteMessage"
-            @ask="handleFollowup"
+          <ChatMessageItem
+              v-for="msg in chat.messages"
+              :key="msg.id"
+              :msg="msg"
+              :streaming="isStreamingMsg(msg)"
+              @delete="handleDeleteMessage"
+              @ask="handleFollowup"
           />
         </template>
       </div>
@@ -164,7 +164,7 @@ async function handleRemove(session: SessionVO): Promise<void> {
     cancelText: '取消',
     onOk: async () => {
       await chat.removeSession(session.id || -1)
-      message.success('会话已删除')
+      await message.success('会话已删除')
     }
   })
 }
@@ -175,14 +175,14 @@ async function handleDeleteMessage(messageId: number): Promise<void> {
   if (chat.currentSessionId) {
     await chat.openSession(chat.currentSessionId)
   }
-  message.success('消息已删除')
+  await message.success('消息已删除')
 }
 
 async function handleExport(): Promise<void> {
   try {
     const md = await chat.exportCurrentSession()
     if (!md) {
-      message.warning('当前会话为空')
+      await message.warning('当前会话为空')
       return
     }
     const blob = new Blob([md], {type: 'text/markdown;charset=utf-8'})
@@ -192,9 +192,9 @@ async function handleExport(): Promise<void> {
     a.download = `traceqa-${chat.currentSessionId}.md`
     a.click()
     URL.revokeObjectURL(url)
-    message.success('已导出 Markdown')
+    await message.success('已导出 Markdown')
   } catch (err) {
-    message.error((err as Error).message || '导出失败')
+    await message.error((err as Error).message || '导出失败')
   }
 }
 
@@ -213,8 +213,8 @@ async function loadFollowup(content: string, streamMsg: StreamMessage): Promise<
   try {
     const res = await fetch('/api/chat/followup', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-      body: JSON.stringify({ content, answer: streamMsg.buffer || '' })
+      headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
+      body: JSON.stringify({content, answer: streamMsg.buffer || ''})
     })
     const json = await res.json()
     if (json.code === 200 && Array.isArray(json.data) && json.data.length) {

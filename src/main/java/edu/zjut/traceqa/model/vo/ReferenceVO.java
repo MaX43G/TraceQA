@@ -1,4 +1,5 @@
 package edu.zjut.traceqa.model.vo;
+
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -13,22 +14,34 @@ import java.util.List;
 @NoArgsConstructor
 public class ReferenceVO {
 
-    /** 引用序号（对应回答中的 [citation:N]） */
+    /**
+     * 引用序号（对应回答中的 [citation:N]）
+     */
     private Integer index;
 
-    /** 来源标题（通常是文件名） */
+    /**
+     * 来源标题（通常是文件名）
+     */
     private String title;
 
-    /** LightRAG 来源文件路径 */
+    /**
+     * LightRAG 来源文件路径
+     */
     private String filePath;
 
-    /** 原始片段文本 */
+    /**
+     * 原始片段文本
+     */
     private String content;
 
-    /** 章节路径（如 Section 1 → Subsection 1.2），可空 */
+    /**
+     * 章节路径（如 Section 1 → Subsection 1.2），可空
+     */
     private List<String> headings;
 
-    /** 命中高亮术语（来自用户问题，前端用于片段内高亮），可空 */
+    /**
+     * 命中高亮术语（来自用户问题，前端用于片段内高亮），可空
+     */
     private List<String> highlight;
 
     public ReferenceVO(Integer index, String title, String filePath, String content) {

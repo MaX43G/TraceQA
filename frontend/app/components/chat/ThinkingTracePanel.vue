@@ -182,19 +182,9 @@ function titleOf(stage: string): string {
 }
 
 /* 状态样式 */
-.flow-node.is-done {
-  border-color: #95de64;
-}
 
 .flow-node.is-done .flow-node__dot {
   color: #52c41a;
-}
-
-.flow-node.is-running {
-  border-color: #1677ff;
-  background: #e6f4ff;
-  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.12);
-  animation: flow-pulse 1.5s ease-in-out infinite;
 }
 
 .flow-node.is-running .flow-node__dot {
@@ -206,16 +196,8 @@ function titleOf(stage: string): string {
   font-weight: 600;
 }
 
-.flow-node.is-failed {
-  border-color: #ff7875;
-}
-
 .flow-node.is-failed .flow-node__dot {
   color: #ff4d4f;
-}
-
-.flow-node.is-pending {
-  opacity: 0.55;
 }
 
 .flow-node.is-pending .flow-node__dot {

@@ -15,18 +15,28 @@ import lombok.EqualsAndHashCode;
 @TableName("t_system_prompt")
 public class SystemPrompt extends BaseEntity {
 
-    /** 提示词场景编码（chat/rewrite/hyde/summary...），同一场景仅一个生效 */
+    /**
+     * 提示词场景编码（chat/rewrite/hyde/summary...），同一场景仅一个生效
+     */
     private String scenario;
 
-    /** 提示词名称 */
+    /**
+     * 提示词名称
+     */
     private String name;
 
-    /** 提示词内容（支持 {placeholder} 模板变量） */
+    /**
+     * 提示词内容（支持 {placeholder} 模板变量）
+     */
     private String content;
 
-    /** 是否启用：1 启用，0 停用 */
+    /**
+     * 是否启用：1 启用，0 停用
+     */
     private Integer enabled;
 
-    /** 备注 */
+    /**
+     * 备注
+     */
     private String remark;
 }

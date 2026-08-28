@@ -26,7 +26,9 @@ public class RedisCacheService {
     @Resource
     private ObjectMapper objectMapper;
 
-    /** 写入缓存（带 TTL） */
+    /**
+     * 写入缓存（带 TTL）
+     */
     public void put(String key, Object value, Duration ttl) {
         try {
             stringRedisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(value), ttl);
@@ -35,7 +37,9 @@ public class RedisCacheService {
         }
     }
 
-    /** 读取缓存（简单类型） */
+    /**
+     * 读取缓存（简单类型）
+     */
     public <T> Optional<T> get(String key, Class<T> type) {
         try {
             String json = stringRedisTemplate.opsForValue().get(key);
@@ -51,7 +55,9 @@ public class RedisCacheService {
         }
     }
 
-    /** 读取缓存（泛型，如 List） */
+    /**
+     * 读取缓存（泛型，如 List）
+     */
     public <T> Optional<T> get(String key, TypeReference<T> typeRef) {
         try {
             String json = stringRedisTemplate.opsForValue().get(key);
@@ -67,7 +73,9 @@ public class RedisCacheService {
         }
     }
 
-    /** 删除缓存 */
+    /**
+     * 删除缓存
+     */
     public void delete(String key) {
         try {
             stringRedisTemplate.delete(key);

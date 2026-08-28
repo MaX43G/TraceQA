@@ -7,25 +7,25 @@
       </div>
       <div class="app-header__nav">
         <a-button
-          v-for="item in staticNav"
-          :key="item.path"
-          type="text"
-          class="app-header__nav-btn"
-          :class="{ 'is-active': isActive(item.path) }"
-          @click="navigateTo(item.path)"
+            v-for="item in staticNav"
+            :key="item.path"
+            type="text"
+            class="app-header__nav-btn"
+            :class="{ 'is-active': isActive(item.path) }"
+            @click="navigateTo(item.path)"
         >
-          <component :is="item.icon" class="app-header__nav-icon" />
+          <component :is="item.icon" class="app-header__nav-icon"/>
           {{ item.label }}
         </a-button>
         <ClientOnly>
           <a-button
-            v-if="auth.isAdmin"
-            type="text"
-            class="app-header__nav-btn"
-            :class="{ 'is-active': isActive('/admin') }"
-            @click="navigateTo('/admin')"
+              v-if="auth.isAdmin"
+              type="text"
+              class="app-header__nav-btn"
+              :class="{ 'is-active': isActive('/admin') }"
+              @click="navigateTo('/admin')"
           >
-            <SettingOutlined class="app-header__nav-icon" />
+            <SettingOutlined class="app-header__nav-icon"/>
             管理后台
           </a-button>
         </ClientOnly>
@@ -35,7 +35,7 @@
           <template v-if="auth.isLoggedIn">
             <a-dropdown>
               <a-space class="app-header__user-info">
-                <a-avatar v-if="auth.userInfo?.avatar" :size="28" :src="auth.userInfo.avatar" />
+                <a-avatar v-if="auth.userInfo?.avatar" :size="28" :src="auth.userInfo.avatar"/>
                 <a-avatar v-else size="28" style="background: linear-gradient(135deg, #1677ff, #06b6d4)">
                   {{ (auth.userInfo?.nickname || 'U').charAt(0) }}
                 </a-avatar>
@@ -44,12 +44,12 @@
               <template #overlay>
                 <a-menu>
                   <a-menu-item key="personal" @click="navigateTo('/personal')">
-                    <UserOutlined />
+                    <UserOutlined/>
                     个人信息
                   </a-menu-item>
-                  <a-menu-divider />
+                  <a-menu-divider/>
                   <a-menu-item key="logout" @click="handleLogout">
-                    <LogoutOutlined />
+                    <LogoutOutlined/>
                     退出登录
                   </a-menu-item>
                 </a-menu>
@@ -63,34 +63,36 @@
 
         <!-- 移动端：展开导航抽屉 -->
         <a-button class="app-header__menu-btn" type="text" @click="drawerOpen = true">
-          <template #icon><MenuOutlined /></template>
+          <template #icon>
+            <MenuOutlined/>
+          </template>
         </a-button>
       </div>
     </a-layout-header>
     <a-layout-content class="app-content">
-      <slot />
+      <slot/>
     </a-layout-content>
 
     <!-- 移动端导航抽屉 -->
     <a-drawer v-model:open="drawerOpen" placement="right" :width="240" title="导航" :closable="false">
       <div class="app-drawer-nav">
         <a-button
-          v-for="item in navItems"
-          :key="item.path"
-          block
-          size="large"
-          type="text"
-          class="app-drawer-nav__item"
-          :class="{ 'is-active': isActive(item.path) }"
-          @click="navigateTo(item.path); drawerOpen = false"
+            v-for="item in navItems"
+            :key="item.path"
+            block
+            size="large"
+            type="text"
+            class="app-drawer-nav__item"
+            :class="{ 'is-active': isActive(item.path) }"
+            @click="navigateTo(item.path); drawerOpen = false"
         >
-          <component :is="item.icon" />
+          <component :is="item.icon"/>
           {{ item.label }}
         </a-button>
       </div>
     </a-drawer>
 
-    </a-layout>
+  </a-layout>
 </template>
 
 <script setup lang="ts">
@@ -105,23 +107,23 @@ import {
   SettingOutlined,
   MenuOutlined
 } from '@ant-design/icons-vue'
-import { useAuthStore } from '@/stores/auth'
+import {useAuthStore} from '@/stores/auth'
 
 const auth = useAuthStore()
 const route = useRoute()
 const drawerOpen = ref(false)
 
 const staticNav = [
-  { label: '首页', path: '/', icon: HomeOutlined },
-  { label: '智能问答', path: '/chat', icon: MessageOutlined }
+  {label: '首页', path: '/', icon: HomeOutlined},
+  {label: '智能问答', path: '/chat', icon: MessageOutlined}
 ]
 
 const navItems = computed(() =>
-  [
-    { label: '首页', path: '/', icon: HomeOutlined },
-    { label: '智能问答', path: '/chat', icon: MessageOutlined },
-    { label: '管理后台', path: '/admin', icon: SettingOutlined, adminOnly: true }
-  ].filter((n) => !n.adminOnly || auth.isAdmin)
+    [
+      {label: '首页', path: '/', icon: HomeOutlined},
+      {label: '智能问答', path: '/chat', icon: MessageOutlined},
+      {label: '管理后台', path: '/admin', icon: SettingOutlined, adminOnly: true}
+    ].filter((n) => !n.adminOnly || auth.isAdmin)
 )
 
 /** 当前路由是否命中导航项（首页匹配根路径） */

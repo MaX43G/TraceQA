@@ -36,9 +36,13 @@ public class DocumentQueueWorker {
 
     private static final String STREAM_KEY = "doc:queue";
     private static final String DEAD_KEY = "doc:queue:dead";
-    /** 最大重试次数 */
+    /**
+     * 最大重试次数
+     */
     private static final int MAX_RETRY = 3;
-    /** 重试退避基础（秒）：retry 1 → 5s，2 → 10s，3 → 15s */
+    /**
+     * 重试退避基础（秒）：retry 1 → 5s，2 → 10s，3 → 15s
+     */
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
@@ -48,10 +52,14 @@ public class DocumentQueueWorker {
     @Resource
     private DocumentParseWorker parseWorker;
 
-    /** 当前处理中的文档数（统计用） */
+    /**
+     * 当前处理中的文档数（统计用）
+     */
     private final AtomicInteger processingCount = new AtomicInteger(0);
 
-    /** 入队：提交一个文档解析任务 */
+    /**
+     * 入队：提交一个文档解析任务
+     */
     public void enqueue(Long documentId) {
         try {
             StreamOperations<String, Object, Object> ops = stringRedisTemplate.opsForStream();
@@ -59,11 +67,13 @@ public class DocumentQueueWorker {
             log.debug("文档任务已入队：docId={}", documentId);
         } catch (Exception e) {
             log.warn("文档任务入队失败，降级为直接解析：docId={}, err={}", documentId, e.getMessage());
-            dispatch(Long.valueOf(documentId), 0);
+            dispatch(documentId);
         }
     }
 
-    /** 启动消费线程（守护线程） */
+    /**
+     * 启动消费线程（守护线程）
+     */
     @PostConstruct
     public void start() {
         Thread consumer = new Thread(this::consumeLoop, "doc-queue-consumer");
@@ -72,7 +82,9 @@ public class DocumentQueueWorker {
         log.info("文档解析任务队列消费者已启动");
     }
 
-    /** 阻塞消费循环：读任务 -> 同步解析 -> 成功删除 / 失败重试或进死信 */
+    /**
+     * 阻塞消费循环：读任务 -> 同步解析 -> 成功删除 / 失败重试或进死信
+     */
     private void consumeLoop() {
         while (!Thread.currentThread().isInterrupted()) {
             try {
@@ -89,14 +101,12 @@ public class DocumentQueueWorker {
                     int retry = (int) parseLong(record.getValue().get("retry"));
                     boolean ok = false;
                     try {
-                        ok = dispatch(documentId, retry);
+                        ok = dispatch(documentId);
                     } catch (Exception e) {
                         log.warn("文档任务处理异常：docId={}, err={}", documentId, e.getMessage());
                     }
-                    if (ok) {
-                        ops.delete(STREAM_KEY, recordId);
-                    } else {
-                        ops.delete(STREAM_KEY, recordId);
+                    ops.delete(STREAM_KEY, recordId);
+                    if (!ok) {
                         handleRetryOrDead(documentId, retry);
                     }
                 }
@@ -107,8 +117,10 @@ public class DocumentQueueWorker {
         }
     }
 
-    /** 处理单个任务：读取文档并同步解析，返回是否成功 */
-    private boolean dispatch(Long documentId, int retry) {
+    /**
+     * 处理单个任务：读取文档并同步解析，返回是否成功
+     */
+    private boolean dispatch(Long documentId) {
         if (documentId == null) {
             return true;
         }
@@ -135,7 +147,9 @@ public class DocumentQueueWorker {
         }
     }
 
-    /** 失败处理：重试（指数退避）或进入死信队列 */
+    /**
+     * 失败处理：重试（指数退避）或进入死信队列
+     */
     private void handleRetryOrDead(Long documentId, int retry) {
         int nextRetry = retry + 1;
         if (nextRetry <= MAX_RETRY) {
@@ -155,17 +169,19 @@ public class DocumentQueueWorker {
             } catch (Exception e) {
                 log.warn("死信写入失败：docId={}, err={}", documentId, e.getMessage());
             }
-            markFailed(documentId, "解析重试耗尽，已进入失败队列");
+            markFailed(documentId);
         }
     }
 
-    /** 死信兜底：确保文档标记为失败（正常情况下 parse 已标记） */
-    private void markFailed(Long documentId, String message) {
+    /**
+     * 死信兜底：确保文档标记为失败（正常情况下 parse 已标记）
+     */
+    private void markFailed(Long documentId) {
         try {
             Document doc = documentMapper.selectById(documentId);
             if (doc != null && !DocumentStatus.DONE.name().equals(doc.getStatus())) {
                 doc.setStatus(DocumentStatus.FAILED.name());
-                doc.setErrorMsg(message);
+                doc.setErrorMsg("解析重试耗尽，已进入失败队列");
                 documentMapper.updateById(doc);
             }
         } catch (Exception e) {
@@ -173,7 +189,9 @@ public class DocumentQueueWorker {
         }
     }
 
-    /** 解析队列统计（管理后台可视化） */
+    /**
+     * 解析队列统计（管理后台可视化）
+     */
     public Map<String, Object> queueStats() {
         Map<String, Object> stats = new HashMap<>();
         try {

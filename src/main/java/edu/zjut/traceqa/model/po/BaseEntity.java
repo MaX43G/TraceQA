@@ -10,6 +10,7 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
@@ -25,21 +26,30 @@ import java.time.LocalDateTime;
 @SuperBuilder
 public abstract class BaseEntity implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
-    /** 主键（雪花 ID） */
+    /**
+     * 主键（雪花 ID）
+     */
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
-    /** 创建时间（插入时自动填充） */
+    /**
+     * 创建时间（插入时自动填充）
+     */
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
-    /** 更新时间（插入/更新时自动填充） */
+    /**
+     * 更新时间（插入/更新时自动填充）
+     */
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 
-    /** 逻辑删除标记：0 未删除，1 已删除 */
+    /**
+     * 逻辑删除标记：0 未删除，1 已删除
+     */
     @TableLogic
     @TableField("deleted")
     private Integer deleted;

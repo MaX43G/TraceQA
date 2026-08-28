@@ -25,36 +25,39 @@ public class ChatStreamRequest {
      */
     private Long knowledgeBaseId;
 
-    @NotBlank(message = "消息内容不能为空")
-    @Size(max = 2000, message = "消息内容过长")
 
     /**
      * 用户消息内容
      */
+    @NotBlank(message = "消息内容不能为空")
+    @Size(max = 2000, message = "消息内容过长")
     private String content;
 
-    @Size(max = 128, message = "模型名称过长")
     /**
      * 选中的服务端模型名（如 Qwen/Qwen3-8B，走平台默认 Base URL/API Key）
      */
-    private String serverModel;
 
     @Size(max = 128, message = "模型名称过长")
+    private String serverModel;
+
+
     /**
      * 自定义模型名称（仅使用自定义模型时提供）
      */
+    @Size(max = 128, message = "模型名称过长")
     private String model;
 
-    @Size(max = 512, message = "接口地址过长")
+
     /**
      * 自定义模型 OpenAI 兼容地址（仅使用自定义模型时提供）
      */
+    @Size(max = 512, message = "接口地址过长")
     private String baseUrl;
 
-    @Size(max = 256, message = "API Key 过长")
     /**
-     * 自定义模型 API Key（仅本次请求使用，不持久化）
+     * 自定义模型 API Key（不持久化）
      */
+    @Size(max = 256, message = "API Key 过长")
     private String apiKey;
 
     /**

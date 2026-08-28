@@ -10,7 +10,6 @@ import edu.zjut.traceqa.model.po.User;
 import edu.zjut.traceqa.mapper.UserMapper;
 import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.lang.NonNull;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -26,7 +25,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    /** Prometheus 抓取令牌请求头 */
+    /**
+     * Prometheus 抓取令牌请求头
+     */
     private static final String SCRAPE_TOKEN_HEADER = "X-Scrape-Token";
 
     @Resource
@@ -39,39 +40,41 @@ public class WebConfig implements WebMvcConfigurer {
     private AppProperties appProperties;
 
     @Override
-    public void addInterceptors(@NonNull InterceptorRegistry registry) {
+    public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(rateLimitInterceptor)
                 .addPathPatterns("/api/**");
         // sa-token 拦截器：路由规则强制登录 + 自动解析 @SaCheckXxx 注解
-        registry.addInterceptor(new SaInterceptor(handle -> {
-            // 业务 API：除放行项外需登录
-            SaRouter.match("/api/**")
-                    .notMatch("/api/auth/login", "/api/auth/register", "/api/health",
-                            "/api/announcement/active")
-                    .check(r -> {
-                        StpUtil.checkLogin();
-                        checkUserEnabled();
-                    });
-            // Prometheus 抓取端点：携带合法抓取令牌或管理员身份放行
-            SaRouter.match("/actuator/prometheus")
-                    .check(r -> {
-                        if (hasScrapeToken()) {
-                            SaRouter.stop();
-                        }
-                        StpUtil.checkLogin();
-                        StpUtil.checkRole("ADMIN");
-                    });
-            // 其余可观测性端点：仅管理员
-            SaRouter.match("/actuator/**")
-                    .check(r -> {
-                        StpUtil.checkLogin();
-                        StpUtil.checkRole("ADMIN");
-                    });
-        }))
+        registry.addInterceptor(new SaInterceptor(_ -> {
+                    // 业务 API：除放行项外需登录
+                    SaRouter.match("/api/**")
+                            .notMatch("/api/auth/login", "/api/auth/register", "/api/health",
+                                    "/api/announcement/active")
+                            .check(_ -> {
+                                StpUtil.checkLogin();
+                                checkUserEnabled();
+                            });
+                    // Prometheus 抓取端点：携带合法抓取令牌或管理员身份放行
+                    SaRouter.match("/actuator/prometheus")
+                            .check(_ -> {
+                                if (hasScrapeToken()) {
+                                    SaRouter.stop();
+                                }
+                                StpUtil.checkLogin();
+                                StpUtil.checkRole("ADMIN");
+                            });
+                    // 其余可观测性端点：仅管理员
+                    SaRouter.match("/actuator/**")
+                            .check(_ -> {
+                                StpUtil.checkLogin();
+                                StpUtil.checkRole("ADMIN");
+                            });
+                }))
                 .addPathPatterns("/api/**", "/actuator/**");
     }
 
-    /** 请求是否携带与配置一致的 Prometheus 抓取令牌 */
+    /**
+     * 请求是否携带与配置一致的 Prometheus 抓取令牌
+     */
     private boolean hasScrapeToken() {
         String expected = appProperties.getObservability().getScrapeToken();
         if (expected == null || expected.isBlank()) {
@@ -81,7 +84,9 @@ public class WebConfig implements WebMvcConfigurer {
         return expected.equals(provided);
     }
 
-    /** 校验当前登录用户是否被禁用；被禁用则强制注销并视为未登录 */
+    /**
+     * 校验当前登录用户是否被禁用；被禁用则强制注销并视为未登录
+     */
     private void checkUserEnabled() {
         try {
             Long userId = StpUtil.getLoginIdAsLong();

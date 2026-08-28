@@ -3,7 +3,7 @@
     <a-card :bordered="false" class="admin-card">
       <template #title>
         <a-space>
-          <ToolOutlined />
+          <ToolOutlined/>
           <span>管理后台</span>
         </a-space>
       </template>
@@ -12,25 +12,25 @@
       </template>
       <a-tabs v-model:active-key="activeKey" class="admin-tabs">
         <a-tab-pane key="kb" tab="知识库管理">
-          <KnowledgeBaseManager v-if="activeKey === 'kb'" />
+          <KnowledgeBaseManager v-if="activeKey === 'kb'"/>
         </a-tab-pane>
         <a-tab-pane key="doc" tab="文档管理">
-          <DocumentManager v-if="activeKey === 'doc'" />
+          <DocumentManager v-if="activeKey === 'doc'"/>
         </a-tab-pane>
         <a-tab-pane key="prompt" tab="系统提示词">
-          <PromptManager v-if="activeKey === 'prompt'" />
+          <PromptManager v-if="activeKey === 'prompt'"/>
         </a-tab-pane>
         <a-tab-pane key="user" tab="用户与权限">
-          <UserManager v-if="activeKey === 'user'" />
+          <UserManager v-if="activeKey === 'user'"/>
         </a-tab-pane>
         <a-tab-pane key="lightrag" tab="LightRAG 管理">
-          <LightRagManager v-if="activeKey === 'lightrag'" />
+          <LightRagManager v-if="activeKey === 'lightrag'"/>
         </a-tab-pane>
         <a-tab-pane key="announcement" tab="公告管理">
-          <AnnouncementManager v-if="activeKey === 'announcement'" />
+          <AnnouncementManager v-if="activeKey === 'announcement'"/>
         </a-tab-pane>
         <a-tab-pane key="monitor" tab="系统监控">
-          <MonitorPanel v-if="activeKey === 'monitor'" />
+          <MonitorPanel v-if="activeKey === 'monitor'"/>
         </a-tab-pane>
       </a-tabs>
     </a-card>
@@ -41,8 +41,8 @@
 /**
  * 管理后台页面（RBAC：仅 ADMIN 角色可访问）。
  */
-import { useAuthStore } from '@/stores/auth'
-import { ToolOutlined } from '@ant-design/icons-vue'
+import {useAuthStore} from '@/stores/auth'
+import {ToolOutlined} from '@ant-design/icons-vue'
 import KnowledgeBaseManager from '@/components/admin/KnowledgeBaseManager.vue'
 import DocumentManager from '@/components/admin/DocumentManager.vue'
 import PromptManager from '@/components/admin/PromptManager.vue'

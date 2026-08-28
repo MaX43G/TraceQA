@@ -30,7 +30,6 @@ public class KnowledgeBaseController {
     @Resource
     private KnowledgeBaseService knowledgeBaseService;
 
-    
 
     @Operation(summary = "查询知识库列表")
     @GetMapping

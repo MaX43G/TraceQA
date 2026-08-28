@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+
 import edu.zjut.traceqa.common.convert.DtoMapper;
 
 /**
@@ -33,7 +34,6 @@ public class SystemPromptController {
     @Resource
     private SystemPromptService systemPromptService;
 
-    
 
     @Operation(summary = "查询全部系统提示词")
     @GetMapping
@@ -44,7 +44,7 @@ public class SystemPromptController {
     @Operation(summary = "创建系统提示词（平台预置场景，不支持新增）")
     @PostMapping
     @SaCheckPermission("prompt:manage")
-    public ApiResponse<SystemPromptDTO> create(@Valid @RequestBody SystemPromptDTO dto) {
+    public ApiResponse<SystemPromptDTO> create() {
         throw new BizException(ErrorCode.PARAM_ERROR,
                 "系统提示词由平台预置，管理员仅可编辑已有提示词，不支持新增场景");
     }
@@ -67,7 +67,9 @@ public class SystemPromptController {
     }
 
 
-    /** DTO 转实体 */
+    /**
+     * DTO 转实体
+     */
     private SystemPrompt toEntity(SystemPromptDTO dto) {
         SystemPrompt prompt = new SystemPrompt();
         prompt.setScenario(dto.getScenario());

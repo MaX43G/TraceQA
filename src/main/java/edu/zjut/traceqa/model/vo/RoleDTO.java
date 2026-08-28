@@ -1,6 +1,9 @@
 package edu.zjut.traceqa.model.vo;
+
 import edu.zjut.traceqa.model.po.Role;
+
 import java.time.LocalDateTime;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -25,7 +28,9 @@ public class RoleDTO {
 
     private LocalDateTime updateTime;
 
-/** 由角色实体组装 */
+    /**
+     * 由角色实体组装
+     */
     public static RoleDTO of(Role role) {
         return new RoleDTO(role.getId(), role.getCode(), role.getName(),
                 role.getPermissions(), role.getDescription(), role.getUpdateTime());
