@@ -13,6 +13,7 @@ import edu.zjut.traceqa.mapper.UserMapper;
 import edu.zjut.traceqa.mapper.AnnouncementMapper;
 import edu.zjut.traceqa.model.po.Announcement;
 import edu.zjut.traceqa.service.AuthService;
+import edu.zjut.traceqa.service.FileStorageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -45,6 +46,8 @@ public class DataInitializer implements ApplicationRunner {
     @Resource
     private AnnouncementMapper announcementMapper;
     @Resource
+    private FileStorageService fileStorageService;
+    @Resource
     private PasswordEncoder passwordEncoder;
 
     @Override
@@ -55,6 +58,7 @@ public class DataInitializer implements ApplicationRunner {
         initKnowledgeBase();
         initSystemPrompts();
         initAnnouncement();
+        fileStorageService.ensureBucketConfigured();
         log.info("系统初始化数据装载完成");
     }
 

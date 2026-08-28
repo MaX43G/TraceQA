@@ -60,6 +60,16 @@ public class FileStorageService {
         return url;
     }
 
+    /** 确保桶存在并设置公共只读策略 */
+    public void ensureBucketConfigured() {
+        AppProperties.Minio cfg = properties.getMinio();
+        try {
+            ensureBucket(cfg);
+        } catch (Exception e) {
+            log.warn("确保 MinIO 桶/策略失败：{}", e.getMessage());
+        }
+    }
+
     private void ensureBucket(AppProperties.Minio cfg) throws Exception {
         boolean exists = minioClient.bucketExists(BucketExistsArgs.builder().bucket(cfg.getBucket()).build());
         if (!exists) {
