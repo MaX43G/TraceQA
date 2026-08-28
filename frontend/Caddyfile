@@ -1,6 +1,7 @@
 {
     debug
     default_sni 121.41.72.189
+    auto_https off
 }
 
 # ===== HTTP 重定向 =====
@@ -16,7 +17,6 @@
 
 # ===== 前端 HTTPS 服务 =====
 https://121.41.72.189 {
-    auto_https off
     tls /etc/ssl/caddy-certs/fullchain.cer /etc/ssl/caddy-certs/121.41.72.189.key
 
     reverse_proxy frontend:3000
