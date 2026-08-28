@@ -297,3 +297,4 @@ volumes:
   traceqa-caddy-data:
   traceqa-caddy-config:
   traceqa-loki-data:
+  acme-webroot:
