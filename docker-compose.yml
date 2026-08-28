@@ -118,10 +118,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
       TZ: Asia/Shanghai
-      MINIO_CERTS_DIR: /root/.minio/certs
     volumes:
       - traceqa-minio-data:/data
-      - /root/.acme.sh/121.41.72.189_ecc:/root/.minio/certs:ro
     ports:
       - "6116:9000"
       - "9001:9001"
