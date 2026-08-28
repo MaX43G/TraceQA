@@ -1,21 +1,24 @@
 # ============================================================
 # 溯知 / TraceQA 一键部署编排
-# 服务：mysql + redis + lightrag + minio + backend(Spring Boot) + frontend(Nuxt SSR) + caddy(HTTPS入口) + prometheus + grafana
+# 服务：mysql + redis + lightrag + minio + backend + frontend + caddy(HTTPS入口) + prometheus + grafana + loki + promtail
 #
-# 其余所有服务仅内部网络访问（后端/MySQL/Redis/LightRAG/Prometheus/Grafana 均不对外绑定端口）。
-#
-# HTTPS：无域名时 Caddy 用自签证书（tls internal，自动管理/续期）提供安全上下文，浏览器放行麦克风；
-#        有域名后改 frontend/Caddyfile 的 `tls internal` 为 `tls 你的域名` 即可自动申请 Let's Encrypt。
-# 资源：不限制 CPU/内存，充分利用服务器资源（Redis 无内存上限、JVM 按可用内存动态分配）。
 # 使用：cp .env.example .env && docker compose up -d --build
 # ============================================================
 name: traceqa
+
+# 默认日志轮转（避免 /var/lib/docker 撑爆磁盘）
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
 
 services:
   # 数据库
   mysql:
     image: mysql:latest
     container_name: traceqa-mysql
+    logging: *default-logging
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
@@ -27,13 +30,12 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
     volumes:
-      # 首次启动自动建表
       - ./src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - traceqa-mysql-data:/var/lib/mysql
     ports:
       - "6118:3306"
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root123456}" ]
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root123456}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -43,14 +45,15 @@ services:
   redis:
     image: redis:latest
     container_name: traceqa-redis
+    logging: *default-logging
     restart: unless-stopped
-    command: [ "redis-server", "--appendonly", "yes", "--save", "60 1", "--appendfsync", "everysec" ]
+    command: ["redis-server", "--appendonly", "yes", "--save", "60 1", "--appendfsync", "everysec"]
     volumes:
       - traceqa-redis-data:/data
     ports:
       - "6117:6379"
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -59,9 +62,9 @@ services:
   lightrag:
     image: ghcr.io/hkuds/lightrag:latest
     container_name: traceqa-lightrag
+    logging: *default-logging
     restart: unless-stopped
     environment:
-      # LLM（OpenAI 兼容，硅基流动；LightRAG 需带 /v1，与后端 Spring AI 的 base-url 分离）
       LLM_BINDING: openai
       LLM_BINDING_HOST: ${LIGHTRAG_LLM_BASE_URL:-https://api.siliconflow.cn/v1}
       LLM_BASE_URL: ${LIGHTRAG_LLM_BASE_URL:-https://api.siliconflow.cn/v1}
@@ -84,10 +87,8 @@ services:
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
       EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}
       EMBEDDING_MAX_TOKEN_SIZE: ${EMBEDDING_MAX_TOKEN_SIZE:-8192}
-      # 服务
       PORT: 9621
       WORKING_DIR: /app/data/rag_storage
-      # 反向代理前缀：WebUI 与所有 API 都挂在该前缀下，仅经后端 /lightrag-webui/** 代理访问
       LIGHTRAG_API_PREFIX: /lightrag-webui
       LIGHTRAG_API_KEY: ""
       AUTH_ACCOUNTS: ""
@@ -99,7 +100,7 @@ services:
     ports:
       - "6119:9621"
     healthcheck:
-      test: [ "CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:9621/health', timeout=5)" ]
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:9621/health', timeout=5)"]
       interval: 15s
       timeout: 8s
       retries: 10
@@ -110,8 +111,9 @@ services:
   minio:
     image: minio/minio:latest
     container_name: traceqa-minio
+    logging: *default-logging
     restart: unless-stopped
-    command: [ "server", "/data", "--console-address", ":9001" ]
+    command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
@@ -122,7 +124,7 @@ services:
       - "6110:9000"
       - "9001:9001"
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -133,6 +135,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: traceqa-backend
+    logging: *default-logging
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: prod
@@ -176,19 +179,20 @@ services:
       args:
         API_PROXY_TARGET: http://backend:8080
     container_name: traceqa-frontend
+    logging: *default-logging
     restart: unless-stopped
-    ports:
-      - "6109:3000"
     depends_on:
       - backend
 
-  # Caddy：HTTPS 反向代理入口。
-  #   6115 -> 前端（HTTPS）
-  #   6116 -> MinIO S3（HTTPS，头像公开访问）
-  # 无域名用自签证书（tls internal，自动管理），有域名改 Caddyfile 的 tls 即可。
+  # Caddy：HTTPS 反向代理入口
+  #   80   -> Let's Encrypt HTTP-01 校验 + http->https 跳转
+  #   443  -> HTTPS 前端（标准端口，Let's Encrypt IP 证书）
+  #   6115 -> 兼容旧入口，转发到同一前端 HTTPS
+  #   6116 -> MinIO S3（HTTPS，自签证书）
   caddy:
     image: caddy:2-alpine
     container_name: traceqa-caddy
+    logging: *default-logging
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
@@ -198,12 +202,9 @@ services:
       - traceqa-caddy-data:/data
       - traceqa-caddy-config:/config
     ports:
-      # HTTP 重定向（80 与 6115 都跳到 https://:443）
       - "80:80"
-      - "6115:80"
-      # HTTPS 前端（标准 443 端口）
       - "443:443"
-      # HTTPS MinIO
+      - "6115:443"
       - "6116:8443"
     depends_on:
       - frontend
@@ -213,6 +214,7 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: traceqa-prometheus
+    logging: *default-logging
     restart: unless-stopped
     entrypoint:
       - /bin/sh
@@ -234,6 +236,7 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: traceqa-grafana
+    logging: *default-logging
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
@@ -259,6 +262,30 @@ services:
     depends_on:
       - prometheus
 
+  # Loki：日志聚合
+  loki:
+    image: grafana/loki:latest
+    container_name: traceqa-loki
+    logging: *default-logging
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./docker/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - traceqa-loki-data:/loki
+
+  # Promtail：采集 Docker 容器日志推送到 Loki
+  promtail:
+    image: grafana/promtail:latest
+    container_name: traceqa-promtail
+    logging: *default-logging
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./docker/promtail-config.yaml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+
 volumes:
   traceqa-mysql-data:
   traceqa-redis-data:
@@ -268,3 +295,4 @@ volumes:
   traceqa-grafana-data:
   traceqa-caddy-data:
   traceqa-caddy-config:
+  traceqa-loki-data:

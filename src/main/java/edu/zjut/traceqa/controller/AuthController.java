@@ -43,8 +43,9 @@ public class AuthController {
 
     @Operation(summary = "用户登录")
     @PostMapping("/login")
-    public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ApiResponse.ok(authService.login(request));
+    public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request,
+                                            jakarta.servlet.http.HttpServletRequest httpRequest) {
+        return ApiResponse.ok(authService.login(httpRequest, request));
     }
 
     @Operation(summary = "用户登出")

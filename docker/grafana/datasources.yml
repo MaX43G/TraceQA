@@ -1,3 +1,4 @@
+# nonk8s
 apiVersion: 1
 datasources:
   - name: Prometheus
@@ -6,4 +7,10 @@ datasources:
     url: http://prometheus:9090/prometheus
     isDefault: true
     uid: PROM
+    editable: false
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    uid: LOKI
     editable: false

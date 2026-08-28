@@ -1,40 +1,16 @@
 # ============================================================
 # 溯知 / TraceQA Caddy 反向代理
 #
-# 端口规划：
-#   :80   -> HTTP，重定向到 https://121.41.72.189（即 443）
-#   :443  -> HTTPS 前端（主入口，标准 443 端口）
-#   :8443 -> HTTPS MinIO（头像公开访问）
-#
-# 对外端口映射（docker-compose）：
-#   80   -> :80   （HTTP 重定向）
-#   443  -> :443  （HTTPS 前端）
-#   6115 -> :80   （HTTP 重定向，兼容旧的 6115 入口）
-#   6116 -> :8443 （HTTPS MinIO）
-#
-# 证书：手动自签（./certs，挂载到 /certs）。
-# 生成：openssl req -x509 -nodes -newkey rsa:2048 \
-#     -keyout certs/privkey.pem -out certs/fullchain.pem -days 3650 \
-#     -subj "/CN=server ip" \
-#     -addext "subjectAltName=IP:server ip,DNS:localhost"
-# 有公网域名后把 `tls /certs/...` 改为 `tls 你的域名` 自动申请 Let's Encrypt。
 # ============================================================
 
-# HTTP -> HTTPS 重定向（80）
-:80 {
-	redir https://121.41.72.189{uri} permanent
-}
-
-# HTTPS 前端（443，标准主入口）
-:443 {
-	tls /certs/fullchain.pem /certs/privkey.pem
+# HTTPS 前端（Let's Encrypt IP 证书，自动续期）
+121.41.72.189 {
 	reverse_proxy frontend:3000
 	encode gzip
-	# HSTS：成功后强制浏览器此后一律使用 HTTPS（http 自动升级）
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
 }
 
-# HTTPS MinIO（8443，头像公开访问）
+# HTTPS MinIO（host 6116，自签证书）
 :8443 {
 	tls /certs/fullchain.pem /certs/privkey.pem
 	reverse_proxy minio:9000
