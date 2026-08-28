@@ -256,8 +256,18 @@ public class RetrievalService {
     /**
      * 三路 RRF 融合 + ReRead 二次补全 + LLM 精排，产出最终结果。
      */
+    public RetrievalResult fuseAndSupplement(String question, List<RetrievedChunk> graphChunks,
+                                             List<RetrievedChunk> vectorChunks, List<RetrievedChunk> keywordChunks,
+                                             EnhancedQuery enhanced, LlmConfig config) {
+List<RetrievedChunk> fused = fuse(graphChunks, vectorChunks, keywordChunks);
+        List<RetrievedChunk> supplemented = reread(fused, config);
+        List<RetrievedChunk> reranked = rerankWithModel(question, supplemented, config);
+        boolean degraded = enhanced.getRewritten() == null && enhanced.getHyde() == null;
+        return new RetrievalResult(reranked, degraded);
+    }
+
     /** 语义重排：优先调用外部 Rerank 模型（如 bge-reranker-v2-m3），失败回退 LLM 精排 */
-    public List<RetrievedChunk> rerankWithModel(String question, List<RetrievedChunk> chunks, LlmConfig config) {
+    private List<RetrievedChunk> rerankWithModel(String question, List<RetrievedChunk> chunks, LlmConfig config) {
         if (chunks == null || chunks.size() <= 3) {
             return chunks;
         }
@@ -585,7 +595,7 @@ public class RetrievalService {
      * ReRead 二次检索：
      * 从已检索片段中抽取关键术语，用术语补查一次，将新片段合并进结果。
      */
-    public List<RetrievedChunk> reread(List<RetrievedChunk> fused, LlmConfig config) {
+    private List<RetrievedChunk> reread(List<RetrievedChunk> fused, LlmConfig config) {
         if (fused.isEmpty()) {
             return fused;
         }

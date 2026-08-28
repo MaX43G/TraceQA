@@ -224,10 +224,10 @@ public class RagAgentOrchestrator {
                     ? List.of()
                     : runKeyword(emitter, thinking, content, config, cancelled);
             List<RetrievedChunk> fused = retrievalService.fuse(vectorChunks, keywordChunks);
-            ThinkingNodeVO fuseNode = startThinking(thinking, "多路融合", "fusion-agent",
+            ThinkingNodeVO fuseNode = startThinking(thinking, "融合与补全", "fusion-agent",
                     "正在融合关键词与向量结果");
             ssePublisher.send(emitter, "thinking", fuseNode);
-            finishThinking(thinking, emitter, "多路融合", "融合后共 " + fused.size() + " 条");
+            finishThinking(thinking, emitter, "融合与补全", "融合后共 " + fused.size() + " 条");
             emitRetrievalStats(emitter, 0, vectorChunks.size(), keywordChunks.size(), fused, retrieveStart);
             return new RetrievalResult(fused, true);
         }
@@ -241,8 +241,8 @@ public class RagAgentOrchestrator {
         }
 
         // 对比/复杂问题：完整复合检索链路
-        // 步骤 1：查询重写与假设文档（并行；对比类还会做查询分解）
-        ThinkingNodeVO enhanceNode = startThinking(thinking, "查询重写与假设文档", "rewrite-agent",
+        // 步骤 1：查询重写与 HyDE（并行；对比类还会做查询分解）
+        ThinkingNodeVO enhanceNode = startThinking(thinking, "查询重写与 HyDE", "rewrite-agent",
                 "正在生成查询重写与假设性文档");
         ssePublisher.send(emitter, "thinking", enhanceNode);
         EnhancedQuery enhanced = retrievalService.enhance(content, config,
@@ -252,7 +252,7 @@ public class RagAgentOrchestrator {
                 && !enhanced.getSubqueries().isEmpty()) {
             enhanceDetail += String.format("（分解 %d 个子问题）", enhanced.getSubqueries().size());
         }
-        finishThinking(thinking, emitter, "查询重写与假设文档", enhanceDetail);
+        finishThinking(thinking, emitter, "查询重写与 HyDE", enhanceDetail);
 
         // 步骤 2-3：图谱 / 向量 并行检索（关键词检索已移除，避免在大型库上拖慢）
         CompletableFuture<List<RetrievedChunk>> graphFuture = CompletableFuture.supplyAsync(() -> {
@@ -274,28 +274,18 @@ public class RagAgentOrchestrator {
                 ? List.of()
                 : runKeyword(emitter, thinking, content, config, cancelled);
 
-        // 步骤 5：多路融合
-        ThinkingNodeVO fuseNode = startThinking(thinking, "多路融合", "fusion-agent", "正在融合图谱/向量/关键词三路结果");
+        // 步骤 5：三路融合 + ReRead 补全 + LLM 精排
+        ThinkingNodeVO fuseNode = startThinking(thinking, "融合与补全", "fusion-agent",
+                "正在融合三路结果并二次检索补全、精排");
         ssePublisher.send(emitter, "thinking", fuseNode);
-        List<RetrievedChunk> fused = retrievalService.fuse(graphChunks, vectorChunks, keywordChunks);
-        finishThinking(thinking, emitter, "多路融合", "融合去重后共 " + fused.size() + " 条");
-
-        // 步骤 6：二次检索补全
-        ThinkingNodeVO rereadNode = startThinking(thinking, "二次检索补全", "fusion-agent", "正在从已检索片段二次检索补全");
-        ssePublisher.send(emitter, "thinking", rereadNode);
-        List<RetrievedChunk> supplemented = retrievalService.reread(fused, config);
-        finishThinking(thinking, emitter, "二次检索补全", "补全后 " + supplemented.size() + " 条");
-
-        // 步骤 7：语义重排
-        ThinkingNodeVO rerankNode = startThinking(thinking, "语义重排", "fusion-agent", "正在按相关度语义重排精排");
-        ssePublisher.send(emitter, "thinking", rerankNode);
-        List<RetrievedChunk> reranked = retrievalService.rerankWithModel(content, supplemented, config);
-        finishThinking(thinking, emitter, "语义重排", "精排完成，最终 " + reranked.size() + " 条");
-
-        boolean degraded = enhanced.getRewritten() == null && enhanced.getHyde() == null;
+        RetrievalResult result = retrievalService.fuseAndSupplement(content, graphChunks, vectorChunks,
+                keywordChunks, enhanced, config);
+        String fuseDetail = String.format("融合后共 %d 条%s", result.getChunks().size(),
+                result.isDegraded() ? "（查询增强已降级）" : "");
+        finishThinking(thinking, emitter, "融合与补全", fuseDetail);
         emitRetrievalStats(emitter, graphChunks.size(), vectorChunks.size(), keywordChunks.size(),
-                reranked, retrieveStart);
-        return new RetrievalResult(reranked, degraded);
+                result.getChunks(), retrieveStart);
+        return result;
     }
 
     /** 推送「检索分析」数据（三路命中数 + 来源文档分布 + 耗时） */

@@ -94,7 +94,7 @@ const features = [
   },
   {
     title: '图谱 + 向量 + 关键词三路检索',
-    desc: 'LightRAG 图谱、语义向量与关键词三路并行检索，多路融合 + 二次检索补全 + 语义重排精排，查询更准',
+    desc: 'LightRAG 图谱、语义向量与关键词三路并行检索，RRF 融合 + ReRead 补全 + 语义重排精排，召回更准',
     icon: ApartmentOutlined,
     color: '#722ed1'
   },
@@ -130,9 +130,7 @@ const workflow = [
   { label: '图谱检索', icon: ApartmentOutlined },
   { label: '向量检索', icon: SearchOutlined },
   { label: '关键词检索', icon: FileSearchOutlined },
-  { label: '多路融合', icon: CompressOutlined },
-  { label: '二次补全', icon: FileSearchOutlined },
-  { label: '语义重排', icon: SearchOutlined },
+  { label: '融合精排', icon: CompressOutlined },
   { label: '总结生成', icon: ThunderboltOutlined }
 ]
 
