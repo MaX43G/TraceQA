@@ -12,7 +12,7 @@
 
 # 前端 HTTPS 服务
 121.41.72.189 {
-    tls /root/.acme.sh/121.41.72.189_ecc/fullchain.cer /root/.acme.sh/121.41.72.189_ecc/121.41.72.189.key
+    tls /etc/ssl/certs/fullchain.cer /etc/ssl/certs/121.41.72.189.key
 
     reverse_proxy frontend:3000
     encode gzip
