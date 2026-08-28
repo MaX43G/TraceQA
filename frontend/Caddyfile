@@ -1,17 +1,22 @@
-# 专门处理续期验证
-https://121.41.72.189:443 {
+{
+    debug
+    default_sni 121.41.72.189
+}
+
+# ===== HTTP 重定向 =====
+:80 {
     handle /.well-known/acme-challenge/* {
         root * /var/www/acme-challenge
         file_server
     }
-    # 其他所有 HTTP 请求，强制跳转到 HTTPS
     handle {
         redir https://{host}{uri} permanent
     }
 }
 
-# 前端 HTTPS 服务
-121.41.72.189 {
+# ===== 前端 HTTPS 服务 =====
+https://121.41.72.189 {
+    auto_https off
     tls /etc/ssl/caddy-certs/fullchain.cer /etc/ssl/caddy-certs/121.41.72.189.key
 
     reverse_proxy frontend:3000
