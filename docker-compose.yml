@@ -194,6 +194,7 @@ services:
       TZ: Asia/Shanghai
     volumes:
       - ./frontend/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/certs:ro
       - traceqa-caddy-data:/data
       - traceqa-caddy-config:/config
     ports:

@@ -1,21 +1,26 @@
 # ============================================================
 # 溯知 / TraceQA Caddy 反向代理
 #
-# 证书方案（二选一）：
-#   A. 无公网域名：用 `tls internal`（Caddy 内置 CA 自签，自动管理/续期）。
-#   B. 有公网域名：把下面的 `tls internal` 改为 `tls 你的域名`，Caddy 自动申请
-#      受信任的 Let's Encrypt 证书（其余配置无需改动）。
+# 证书方案：使用手动生成的自签证书（./certs 目录，挂载到 /certs）。
+# 生成命令（服务器执行一次）：
+#   mkdir -p certs
+#   openssl req -x509 -nodes -newkey rsa:2048 \
+#     -keyout certs/privkey.pem -out certs/fullchain.pem -days 3650 \
+#     -subj "/CN=server ip" \
+#     -addext "subjectAltName=IP:server ip,DNS:localhost"
+#
+# 有公网域名后，可改用 Let's Encrypt（把 `tls /certs/...` 改为 `tls 你的域名`）。
 # ============================================================
 
 # 前端：对外 6115（HTTPS）
 :443 {
-	tls internal
+	tls /certs/fullchain.pem /certs/privkey.pem
 	reverse_proxy frontend:3000
 	encode gzip
 }
 
 # MinIO 对象存储（S3 API）：对外 6116（HTTPS），供头像公开访问与上传
 :8443 {
-	tls internal
+	tls /certs/fullchain.pem /certs/privkey.pem
 	reverse_proxy minio:9000
 }
