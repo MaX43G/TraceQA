@@ -12,11 +12,18 @@
 # 有公网域名后，可改用 Let's Encrypt（把 `tls /certs/...` 改为 `tls 你的域名`）。
 # ============================================================
 
+# HTTP -> HTTPS 重定向（需要额外开放一个 HTTP 端口，如 80，并在 compose 里映射 80:80）
+:80 {
+	redir https://121.41.72.189:6115{uri} permanent
+}
+
 # 前端：对外 6115（HTTPS）
 :443 {
 	tls /certs/fullchain.pem /certs/privkey.pem
 	reverse_proxy frontend:3000
 	encode gzip
+	# HSTS：浏览器在成功访问 HTTPS 后，强制该站点此后一律使用 HTTPS（http 自动升级）
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
 }
 
 # MinIO 对象存储（S3 API）：对外 6116（HTTPS），供头像公开访问与上传
