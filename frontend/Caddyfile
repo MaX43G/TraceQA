@@ -10,16 +10,13 @@
         root * /var/www/acme-challenge
         file_server
     }
-    handle /traceqa/* {
-        reverse_proxy minio:9000
-    }
 }
 
 # ===== 前端 HTTPS 服务 =====
 https://121.41.72.189 {
     tls /etc/ssl/caddy-certs/fullchain.cer /etc/ssl/caddy-certs/121.41.72.189.key
 
-    handle /traceqa/avatar/* {
+    handle /traceqa/* {
          reverse_proxy minio:9000
     }
 
