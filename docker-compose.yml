@@ -204,7 +204,6 @@ services:
       - "80:80"
       - "443:443"
       - "6115:443"
-      - "6116:8443"
     depends_on:
       - frontend
       - minio
