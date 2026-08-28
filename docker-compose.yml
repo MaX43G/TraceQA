@@ -203,6 +203,7 @@ services:
       - traceqa-caddy-data:/data
       - traceqa-caddy-config:/config
       - acme-webroot:/var/www/acme-challenge
+      - /root/.acme.sh/121.41.72.189_ecc:/etc/ssl/certs:ro
     ports:
       - "80:80"
       - "443:443"
