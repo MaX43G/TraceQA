@@ -1,5 +1,5 @@
 # 专门处理续期验证
-:80 {
+https://121.41.72.189:443 {
     handle /.well-known/acme-challenge/* {
         root * /var/www/acme-challenge
         file_server
