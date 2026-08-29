@@ -114,8 +114,14 @@ public class ObservabilityProxyFilter extends OncePerRequestFilter {
                 ? properties.getObservability().getPrometheusBaseUrl()
                 : properties.getObservability().getGrafanaBaseUrl();
         String target = baseUrl + path + (request.getQueryString() == null ? "" : "?" + request.getQueryString());
+        URI targetUri = URI.create(target);
+        String expectedHost = URI.create(baseUrl).getHost();
+        if (expectedHost == null || !expectedHost.equalsIgnoreCase(targetUri.getHost())) {
+            rejectBadRequest(response);
+            return;
+        }
         try {
-            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(target))
+            HttpRequest.Builder builder = HttpRequest.newBuilder(targetUri)
                     .timeout(Duration.ofMinutes(5))
                     .method(request.getMethod(), bodyPublisher(request));
             Enumeration<String> names = request.getHeaderNames();
@@ -143,7 +149,6 @@ public class ObservabilityProxyFilter extends OncePerRequestFilter {
 
             String contentType = upstream.headers().firstValue("content-type").orElse("");
             if (contentType.toLowerCase().contains("text/html")) {
-                // 双保险：把 HTML 里根相对资源引用加上对应前缀（Grafana/Prometheus 已按子路径配置，一般用不到）
                 byte[] body = upstream.body().readAllBytes();
                 String html = new String(body, StandardCharsets.ISO_8859_1);
                 String prefix = isPrometheus ? PROMETHEUS_PREFIX : GRAFANA_PREFIX;
@@ -192,6 +197,17 @@ public class ObservabilityProxyFilter extends OncePerRequestFilter {
         }
         matcher.appendTail(sb);
         return sb.toString();
+    }
+
+    private void rejectBadRequest(HttpServletResponse response) {
+        try {
+            if (!response.isCommitted()) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.setContentType("application/json;charset=UTF-8");
+                response.getWriter().write("{\"code\":400,\"msg\":\"非法代理目标\"}");
+            }
+        } catch (IOException ignored) {
+        }
     }
 
     /**

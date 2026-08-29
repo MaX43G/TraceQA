@@ -51,7 +51,7 @@ public class FileStorageService {
             minioClient.putObject(PutObjectArgs.builder()
                     .bucket(cfg.getBucket())
                     .object(object)
-                    .stream(new ByteArrayInputStream(data), data.length, -1)
+                    .stream(new ByteArrayInputStream(data), (long) data.length, -1L)
                     .contentType(contentType == null || contentType.isBlank() ? "image/jpeg" : contentType)
                     .build());
         } catch (Exception e) {

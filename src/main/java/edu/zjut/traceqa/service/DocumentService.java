@@ -101,6 +101,11 @@ public class DocumentService {
                     continue;
                 }
                 String name = entry.getName();
+                if (name.startsWith("/") || name.startsWith("\\") || name.contains("..")) {
+                    failed++;
+                    errors.add(name + "：非法文件名（拒绝路径穿越）");
+                    continue;
+                }
                 try {
                     byte[] content = zis.readAllBytes();
                     uploadContent(name, content, knowledgeBaseId);
@@ -247,7 +252,11 @@ public class DocumentService {
             Files.createDirectories(dir);
             String filename = UUID.randomUUID().toString().replace("-", "")
                     + "_" + sanitizeFilename(originalName);
-            Path target = dir.resolve(filename);
+            Path target = dir.resolve(filename).normalize();
+            // 路径穿越防护：确保最终路径仍在目标目录内
+            if (!target.startsWith(dir)) {
+                throw new BizException(ErrorCode.PARAM_ERROR, "非法的文件名");
+            }
             Files.write(target, content);
             return target;
         } catch (IOException e) {
@@ -281,7 +290,16 @@ public class DocumentService {
      * 文件名清洗（去路径分隔符）
      */
     private String sanitizeFilename(String name) {
-        String safe = name == null ? "file" : name.replaceAll("[/\\\\]", "_");
+        if (name == null || name.isBlank()) {
+            return "file";
+        }
+        // 移除路径分隔符、控制字符与路径穿越片段，避免任意文件写入
+        String safe = name
+                .replaceAll("[/\\\\]", "_")
+                .replaceAll("\\.\\.", "_")
+                .replaceAll("[\\x00-\\x1f]", "");
+        // 去掉开头的点/下划线，避免隐藏文件与残留的 .. 
+        safe = safe.replaceAll("^[\\._]+", "");
         return safe.isBlank() ? "file" : safe;
     }
 

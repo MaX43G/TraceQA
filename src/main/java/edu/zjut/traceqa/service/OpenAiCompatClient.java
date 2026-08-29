@@ -1,7 +1,7 @@
 package edu.zjut.traceqa.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import edu.zjut.traceqa.model.dto.LlmConfig;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;

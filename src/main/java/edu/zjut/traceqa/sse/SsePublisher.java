@@ -1,7 +1,7 @@
 package edu.zjut.traceqa.sse;
 
 import jakarta.annotation.Resource;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;

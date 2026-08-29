@@ -66,11 +66,7 @@
             <version>3.1.0</version>
         </dependency>
 
-        <!-- Java 8 时间类型 JSON 序列化支持 -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
-        </dependency>
+        
 
         <!-- MySQL 驱动（生产环境），H2 仅用于本地无依赖启动 -->
         <dependency>
@@ -158,15 +154,17 @@
         </dependency>
 
         <!-- MinIO 对象存储：统一管理用户上传的文件（如头像），返回可访问 URL -->
-        <dependency>
+<dependency>
             <groupId>io.minio</groupId>
             <artifactId>minio</artifactId>
             <version>9.0.3</version>
         </dependency>
+        <!-- minio 9.0.3 的 MinioClient/PutObjectArgs API 使用 okhttp3 包（okhttp 4.x）；
+            其自带传递依赖 okhttp 5.3.2 仅提供 okhttp 包，故需显式声明 okhttp 4.x -->
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>okhttp</artifactId>
-            <version>5.5.0</version>
+            <version>4.12.0</version>
         </dependency>
     </dependencies>
 

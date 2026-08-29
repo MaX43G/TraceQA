@@ -1,7 +1,7 @@
 package edu.zjut.traceqa.retrieval;
 
 import jakarta.annotation.Resource;
-import com.fasterxml.jackson.core.type.TypeReference;
+import tools.jackson.core.type.TypeReference;
 import edu.zjut.traceqa.config.LightRagClient;
 import edu.zjut.traceqa.config.RerankClient;
 import edu.zjut.traceqa.model.dto.EnhancedQuery;

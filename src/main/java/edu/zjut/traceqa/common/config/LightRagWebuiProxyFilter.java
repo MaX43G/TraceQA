@@ -111,10 +111,17 @@ public class LightRagWebuiProxyFilter extends OncePerRequestFilter {
      * 将请求转发至 LightRAG 并流式回写响应
      */
     private void proxy(HttpServletRequest request, HttpServletResponse response) {
-        String target = properties.getLightrag().getBaseUrl() + request.getRequestURI()
+        String baseUrl = properties.getLightrag().getBaseUrl();
+        String target = baseUrl + request.getRequestURI()
                 + (request.getQueryString() == null ? "" : "?" + request.getQueryString());
+        URI targetUri = URI.create(target);
+        String expectedHost = URI.create(baseUrl).getHost();
+        if (expectedHost == null || !expectedHost.equalsIgnoreCase(targetUri.getHost())) {
+            rejectBadRequest(response);
+            return;
+        }
         try {
-            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(target))
+            HttpRequest.Builder builder = HttpRequest.newBuilder(targetUri)
                     .timeout(Duration.ofMinutes(5))
                     .method(request.getMethod(), bodyPublisher(request));
             Enumeration<String> names = request.getHeaderNames();
@@ -193,6 +200,18 @@ public class LightRagWebuiProxyFilter extends OncePerRequestFilter {
         }
         matcher.appendTail(sb);
         return sb.toString();
+    }
+
+    private void rejectBadRequest(HttpServletResponse response) {
+        try {
+            if (!response.isCommitted()) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.setContentType("application/json;charset=UTF-8");
+                response.getWriter().write("{\"code\":400,\"msg\":\"非法代理目标\"}");
+            }
+        } catch (IOException ignored) {
+            // 响应已提交或写出失败，忽略
+        }
     }
 
     /**

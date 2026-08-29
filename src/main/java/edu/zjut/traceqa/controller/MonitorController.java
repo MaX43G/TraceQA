@@ -4,7 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckRole;
 import edu.zjut.traceqa.common.api.ApiResponse;
 import edu.zjut.traceqa.common.config.LightRagWebuiSessionStore;
 import edu.zjut.traceqa.common.config.ObservabilitySessionStore;
-import edu.zjut.traceqa.config.AppProperties;
+
 import edu.zjut.traceqa.service.LightRagMonitorService;
 import edu.zjut.traceqa.service.MonitorService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,9 +38,6 @@ public class MonitorController {
 
     @Resource
     private ObservabilitySessionStore observabilitySessionStore;
-
-    @Resource
-    private AppProperties appProperties;
 
     @Operation(summary = "查询系统运行指标")
     @SaCheckRole("ADMIN")
@@ -91,7 +88,7 @@ public class MonitorController {
         String token = webuiSessionStore.create();
         Cookie cookie = new Cookie("tq_webui", token);
         cookie.setHttpOnly(true);
-        cookie.setSecure(appProperties.isCookieSecure());
+        cookie.setSecure(true);
         cookie.setPath("/");
         cookie.setMaxAge(60 * 60);
         cookie.setAttribute("SameSite", "Lax");
@@ -106,7 +103,7 @@ public class MonitorController {
         String token = observabilitySessionStore.create();
         Cookie cookie = new Cookie("tq_obs", token);
         cookie.setHttpOnly(true);
-        cookie.setSecure(appProperties.isCookieSecure());
+        cookie.setSecure(true);
         cookie.setPath("/");
         cookie.setMaxAge(60 * 60);
         cookie.setAttribute("SameSite", "Lax");

@@ -18,6 +18,8 @@ services:
   mysql:
     image: dhi.io/mysql:9.7.2
     container_name: traceqa-mysql
+    labels:
+      logging: promtail
     logging: *default-logging
     restart: unless-stopped
     environment:
@@ -45,6 +47,8 @@ services:
   redis:
     image: redis:8.8.2
     container_name: traceqa-redis
+    labels:
+      logging: promtail
     logging: *default-logging
     restart: unless-stopped
     command: [ "redis-server", "--appendonly", "yes", "--save", "60 1", "--appendfsync", "everysec" ]
@@ -62,6 +66,8 @@ services:
   lightrag:
     image: ghcr.io/hkuds/lightrag:latest
     container_name: traceqa-lightrag
+    labels:
+      logging: promtail
     logging: *default-logging
     restart: unless-stopped
     environment:
@@ -110,6 +116,8 @@ services:
   minio:
     image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
     container_name: traceqa-minio
+    labels:
+      logging: promtail
     logging: *default-logging
     restart: unless-stopped
     command: [ "server", "/data", "--console-address", ":9001" ]
@@ -135,6 +143,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: traceqa-backend
+    labels:
+      logging: promtail
     logging: *default-logging
     restart: unless-stopped
     environment:
@@ -180,6 +190,8 @@ services:
       args:
         API_PROXY_TARGET: http://backend:8080
     container_name: traceqa-frontend
+    labels:
+      logging: promtail
     logging: *default-logging
     restart: unless-stopped
     depends_on:
@@ -189,6 +201,8 @@ services:
   caddy:
     image: caddy:2.11.4-alpine
     container_name: traceqa-caddy
+    labels:
+      logging: promtail
     logging: *default-logging
     restart: unless-stopped
     environment:
@@ -211,6 +225,8 @@ services:
   prometheus:
     image: prom/prometheus:v3.14.0
     container_name: traceqa-prometheus
+    labels:
+      logging: promtail
     logging: *default-logging
     restart: unless-stopped
     entrypoint:
@@ -234,6 +250,8 @@ services:
   grafana:
     image: grafana/grafana:13.1.4
     container_name: traceqa-grafana
+    labels:
+      logging: promtail
     logging: *default-logging
     restart: unless-stopped
     environment:
@@ -264,6 +282,8 @@ services:
   loki:
     image: grafana/loki:3.6.16
     container_name: traceqa-loki
+    labels:
+      logging: promtail
     logging: *default-logging
     restart: unless-stopped
     command: -config.file=/etc/loki/local-config.yaml
@@ -275,6 +295,8 @@ services:
   promtail:
     image: grafana/promtail:3.6.11
     container_name: traceqa-promtail
+    labels:
+      logging: promtail
     logging: *default-logging
     restart: unless-stopped
     command: -config.file=/etc/promtail/config.yml
