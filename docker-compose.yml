@@ -16,7 +16,7 @@ x-logging: &default-logging
 services:
   # 数据库
   mysql:
-    image: mysql:latest
+    image: dhi.io/mysql:9.7.2
     container_name: traceqa-mysql
     logging: *default-logging
     restart: unless-stopped
@@ -43,7 +43,7 @@ services:
   # Redis：查询/Agent 决策缓存 + 文档处理异步队列
   # 不设内存上限（充分利用服务器资源），开启 AOF 落盘持久化
   redis:
-    image: redis:latest
+    image: redis:8.8.2
     container_name: traceqa-redis
     logging: *default-logging
     restart: unless-stopped
@@ -108,7 +108,7 @@ services:
 
   # MinIO 对象存储：统一管理用户上传的文件（如头像）。
   minio:
-    image: minio/minio:latest
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
     container_name: traceqa-minio
     logging: *default-logging
     restart: unless-stopped
@@ -187,7 +187,7 @@ services:
 
   # Caddy：HTTPS 反向代理入口
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.11.4-alpine
     container_name: traceqa-caddy
     logging: *default-logging
     restart: unless-stopped
@@ -209,7 +209,7 @@ services:
 
   # Prometheus：抓取后端 /actuator/prometheus 指标
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.14.0
     container_name: traceqa-prometheus
     logging: *default-logging
     restart: unless-stopped
@@ -230,9 +230,9 @@ services:
     ports:
       - "6112:9090"
 
-  # Grafana：可观测性可视化大盘（仅内部访问，经后端 /grafana/** 代理）
+  # Grafana：可观测性可视化大盘
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.1.4
     container_name: traceqa-grafana
     logging: *default-logging
     restart: unless-stopped
@@ -262,7 +262,7 @@ services:
 
   # Loki：日志聚合
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:3.6.16
     container_name: traceqa-loki
     logging: *default-logging
     restart: unless-stopped
@@ -273,7 +273,7 @@ services:
 
   # Promtail：采集 Docker 容器日志推送到 Loki
   promtail:
-    image: grafana/promtail:latest
+    image: grafana/promtail:3.6.11
     container_name: traceqa-promtail
     logging: *default-logging
     restart: unless-stopped
