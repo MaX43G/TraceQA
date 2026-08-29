@@ -19,7 +19,7 @@
     "katex": "^0.16.21",
     "cytoscape": "^3.30.4",
     "cropperjs": "^1.6.3",
-    "echarts": "^5.5.1",
+    "echarts": "^6.1.0",
     "markdown-it": "^15.0.0",
     "nuxt": "^4.5.2",
     "vee-validate": "^4.15.1",
