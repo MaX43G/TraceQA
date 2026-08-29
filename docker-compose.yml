@@ -16,7 +16,7 @@ x-logging: &default-logging
 services:
   # 数据库
   mysql:
-    image: dhi.io/mysql:9.7.2
+    image: mysql:9.7.2
     container_name: traceqa-mysql
     labels:
       logging: promtail
