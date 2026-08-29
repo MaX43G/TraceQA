@@ -40,9 +40,16 @@ RUN apt-get update \
 # 从构建阶段拷贝产物
 COPY --from=build /app/target/*.jar app.jar
 
+# 非 root 运行
+RUN groupadd -r appuser && useradd -r -g appuser appuser \
+    && mkdir -p /app/data \
+    && chown -R appuser:appuser /app
+
 # 运行参数
 ENV SPRING_PROFILES_ACTIVE=prod
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=25.0"
+
+USER appuser
 
 EXPOSE 8080
 

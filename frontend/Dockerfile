@@ -34,6 +34,11 @@ ENV NITRO_HOST=0.0.0.0
 # 拷贝构建产物
 COPY --from=build /app/.output .output
 
+# 非 root 运行
+RUN chown -R node:node /app
+
+USER node
+
 EXPOSE 3000
 
 # 健康检查
