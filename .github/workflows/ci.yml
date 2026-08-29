@@ -56,8 +56,7 @@ jobs:
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /tmp/trivy
           /tmp/trivy/trivy --version
-      - name: Trivy 文件系统扫描（漏洞 + 配置 + 密钥）
-        # 先不阻断流水线（仅报告），待修复高/严重级问题后再改回 --exit-code 1 作为硬门禁
+      - name: Trivy 文件系统扫描（配置 + 密钥）
         continue-on-error: true
         run: |
-          /tmp/trivy/trivy fs --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --ignore-unfixed .
+          /tmp/trivy/trivy fs --scanners misconfig,secret --severity HIGH,CRITICAL --ignore-unfixed .

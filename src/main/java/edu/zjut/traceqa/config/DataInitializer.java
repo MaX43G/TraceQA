@@ -56,13 +56,22 @@ public class DataInitializer implements ApplicationRunner {
     @Override
     @Transactional
     public void run(@NonNull ApplicationArguments args) {
-        initRoles();
-        initUsers();
-        initKnowledgeBase();
-        initSystemPrompts();
-        initAnnouncement();
+        safeInit(this::initRoles, "角色");
+        safeInit(this::initUsers, "默认用户");
+        safeInit(this::initKnowledgeBase, "默认知识库");
+        safeInit(this::initSystemPrompts, "系统提示词");
+        safeInit(this::initAnnouncement, "默认公告");
         fileStorageService.ensureBucketConfigured();
         log.info("系统初始化数据装载完成");
+    }
+
+    /** 容错执行一个初始化任务：异常仅告警，不中断启动 */
+    private void safeInit(Runnable task, String name) {
+        try {
+            task.run();
+        } catch (Exception e) {
+            log.warn("初始化「{}」失败（请检查表结构是否已迁移）：{}", name, e.getMessage());
+        }
     }
 
     /**
