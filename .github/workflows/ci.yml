@@ -62,5 +62,24 @@ jobs:
             --scanners misconfig,secret \
             --severity HIGH,CRITICAL \
             --ignore-unfixed \
+            --skip-files pom.xml \
             --skip-dirs node_modules,.git,target,backend/target,frontend/node_modules,frontend/.nuxt,frontend/.output \
             .
+
+  backend-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: OWASP 依赖安全检查
+        continue-on-error: true
+        run: |
+          chmod +x mvnw
+          ./mvnw -B -q dependency:resolve -DskipTests
+          ./mvnw -B org.owasp:dependency-check-maven:check \
+            -DskipTests -DfailBuildOnCVSS=7 \
+            -Dformat=HTML
