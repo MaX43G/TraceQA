@@ -50,3 +50,4 @@ traceqa-images.tar
 src/main/resources/application-dev.yaml
 
 certs/
+minio-data/
