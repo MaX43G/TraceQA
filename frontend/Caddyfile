@@ -31,9 +31,9 @@ https://121.41.72.189 {
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "microphone=(self), camera=(), geolocation=()"
         Cross-Origin-Opener-Policy "same-origin"
-        Cross-Origin-Resource-Policy "same-origin"
+        Cross-Origin-Resource-Policy "cross-origin"
         X-Permitted-Cross-Domain-Policies "none"
-        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https:; media-src 'self' blob:; object-src 'none'; frame-ancestors 'none';"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' blob: https:; media-src 'self' blob:; object-src 'none'; frame-ancestors 'none';"
     }
 
     @static {
