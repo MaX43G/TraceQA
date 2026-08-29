@@ -107,7 +107,6 @@ services:
       start_period: 30s
 
   # MinIO 对象存储：统一管理用户上传的文件（如头像）。
-  # S3 API（9000）仅内部访问，由 caddy 在 6116 提供 HTTPS 对外。
   minio:
     image: minio/minio:latest
     container_name: traceqa-minio
@@ -129,8 +128,9 @@ services:
       timeout: 5s
       retries: 10
 
-  # Spring Boot 后端
+  # Spring Boot 后端（镜像来自 GHCR，本地可用 --build 构建）
   backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/max43g/traceqa/backend:latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -171,8 +171,9 @@ services:
       lightrag:
         condition: service_healthy
 
-  # Nuxt SSR 前端（内部 3000，由 caddy 提供 HTTPS 对外）
+  # Nuxt SSR 前端
   frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/max43g/traceqa/frontend:latest}
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -185,12 +186,8 @@ services:
       - backend
 
   # Caddy：HTTPS 反向代理入口
-  #   80   -> Let's Encrypt HTTP-01 校验 + http->https 跳转
-  #   443  -> HTTPS 前端（标准端口，Let's Encrypt IP 证书）
-  #   6115 -> 兼容旧入口，转发到同一前端 HTTPS
-  #   6116 -> MinIO S3（HTTPS，自签证书）
   caddy:
-    image: caddy:2.11.4-alpine
+    image: caddy:2-alpine
     container_name: traceqa-caddy
     logging: *default-logging
     restart: unless-stopped
@@ -232,6 +229,7 @@ services:
       - backend
     ports:
       - "6112:9090"
+
   # Grafana：可观测性可视化大盘（仅内部访问，经后端 /grafana/** 代理）
   grafana:
     image: grafana/grafana:latest

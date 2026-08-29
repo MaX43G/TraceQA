@@ -53,5 +53,15 @@ jobs:
             --exclude 'node_modules' --exclude 'target' --exclude 'data' --exclude 'certs' \
             --exclude 'frontend/node_modules' --exclude 'frontend/.nuxt' --exclude 'frontend/.output' \
             ./ "$USER@$HOST:/opt/TraceQA/"
-          ssh $SSHOPTS "$USER@$HOST" \
-            "cd /opt/TraceQA && docker compose up -d --build && sleep 10 && curl -sf http://127.0.0.1:6114/actuator/health || echo '健康检查未通过（可忽略）'"
+          ssh $SSHOPTS "$USER@$HOST" '
+            set -e
+            cd /opt/TraceQA
+            if docker compose pull backend frontend; then
+              docker compose up -d --no-build
+            else
+              echo "GHCR 拉取失败，回退到源码构建"
+              docker compose up -d --build
+            fi
+            sleep 10
+            curl -sf http://127.0.0.1:6114/actuator/health || echo "健康检查未通过（可忽略）"
+          '
