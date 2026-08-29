@@ -110,9 +110,16 @@ jobs:
             echo "构建并启动服务..."
             docker compose up -d --build
 
-            echo "等待服务启动..."
-            sleep 10
-            echo "执行健康检查..."
-            curl -sf http://127.0.0.1:6114/actuator/health || (echo "健康检查未通过" && exit 1)
-            echo "部署完成"
+            echo "等待后端健康检查通过..."
+            for i in $(seq 1 30); do
+              if curl -sf http://127.0.0.1:6114/actuator/health > /dev/null 2>&1; then
+                echo "✅ 健康检查通过（第 ${i} 次尝试）"
+                exit 0
+              fi
+              echo "  等待中... ($i/30)"
+              sleep 5
+            done
+            echo "❌ 健康检查超时（150 秒）"
+            docker compose logs --tail=50 backend
+            exit 1
           '
