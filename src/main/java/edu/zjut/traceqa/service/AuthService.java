@@ -112,6 +112,7 @@ public class AuthService {
         // 统一错误提示，防账号枚举
         if (user == null || !passwordEncoder.matches(req.getPassword(), user.getPassword())) {
             recordFail(failKey, lockKey);
+            log.warn("登录失败：username={}, ip={}", req.getUsername(), ip);
             throw new BizException(ErrorCode.PARAM_ERROR, "用户名或密码错误");
         }
         if (user.getStatus() == null || user.getStatus() != 1) {
@@ -144,6 +145,10 @@ public class AuthService {
             }
             if (count != null && count >= LOGIN_MAX_FAIL) {
                 stringRedisTemplate.opsForValue().set(lockKey, "1", LOGIN_LOCK_TTL);
+                log.warn("登录审计：账号+IP 触发锁定 username={}, ip={}（已锁定 {} 分钟）",
+                        lockKey.substring("login:lock:".length(), lockKey.lastIndexOf(':')),
+                        lockKey.substring(lockKey.lastIndexOf(':') + 1),
+                        LOGIN_LOCK_TTL.toMinutes());
             }
         } catch (Exception e) {
             log.debug("登录失败计数降级（Redis 不可用）：{}", e.getMessage());

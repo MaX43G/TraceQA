@@ -151,7 +151,7 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-traceqa}
-      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-https://121.41.72.189:6116}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-https://121.41.72.189}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-THUDM/GLM-4-9B-0414}
@@ -200,8 +200,8 @@ services:
       - ./frontend/Caddyfile:/etc/caddy/Caddyfile:ro
       - traceqa-caddy-data:/data
       - traceqa-caddy-config:/config
-      - acme-webroot:/var/www/acme-challenge
       - /root/caddy-certs:/etc/ssl/caddy-certs:ro
+      - /var/www/acme-challenge:/var/www/acme-challenge:ro
     ports:
       - "80:80"
       - "443:443"
