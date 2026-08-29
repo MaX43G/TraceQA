@@ -4,48 +4,34 @@
 # ============================================================
 
 # ---- 构建阶段 ----
-FROM eclipse-temurin:25-jdk-noble AS build
+FROM maven:3.9.16-eclipse-temurin-25-alpine AS build
+
 WORKDIR /app
 
-# 利用 Maven Wrapper 下载依赖（only-script 分发，自动拉取 Maven）
-RUN mkdir -p /root/.m2 && \
-    echo '<?xml version="1.0" encoding="UTF-8"?>\
-<settings>\
-  <mirrors>\
-    <mirror>\
-      <id>aliyun</id>\
-      <mirrorOf>central</mirrorOf>\
-      <name>Aliyun Maven Mirror</name>\
-      <url>https://maven.aliyun.com/repository/public</url>\
-    </mirror>\
-  </mirrors>\
-</settings>' > /root/.m2/settings.xml
-COPY .mvn .mvn
-COPY mvnw pom.xml ./
-RUN chmod +x mvnw && ./mvnw -q -DskipTests dependency:go-offline
+COPY settings.xml /root/.m2/settings.xml
 
-# 拷贝源码并打包
-COPY src src
-RUN ./mvnw -q -DskipTests package
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+
+COPY src ./src
+
+RUN mvn clean package -DskipTests -B
 
 # ---- 运行阶段 ----
-FROM eclipse-temurin:25-jdk-noble
+FROM eclipse-temurin:25-jre-noble
+
 WORKDIR /app
 
-# 健康检查所需工具
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
-# 从构建阶段拷贝产物
 COPY --from=build /app/target/*.jar app.jar
 
-# 非 root 运行
 RUN groupadd -r appuser && useradd -r -g appuser appuser \
     && mkdir -p /app/data \
     && chown -R appuser:appuser /app
 
-# 运行参数
 ENV SPRING_PROFILES_ACTIVE=prod
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=25.0"
 
@@ -53,7 +39,6 @@ USER appuser
 
 EXPOSE 8080
 
-# 健康检查：探测健康接口
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 \
   CMD curl -fsS http://127.0.0.1:8080/api/health || exit 1
 
