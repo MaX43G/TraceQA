@@ -9,7 +9,7 @@ COPY settings.xml /root/.m2/settings.xml
 
 COPY . .
 
-RUN --mount=type=cache,target=/root/.m2 mvn -pl traceqa-qa-service -am package -DskipTests -B
+RUN --mount=type=cache,target=/root/.m2/repository mvn -pl traceqa-qa-service -am package -DskipTests -B
 
 FROM eclipse-temurin:25-jre-noble
 

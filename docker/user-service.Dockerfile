@@ -9,7 +9,7 @@ COPY settings.xml /root/.m2/settings.xml
 
 COPY . .
 
-RUN --mount=type=cache,target=/root/.m2 mvn -pl traceqa-user-service -am package -DskipTests -B
+RUN --mount=type=cache,target=/root/.m2/repository mvn -T 1C -pl traceqa-user-service -am package -DskipTests -B
 
 FROM eclipse-temurin:25-jre-noble
 
@@ -39,5 +39,8 @@ USER appuser
 EXPOSE 8081
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
+
+
+
 
 
