@@ -1,0 +1,60 @@
+package edu.zjut.traceqa.qaservice.agent;
+
+import com.alibaba.cloud.ai.graph.agent.ReactAgent;
+import edu.zjut.traceqa.common.model.dto.LlmConfig;
+import edu.zjut.traceqa.qaservice.service.LlmService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
+
+/**
+ * 总结生成 Agent（流式）。
+ *
+ * <p>默认基于 Spring AI Alibaba 的 ReAct 智能体；使用自定义模型时改走
+ * {@link LlmService} 的 OpenAI 兼容流式直连。任何异常均优雅降级返回空流，
+ * 由编排器继续走降级链路。</p>
+ */
+@Component
+public class AnswerAgent {
+
+    private static final Logger log = LoggerFactory.getLogger(AnswerAgent.class);
+
+    private final RagAgents ragAgents;
+    private final LlmService llmService;
+
+    public AnswerAgent(RagAgents ragAgents, LlmService llmService) {
+        this.ragAgents = ragAgents;
+        this.llmService = llmService;
+    }
+
+    /**
+     * 流式生成回答。
+     *
+     * @param userPrompt 组装好的「问题 + 检索上下文」提示词
+     * @param config     自定义模型配置（null 表示使用默认模型）
+     * @return 回答内容块流；失败返回空流
+     */
+    public Flux<String> streamAnswer(String userPrompt, LlmConfig config) {
+        if (config != null && config.isValid()) {
+            return llmService.callStream("summary", userPrompt, config);
+        }
+        ReactAgent agent = ragAgents.answerAgent();
+        if (agent == null) {
+            log.debug("总结 Agent 未就绪，返回空流");
+            return Flux.empty();
+        }
+        try {
+            return agent.streamMessages(userPrompt)
+                    .filter(m -> m.getText() != null && !m.getText().isEmpty())
+                    .map(m -> m.getText() != null ? m.getText() : "")
+                    .onErrorResume(e -> {
+                        log.warn("总结 Agent 流式生成失败，返回空流：{}", e.getMessage());
+                        return Flux.empty();
+                    });
+        } catch (Exception e) {
+            log.warn("总结 Agent 调用异常，返回空流：{}", e.getMessage());
+            return Flux.empty();
+        }
+    }
+}

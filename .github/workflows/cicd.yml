@@ -74,7 +74,7 @@ jobs:
             --severity HIGH,CRITICAL \
             --ignore-unfixed \
             --skip-files pom.xml \
-            --skip-dirs node_modules,.git,target,backend/target,frontend/node_modules,frontend/.nuxt,frontend/.output \
+            --skip-dirs node_modules,.git,target,frontend/node_modules,frontend/.nuxt,frontend/.output \
             .
 
   deploy:
@@ -113,6 +113,6 @@ jobs:
             echo "等待服务启动..."
             sleep 10
             echo "执行健康检查..."
-            curl -sf http://127.0.0.1:6114/actuator/health || (echo "健康检查未通过" && exit 1)
+            curl -sf http://127.0.0.1:6114/api/health || (echo "健康检查未通过" && exit 1)
             echo "部署完成"
           '

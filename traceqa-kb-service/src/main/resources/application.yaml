@@ -1,0 +1,70 @@
+# 溯知 / TraceQA 知识库服务配置
+server:
+  port: ${SERVER_PORT:8084}
+
+spring:
+  application:
+    name: traceqa-kb-service
+  main:
+    web-application-type: servlet
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: 6379
+      timeout: 6s
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 55MB
+  sql:
+    init:
+      mode: never
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE_KB:traceqa_kb}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:123456}
+
+# MyBatis-Plus
+mybatis-plus:
+  global-config:
+    banner: false
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+# 应用配置
+app:
+  # 本地文件存储根目录（文档本体）
+  storage:
+    root: ${APP_STORAGE_ROOT:./data/files}
+  # LightRAG（文档入库）
+  lightrag:
+    base-url: ${LIGHTRAG_BASE_URL:http://localhost:9621}
+    api-key: ${LIGHTRAG_API_KEY:}
+    top-k: ${LIGHTRAG_TOP_K:8}
+    connect-timeout: 5000
+    read-timeout: 120000
+
+# springdoc
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    edu.zjut.traceqa: info

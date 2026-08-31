@@ -11,6 +11,7 @@
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
 import katex from 'katex'
+import DOMPurify from 'dompurify'
 
 /** 引用标记正则：匹配 [citation:1] 形式 */
 const CITATION_RE = /\[citation:(\d+)]/g
@@ -116,13 +117,19 @@ const md = new MarkdownIt({
 /**
  * 渲染 Markdown 为 HTML 字符串。
  *
+ * <p>渲染结果经 DOMPurify 消毒后返回，避免用户/AI 内容中的原始 HTML 引入 XSS。</p>
+ *
  * @param content          原始 Markdown（可能包含 [citation:N]）
  * @param availableIndexes 实际存在引用的序号集合（可选，用于过滤无内容角标）
- * @returns 可直接 v-html 的 HTML
+ * @returns 可安全用于 v-html 的 HTML
  */
 export function renderMarkdown(content: string, availableIndexes?: Set<number>): string {
     if (!content) {
         return ''
     }
-    return md.render(renderMath(decorateCitations(content, availableIndexes)))
+    const rendered = md.render(renderMath(decorateCitations(content, availableIndexes)))
+    return DOMPurify.sanitize(rendered, {
+        ADD_ATTR: ['style', 'data-idx'],
+        ADD_TAGS: ['sup']
+    })
 }

@@ -1,0 +1,14 @@
+{
+  "properties": [
+    {
+      "name": "feign.client.config.default.connect-timeout",
+      "type": "java.lang.Integer",
+      "description": "Feign client connect timeout in milliseconds."
+    },
+    {
+      "name": "feign.client.config.default.read-timeout",
+      "type": "java.lang.Integer",
+      "description": "Feign client read timeout in milliseconds."
+    }
+  ]
+}

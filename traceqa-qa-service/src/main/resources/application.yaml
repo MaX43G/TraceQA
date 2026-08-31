@@ -1,0 +1,102 @@
+# 溯知 / TraceQA 问答服务配置
+server:
+  port: ${SERVER_PORT:8085}
+
+spring:
+  application:
+    name: traceqa-qa-service
+  main:
+    web-application-type: servlet
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: 6379
+      timeout: 6s
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 55MB
+  sql:
+    init:
+      mode: never
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE_QA:traceqa_qa}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:123456}
+  ai:
+    openai:
+      base-url: ${LLM_BASE_URL:https://api.siliconflow.cn}
+      api-key: ${LLM_API_KEY:}
+      chat:
+        model: ${LLM_MODEL:THUDM/GLM-4-9B-0414}
+
+# MyBatis-Plus
+mybatis-plus:
+  global-config:
+    banner: false
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+# 应用配置
+app:
+  # LLM 熔断降级
+  circuit-breaker:
+    failure-threshold: 3
+    open-millis: 30000
+    half-open-max-calls: 1
+  # 语义重排（默认关闭）
+  rerank:
+    enabled: ${APP_RERANK_ENABLED:false}
+    base-url: ${APP_RERANK_BASE_URL:}
+    api-key: ${APP_RERANK_API_KEY:}
+    model: ${APP_RERANK_MODEL:BAAI/bge-reranker-v2-m3}
+    path: ${APP_RERANK_PATH:/rerank}
+  # LightRAG（检索）
+  lightrag:
+    base-url: ${LIGHTRAG_BASE_URL:http://localhost:9621}
+    api-key: ${LIGHTRAG_API_KEY:}
+    top-k: ${LIGHTRAG_TOP_K:8}
+    connect-timeout: 5000
+    read-timeout: 120000
+  # 可用模型列表
+  models:
+    - name: GLM-4-9B
+      model: THUDM/GLM-4-9B-0414
+      baseUrl: https://api.siliconflow.cn/v1
+    - name: DeepSeek-R1-0528
+      model: deepseek-ai/DeepSeek-R1-0528-Qwen3-8B
+      baseUrl: https://api.siliconflow.cn/v1
+    - name: Qwen3-8B
+      model: Qwen/Qwen3-8B
+      baseUrl: https://api.siliconflow.cn/v1
+    - name: Qwen3.5-4B
+      model: Qwen/Qwen3.5-4B
+      baseUrl: https://api.siliconflow.cn/v1
+    - name: Qwen2.5-7B
+      model: Qwen/Qwen2.5-7B-Instruct
+      baseUrl: https://api.siliconflow.cn/v1
+
+# springdoc
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    edu.zjut.traceqa: info

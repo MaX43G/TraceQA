@@ -1,0 +1,147 @@
+# ============================================================
+# 溯知 / TraceQA 网关配置
+# 对外端口 8080（经 Caddy 反向代理；服务器仅开放 80/443/6115/6116）
+# ============================================================
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: traceqa-gateway
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+    gateway:
+      server:
+        webflux:
+          discovery:
+            locator:
+              enabled: false
+          routes:
+            # ---- 用户服务：认证 + 用户/角色管理 ----
+                    - id: traceqa-user-service-auth
+                      uri: lb://traceqa-user-service
+                      predicates:
+                        - Path=/api/auth/**
+                    - id: traceqa-user-service-admin
+                      uri: lb://traceqa-user-service
+                      predicates:
+                        - Path=/api/admin/**
+
+                    # ---- 文件服务：MinIO 文件上传下载 ----
+                    - id: traceqa-file-service
+                      uri: lb://traceqa-file-service
+                      predicates:
+                        - Path=/api/files/**
+
+                    # ---- 知识库服务：知识库 + 文档 ----
+                    - id: traceqa-kb-service
+                      uri: lb://traceqa-kb-service
+                      predicates:
+                        - Path=/api/kbs/**,/api/documents/**
+
+                    # ---- 问答服务：对话 + 模型 + 系统提示词 ----
+                    - id: traceqa-qa-service
+                      uri: lb://traceqa-qa-service
+                      predicates:
+                        - Path=/api/chat/**,/api/models/**,/api/prompts/**
+
+                    # ---- 管理服务：公告 + 监控 + 健康检查 ----
+                    - id: traceqa-admin-service
+                      uri: lb://traceqa-admin-service
+                      predicates:
+                        - Path=/api/announcement/**,/api/monitor/**,/api/health
+
+                    # ---- 管理服务：可观测性 / LightRAG WebUI 反向代理 ----
+                    - id: traceqa-admin-proxy
+                      uri: lb://traceqa-admin-service
+                      predicates:
+                        - Path=/lightrag-webui/**,/grafana/**,/prometheus/**,/docs,/redoc,/openapi.json
+
+                    # ---- 接口文档聚合（各服务 /v3/api-docs）----
+                    - id: traceqa-user-service-docs
+                      uri: lb://traceqa-user-service
+                      predicates:
+                        - Path=/user/v3/api-docs
+                      filters:
+                        - RewritePath=/user/v3/api-docs, /v3/api-docs
+                    - id: traceqa-file-service-docs
+                      uri: lb://traceqa-file-service
+                      predicates:
+                        - Path=/file/v3/api-docs
+                      filters:
+                        - RewritePath=/file/v3/api-docs, /v3/api-docs
+                    - id: traceqa-kb-service-docs
+                      uri: lb://traceqa-kb-service
+                      predicates:
+                        - Path=/kb/v3/api-docs
+                      filters:
+                        - RewritePath=/kb/v3/api-docs, /v3/api-docs
+                    - id: traceqa-qa-service-docs
+                      uri: lb://traceqa-qa-service
+                      predicates:
+                        - Path=/qa/v3/api-docs
+                      filters:
+                        - RewritePath=/qa/v3/api-docs, /v3/api-docs
+                    - id: traceqa-admin-service-docs
+                      uri: lb://traceqa-admin-service
+                      predicates:
+                        - Path=/admin/v3/api-docs
+                      filters:
+                        - RewritePath=/admin/v3/api-docs, /v3/api-docs
+
+  # Redis：Sa-Token 共享登录态
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: 6379
+      timeout: 6s
+
+# Sa-Token 配置（需与用户服务一致，共享同一套 Redis 登录态）
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer
+  token-style: uuid
+  timeout: 86400
+  active-timeout: -1
+  is-concurrent: false
+  is-share: false
+  is-log: false
+
+# springdoc 网关 OpenAPI 聚合
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    urls:
+      - name: 用户服务
+        url: /user/v3/api-docs
+      - name: 文件服务
+        url: /file/v3/api-docs
+      - name: 知识库服务
+        url: /kb/v3/api-docs
+      - name: 问答服务
+        url: /qa/v3/api-docs
+      - name: 管理服务
+        url: /admin/v3/api-docs
+
+# 网关自定义配置
+traceqa:
+  gateway:
+    # 无需登录的公开路径（与业务保持一致）
+    public-paths:
+      - /api/auth/login
+      - /api/auth/register
+      - /api/health
+      - /api/announcement/active
+
+logging:
+  level:
+    edu.zjut.traceqa: info

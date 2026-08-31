@@ -1,10 +1,13 @@
 # 溯知 · TraceQA
 
-> 《数据挖掘》智能问答平台 —— 基于知识图谱与向量检索，多 Agent 协同的智能助教系统。
+> 《数据挖掘》智能问答平台 —— 基于知识图谱与向量检索，多 Agent 协同的智能助教系统（微服务架构）。
 
 溯知（TraceQA）以课程教材与 PPT 为知识源，通过 **LightRAG（图谱 + 向量双路检索）** 与 **Spring AI Alibaba 多 Agent 协同**
 ，实现「意图识别 → 检索调度 → 检索/搜索 → 总结」的完整工作流；SSE 流式推送思考状态与打字机回答，支持引用溯源、随时中断、模型自由切换、多轮对话与移动端访问。平台进一步支持
 **语音输入**（Web Speech API）与**「猜你想问」智能追问**，并接入 **MinIO 对象存储**统一管理用户文件（头像）。
+
+后端已由单体重构为 **Spring Cloud 微服务**：以 **Nacos** 服务注册发现 + **Spring Cloud Gateway** 网关（负载均衡 + Sa-Token 统一鉴权 + OpenAPI 聚合），
+按业务边界拆分为 **用户 / 文件 / 知识库 / 问答 / 管理** 五个高内聚、低耦合的微服务，各服务间通过 **OpenFeign** 完成 RPC 调用，共享一个 `common` 通用库。
 
 ---
 
@@ -12,6 +15,8 @@
 
 - [架构设计](#架构设计)
 - [核心特性](#核心特性)
+- [微服务划分](#微服务划分)
+- [端口规划](#端口规划)
 - [模型体系](#模型体系)
 - [快速开始（Docker 一键部署）](#快速开始docker-一键部署)
 - [本地开发](#本地开发)
@@ -28,33 +33,39 @@
                          ┌──────────────────────────────┐
                          │       浏览器 / 用户          │
                          └──────────────┬───────────────┘
-                                        │  SSR + SSE + OpenAPI 客户端
-                       ┌────────────────▼────────────────┐
-                       │     前端（Nuxt 4 SSR）          │
-                       │  Vue3 + TS + Pinia + Antd       │
-                       │  首页/问答/登录/管理后台        │
-                       │  打字机·状态图·引用·中断·移动端 │
-                       │  /api 代理解决跨域              │
-                       └────────────────┬────────────────┘
-                                        │  /api/**（前端代理转发）
-                       ┌────────────────▼────────────────┐
-                       │    后端（Spring Boot 4.1）      │
-                       │  统一响应/全局异常/RBAC/熔断降级│
-                       │  MyBatis-Plus(MySQL) · SSE      │
-                       │  多 Agent 编排 · 三路混合检索   │
-                       └──────┬─────────────┬────────────┘
-                              │ 多Agent     │ 文档/检索
-                    ┌─────────▼──────┐  ┌────▼─────────────┐
-                    │ LLM（硅基流动）│  │ LightRAG 官方    │
-                    │ OpenAI 兼容    │  │ Server（图+向量+ │
-                    └────────────────┘  │  关键词）        │
-                                        └──────┬───────────┘
-                                               │ 本地文件系统/图谱
-                        ┌──────────────────────────────────────┐
-                        │ Redis（查询/决策缓存 · 文档任务队列）│
-                        └──────────────────────────────────────┘
+                                        │  HTTPS（80 / 443 / 6115）
+                        ┌───────────────▼────────────────┐
+                        │   Caddy 反向代理（前端入口）   │
+                        └───────────────┬────────────────┘
+                        ┌───────────────▼────────────────┐
+                        │     前端（Nuxt 4 SSR）         │
+                        │  /api/** 经 Nitro 代理 → 网关  │
+                        └───────────────┬────────────────┘
+                                        │  /api/**、/lightrag-webui/**、/grafana/**…
+                        ┌───────────────▼─────────────────┐
+                        │   traceqa-gateway（Spring Cloud │
+                        │   Gateway · WebFlux）           │
+                        │   Nacos 负载均衡 + Sa-Token 鉴权│
+                        │   OpenAPI 聚合（接口文档）      │
+                        └───┬────┬────┬────┬────┬─────────┘
+              ┌─────────────┘    │    │    │    └──────────────┐
+        ┌─────▼──────┐ ┌────────▼───┐ ┌─▼────────┐ ┌─────────▼──┐ ┌────────▼──────┐
+        │user-service│ │file-service│ │kb-service│ │ qa-service │ │ admin-service │
+        │ 用户·认证  │ │ MinIO 文件 │ │ 知识库·  │ │对话·多Agent│ │ 公告·监控·    │
+        │ ·RBAC 管理 │ │ 上传下载   │ │ 文档解析 │ │ ·检索·LLM  │ │健康·可观测代理│
+        └─────┬──────┘ └─────┬──────┘ └─┬────────┘ └──────┬─────┘ └───────┬───────┘
+              │  OpenFeign    │         │  OpenFeign      │               │
+              │◄──────────────►│        │◄────────────────┘◄──────────────┘ (指标聚合)
+              │  (头像字节上传) │
+        ┌─────▼────────────────▼───────┐ ┌────▼─────────────┐ ┌──────────────┐
+        │ MySQL（独立库 per 服务）     │ │ LightRAG 官方    │ │ Redis（缓存  │
+        │ traceqa_user/kb/qa/admin     │ │ Server（图+向量+ │ │ ·队列·熔断·  │
+        └──────────────────────────────┘ │  关键词）        │ │ sa-token）   │
+                                         └──────────────────┘ └──────────────┘
+                        ┌──────────── Nacos 注册中心 / 配置中心 ──────────────┐
+                        └─────────────────────────────────────────────────────┘
         ┌────────────────────────── 可观测性（仅管理员）──────────────────────────┐
-        │ 后端 Actuator(/actuator) ──Prometheus──▶ Grafana ── 经后端代理访问      │
+        │ admin-service Actuator ──Prometheus──▶ Grafana ── 经网关/管理服务代理   │
         └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -64,39 +75,62 @@
 意图识别 → 检索策略调度 → 查询重写与HyDE → 图谱检索(local+global) → 向量检索(多查询) → 关键词检索 → 融合与补全(RRF+ReRead+LLM精排) → 总结生成
 ```
 
-调度节点按问题复杂度分流： **简单问题仅向量检索（更快）**， **复杂问题走完整聚合链路**。
+调度节点按问题复杂度分流：**简单问题仅向量检索（更快）**，**复杂问题走完整聚合链路**。
 
 ## 核心特性
 
+- **微服务架构**：Spring Cloud Gateway 网关 + Nacos 注册发现 + OpenFeign RPC，用户/文件/知识库/问答/管理五个高内聚服务
+- **统一鉴权**：网关基于 Sa-Token（Redis 共享登录态）统一登录校验，并将用户信息以请求头透传下游；方法级 RBAC 注解二次鉴权
 - **统一响应** `{code,msg,data,traceId}` + 全局错误码 + 全局异常处理（绝不外泄堆栈）
-- **熔断降级**：LLM 失败自动熔断，逐级降级（Agent → ChatClient → 纯检索 → 友好提示）
-- **三路混合检索**：查询重写、HyDE、图谱 (local+global)+向量 (多查询)+关键词 (hl_keywords)、RRF 融合、ReRead 补全、语义重排（
-  `BAAI/bge-reranker-v2-m3`，可选）
-- **Agentic 检索策略**：由模型动态规划调用哪些检索工具（图谱/向量/关键词），规则兜底，更智能地匹配问题类型
-- **查询分解**：对比/比较类问题自动拆分为子问题多路检索，召回更完整
-- **Redis 缓存**：查询结果、Agent 决策（意图/复杂度/重写）短 TTL 缓存，显著降低 LLM 调用与响应延迟
-- **LLM 复杂度调度**：简单/复杂问题智能分流，兼顾速度与准确率
-- **多轮对话**：历史上下文注入意图识别、查询重写与总结
-- **SSE 流式**：思考状态图实时可视化（三路检索节点）+ 打字机输出 + 随时中断
-- **引用溯源**：只显示实际引用的文献，点击查看全文
-- **模型自由切换**：平台内置 6 个模型 + 自定义 OpenAI 兼容模型（本地存储）
-- **异步文档解析**：支持 .md/.txt 上传与 zip 批量导入，内容指纹去重；大文档切块限速入库（Redis Stream 任务队列），小文档整体提交避免放大
-  LLM 抽取成本，进度实时追踪
-- **知识库**：聊天默认检索 **全部知识库**（不区分/不隔离），管理员在后台统一管理知识库与文档
-- **用户禁用即时生效**：禁用账号立即踢出所有会话，再次登录被拒
-- **RBAC 管理后台**：用户/角色/知识库/文档/系统提示词
-- **可观测性（管理员专属）**：后端 Actuator 指标 + Prometheus 采集 + Grafana 大盘，经后端反向代理统一鉴权访问；管理页实时展示延迟分位/慢请求/错误率/JVM/运行日志
-- **移动端适配** + SSR/SEO 首页
-- **语音输入**：调用浏览器原生 **Web Speech API**（`SpeechRecognition`） **前端实时识别**并填入输入框，完全免费、无需后端参与（Chrome/Edge
-  支持）
-- **猜你想问**：每次回答完成后，AI 解读当前问答并推荐 1-2 个最可能追问的问题，点击即继续深入
-- **头像与个人信息**：接入 **MinIO 对象存储**统一管理用户文件；前端基于 cropperjs
-  高级裁剪（参考线/比例/旋转/缩放）后上传；修改昵称、上传头像、修改密码整合到统一的个人信息页
-- **公告栏**：管理员可在管理后台发布系统公告，首页顶部公告栏面向所有用户展示
+- **熔断降级**：LLM 失败自动熔断（Redis 状态机），逐级降级（Agent → ChatClient → 纯检索 → 友好提示）
+- **三路混合检索**：查询重写、HyDE、图谱 (local+global)+向量 (多查询)+关键词 (hl_keywords)、RRF 融合、ReRead 补全、语义重排
+- **Agentic 检索策略** + **查询分解**（对比类问题拆分）
+- **Redis 缓存**：查询/决策短 TTL 缓存，降低 LLM 调用与延迟
+- **多轮对话**、**SSE 流式**、**引用溯源**、**模型自由切换**
+- **异步文档解析**：.md/.txt 上传与 zip 批量导入，内容指纹去重，Redis Stream 任务队列 + LightRAG 入库
+- **RBAC 管理后台**、**用户禁用即时生效**
+- **可观测性**：管理服务 Actuator + Prometheus + Grafana，经代理统一鉴权访问
+- **语音输入**（Web Speech API）、**猜你想问**、**头像与个人信息**（MinIO + cropperjs）、**公告栏**
+
+## 微服务划分
+
+| 模块 | 职责 | 独立数据表 | 端口 |
+|------|----------------|------------|------|
+| `traceqa-common` | 通用库：统一响应/异常/实体/DTO/VO/RBAC/Feign 契约/LightRAG 客户端 | — | 库 |
+| `traceqa-gateway` | 网关：Nacos 负载均衡路由、Sa-Token 鉴权、OpenAPI 聚合 | — | 8080 |
+| `traceqa-user-service` | 用户注册登录、用户/角色 RBAC 管理、头像（经文件服务） | t_user, t_role | 8081 |
+| `traceqa-file-service` | MinIO 对象存储，统一文件上传下载 | — | 8083 |
+| `traceqa-kb-service` | 知识库与文档管理、异步解析入库（LightRAG） | t_knowledge_base, t_document | 8084 |
+| `traceqa-qa-service` | 会话消息、多 Agent 检索编排、LLM、系统提示词、模型 | t_chat_session, t_chat_message, t_system_prompt | 8085 |
+| `traceqa-admin-service` | 系统公告、监控聚合、健康检查、可观测性反向代理 | t_announcement | 8086 |
+
+微服务间通过 **OpenFeign** 完成 RPC：用户服务调用文件服务上传头像字节；管理服务拉取知识库服务队列统计与问答服务熔断状态。
+
+## 端口规划
+
+服务器对外 **仅开放 80 / 443 / 6115 / 6116** 四个端口（Caddy 前端 HTTPS 与 MinIO 头像直链）；其余端口在 Docker 容器内开放供微服务间通信，
+需在服务器防火墙阻断外网访问。
+
+| 服务 | 容器内端口 | 宿主端口 | 对外 |
+|------|-----------|----------|------|
+| Caddy（前端 HTTPS） | 80/443 | 80 / 443 / 6115 | ✅ 公开 |
+| MinIO（S3 头像直链） | 9000 | 6116 | ✅ 公开 |
+| 网关 gateway | 8080 | 6114 | 内网 |
+| 用户服务 | 8081 | 6122 | 内网 |
+| 文件服务 | 8083 | 6123 | 内网 |
+| 知识库服务 | 8084 | 6124 | 内网 |
+| 问答服务 | 8085 | 6125 | 内网 |
+| 管理服务 | 8086 | 6126 | 内网 |
+| Nacos | 8848/9848 | 6120/6121 | 内网 |
+| MySQL | 3306 | 6118 | 内网 |
+| Redis | 6379 | 6117 | 内网 |
+| LightRAG | 9621 | 6119 | 内网 |
+| Prometheus | 9090 | 6127 | 内网 |
+| Grafana | 3000 | 6128 | 内网 |
 
 ## 模型体系
 
-平台内置服务端模型（共享硅基流动 Base URL/API Key，前端一键切换）：
+平台内置服务端模型（共享硅基流动 Base URL/API Key，前端一键切换），也支持用户填写任意 **OpenAI 兼容自定义模型**。
 
 | 模型             | 名称                                    |
 |------------------|-----------------------------------------|
@@ -107,8 +141,6 @@
 | Qwen3.5-4B       | `Qwen/Qwen3.5-4B`                       |
 | Qwen2.5-7B       | `Qwen/Qwen2.5-7B-Instruct`              |
 
-也支持用户填写任意 **OpenAI 兼容自定义模型**（Base URL / API Key / 模型名），配置仅存浏览器本地。
-
 ## 快速开始（Docker 一键部署）
 
 > 前置：Docker 24+ / Docker Compose v2；需自备硅基流动 API Key（`.env` 中配置）。
@@ -118,126 +150,117 @@
 cp .env.example .env
 #    填入 LLM_API_KEY（硅基流动）；可调整 LLM_MODEL 等
 
-# 2. 一键拉起（mysql + redis + lightrag + minio + backend + frontend + prometheus + grafana）
+# 2. 一键拉起（mysql + redis + nacos + lightrag + minio + gateway + 5 微服务 + frontend + prometheus + grafana）
 docker compose up -d --build
 ```
+
+> **已有 MySQL 数据卷需迁移**：`docker-entrypoint-initdb.d` 仅在 MySQL 数据卷首次初始化时执行。若本机此前已运行过单体版 TraceQA（已存在 `traceqa` 库），
+> 首次启动微服务会报 `Access denied for user 'traceqa'@'%' to database 'traceqa_user'`。执行迁移脚本（幂等）：
+> ```bash
+> # 1) 补建各微服务独立库、授权并建表
+> docker compose exec mysql bash /docker-entrypoint-initdb.d/migrate-existing.sh
+> # 2) 将旧单体 traceqa 库数据复制到各微服务独立库，完成后删除旧 traceqa 数据库（含旧表）
+> docker compose exec mysql bash /docker-entrypoint-initdb.d/migrate-data.sh
+> ```
+> 或彻底重置数据卷后重新初始化（会清空 MySQL/Redis/MinIO 数据，旧数据不保留）：`docker compose down -v && docker compose up -d --build`。
 
 启动后访问：
 
 | 服务                           | 地址                                                                                                     |
 |--------------------------------|----------------------------------------------------------------------------------------------------------|
 | 前端（HTTPS）                  | https://localhost:6115                                                                                   |
-| 后端 API                       | http://localhost:6114                                                                                    |
-| OpenAPI 规范                   | http://localhost:6114/v3/api-docs                                                                        |
+| 网关 / 后端 API                | http://localhost:6114                                                                                    |
+| OpenAPI 聚合文档（Swagger UI） | http://localhost:6114/swagger-ui.html                                                                    |
 | MinIO 对象存储（S3，对外公开） | http://localhost:6116                                                                                    |
-| LightRAG WebUI                 | 经前端「LightRAG 管理 → 打开 WebUI」代理访问（`/lightrag-webui/`，不对外直连）；外网端口已迁移至 `:6119` |
-| Prometheus                     | 经前端「系统监控 → 打开 Prometheus」代理访问（`/prometheus/`）；或直连 `:6112/prometheus`                |
-| Grafana 大盘                   | 经前端「系统监控 → 打开 Grafana」代理访问（`/grafana/`）；或直连 `:6113`                                 |
+| Nacos 控制台                   | http://localhost:6120/nacos（默认 nacos/nacos）                                                          |
 | MySQL                          | localhost:6118                                                                                           |
 | Redis                          | localhost:6117                                                                                           |
 
-**默认账号**：`admin/admin123456`（管理员）、`user/user123456`（生产环境务必修改）。
+**默认账号**：`admin` / `user`（密码由环境变量 `DEFAULT_ADMIN_PASSWORD` / `DEFAULT_USER_PASSWORD` 注入，见 `.env`；未配置则不创建默认账号。生产环境务必修改）。
 
 > **HTTPS / 麦克风（重要）**：浏览器要求页面为 **安全上下文**才允许调用麦克风（语音输入）。前端经 **Caddy** 在 `:6115` 提供
-> HTTPS（`tls internal` 自签证书，Caddy 自动管理/续期）。 **无公网域名时无法申请公网受信证书（Let's Encrypt 只给域名发证）**
-> ，但可把
-> Caddy 内部 CA 安装为系统/浏览器受信根，获得绿锁（等效受信）：
+> HTTPS（`tls internal` 自签证书）。无公网域名时可将 Caddy 内部 CA 安装为受信根证书获得绿锁：
 > ```bash
-> docker compose exec caddy cat /data/caddy/pki/authorities/local/root.crt   # 导出根证书
-> # 将导出的 root.crt 导入系统/浏览器的「受信任的根证书颁发机构」
+> docker compose exec caddy cat /data/caddy/pki/authorities/local/root.crt   # 导出根证书并导入受信任根
 > ```
-> 若配置了公网域名，改 `frontend/Caddyfile` 的 `tls internal` 为 `tls 你的域名` 即可自动申请受信任的 Let's Encrypt 证书。
+> 若配置了公网域名，改 `frontend/Caddyfile` 的 `tls` 即可自动申请 Let's Encrypt 证书。
 >
-> **MinIO（HTTPS）**：MinIO 的 S3 API 也经 Caddy 在 `:6116` 提供 HTTPS（与前端共用同一内部 CA，受信后头像图片可正常显示，避免
-> HTTPS 页面加载 HTTP 图片的混合内容拦截）。`MINIO_PUBLIC_URL` 请设为服务器公网 HTTPS 地址，如 `https://121.41.72.189:6116`
-> 。默认账号 `minioadmin / minioadmin`，可在 `.env` 修改（生产务必改）。后端自动建桶并设置 **公共只读策略**。
+> **MinIO（HTTPS）**：S3 API 经 Caddy 在 `:6116` 提供 HTTPS，`MINIO_PUBLIC_URL` 设为服务器公网 HTTPS 地址（如
+> `https://121.41.72.189:6116`）。后端自动建桶并设置 **公共只读策略**。
 >
-> **Redis**：已取消内存上限限制，并开启 AOF 落盘持久化，重启后缓存与任务队列不丢失。
+> **文档格式**：仅支持 `.md` / `.txt`（zip 批量导入）；PDF/PPT/Word 请先转换为 Markdown。
 >
-> **资源利用**：docker-compose 各服务不限制 CPU/内存，JVM 堆按容器可用内存动态分配（`-XX:MaxRAMPercentage=75`），Redis 无
-> `--maxmemory` 上限，充分利用服务器资源。
-
-> **文档格式说明**：仅支持上传 **`.md` / `.txt`** 文本文件（支持 zip 批量导入，自动内容去重）。
-> PDF / PPT / Word / 图片等格式请先用 MinerU 等工具转换为 Markdown 后再上传（LightRAG 内置 pypdf 无法解析扫描版 PDF
-> 的文本层）。
-
-> **LightRAG 说明**：Docker 部署中 LightRAG 使用 `Qwen/Qwen3.5-4B` + `BAAI/bge-m3`（硅基流动），并已开启 **低并发 +
-重试退避 + 超时调优**以缓解免费额度限流。相关可调参数见 `.env.example`：`LIGHTRAG_MAX_ASYNC_LLM`（抽取并发）、
-> `LIGHTRAG_LLM_TIMEOUT`（LLM 超时，默认 900s）、`LIGHTRAG_EMBEDDING_TIMEOUT`（嵌入超时）、`LIGHTRAG_LLM_MAX_OUTPUT_TOKENS`
-> （抽取输出上限）。若仍遇限流，可在 `.env` 调整 `LLM_MODEL`，或改用本地 Ollama 模型实现无限流。
-
-> **知识库与文档**：系统使用 **全部知识库**检索，不做按库选择或隔离；上传文档时需指定所属知识库（仅用于归档与管理）。删除知识库仅逻辑删除数据库记录，
-> **不会清除 LightRAG 图谱索引中的旧内容**。
-
-## 可观测性（Prometheus + Grafana，仅管理员可见）
-
-项目内置一套 **管理员专属**的可观测性栈，所有指标与大盘均经后端反向代理统一鉴权（管理员会话）访问，不对外直连数据库或暴露弱口令服务：
-
-- **后端 Actuator**：`/actuator/*` 端点（`health/info/metrics/prometheus/loggers`），全部要求 **ADMIN 角色**；
-  `/actuator/prometheus` 额外接受抓取令牌 `X-Scrape-Token`。
-- **Prometheus**：抓取后端指标，挂载在 `/prometheus/` 子路径，管理端经代理访问。
-- **Grafana**：自带「TraceQA 运行大盘」（JVM 堆/非堆、HTTP 速率与 P95、线程、CPU 等）， **免登录（匿名 Admin）**，挂载在 `/grafana/`
-  子路径，经代理访问。
-- **系统监控页**：管理后台 → 系统监控，展示延迟分位（P50/P95/P99）、HTTP 状态分布、慢请求、接口错误率、JVM 运行时、最近异常日志，并可直接点按钮打开
-  Grafana / Prometheus。
-
-> ⚠️ **安全提示**：Prometheus（`:6112`）与 Grafana（`:6113`）已对外暴露端口。Grafana 为匿名管理员、Prometheus 无鉴权，
-> **请务必在部署服务器配置防火墙，仅放行可信 IP/内网**；否则任何人可直连获取全部运行指标乃至 Grafana 管理权。管理端主入口建议一律走经后端代理的
-> `/prometheus/`、`/grafana/`。
+> **LightRAG**：使用 `Qwen/Qwen3.5-4B` + `BAAI/bge-m3`，低并发 + 重试退避 + 超时调优以缓解限流。
+>
+> **知识库**：系统使用 **全部知识库**检索，不做按库隔离；删除知识库不会清除 LightRAG 图谱索引中的旧内容。
 
 ## 本地开发
 
 详见 [docs/DEVELOP.md](docs/DEVELOP.md)。核心命令：
 
 ```bash
-.\mvnw.cmd spring-boot:run          # 后端 :8080（dev profile 连本地 MySQL root/123456）
-cd frontend && pnpm install && pnpm dev   # 前端 :3000
-cd frontend && pnpm gen:api         # 依据 /v3/api-docs 重新生成 TS API 客户端
+# 1. 基础设施（Nacos + MySQL + Redis）
+docker compose up -d mysql redis nacos lightrag minio
+
+# 2. 编译后端（多模块）
+.\mvnw.cmd clean package -DskipTests
+
+# 3. 逐个启动微服务（IDEA 运行各模块 Application，或 java -jar 对应 jar）
+java -jar traceqa-gateway/target/*.jar
+java -jar traceqa-user-service/target/*.jar
+# ... file / kb / qa / admin
+
+# 4. 前端
+cd frontend && pnpm install && pnpm dev   # :3000（/api 代理到 localhost:8080 网关）
+
+# 5. 重新生成前端 API 客户端（接口变更后）
+cd frontend && pnpm gen:api
 ```
 
 ## API 契约
 
-- 后端基于 springdoc 自动生成 **OpenAPI 3**（`/v3/api-docs`），前端 `@umijs/openapi` 自动生成 TS 客户端（`frontend/app/api/`
-  ），禁止手写魔法字符串。
-- 统一响应：`{ code, msg, data, traceId, detail? }`（`detail` 为排障根因，仅在出错时存在）。
-- SSE 事件（`POST /api/chat/stream`）：`thinking` / `delta` / `references` / `done` / `error`。
-- 可观测性端点：`/actuator/*`（仅管理员）、`/grafana/**`、`/prometheus/**`（经后端代理 + 管理员 Cookie）。
+- 网关聚合各微服务 springdoc 生成的 **OpenAPI 3**，统一入口 `/swagger-ui.html`（Swagger UI）与 `/v3/api-docs`。
+- 前端基于 `/v3/api-docs` 用 `@umijs/openapi` 自动生成 TS 客户端。
+- 统一响应：`{ code, msg, data, traceId, detail? }`。
+- SSE 事件（`POST /api/chat/stream`）：`thinking` / `delta` / `references` / `stats` / `done` / `error`。
 
-主要接口：
+主要接口（网关按路径路由到对应微服务）：
 
-| 模块       | 接口                                                                                                                               |
-|------------|------------------------------------------------------------------------------------------------------------------------------------|
-| 认证       | `/api/auth/login                                                                       \|register\|me\|nickname\|password\|avatar` |
-| 模型       | `/api/models`                                                                                                                      |
-| 对话       | `/api/chat/stream`（SSE）、会话/消息 CRUD、`/export`、`/api/chat/followup`（猜你想问）                                             |
-| 知识库     | `/api/kbs`                                                                                                                         |
-| 文档       | `/api/documents`（202 异步）、`/{id}/progress`（SSE）                                                                              |
-| 系统提示词 | `/api/prompts`                                                                                                                     |
-| 系统公告   | `/api/announcement/active`（公开）、`/api/announcement`（管理员）                                                                  |
-| 管理后台   | `/api/admin/users`、`/api/admin/roles`                                                                                             |
+| 模块       | 接口                                                               | 路由到            |
+|------------|--------------------------------------------------------------------|-------------------|
+| 认证/管理   | `/api/auth/*`、`/api/admin/*`                                      | user-service      |
+| 文件       | `/api/files/*`                                                     | file-service      |
+| 知识库/文档 | `/api/kbs/*`、`/api/documents/*`                                   | kb-service        |
+| 对话/模型/提示词 | `/api/chat/*`、`/api/models`、`/api/prompts/*`                 | qa-service        |
+| 公告/监控/健康 | `/api/announcement/*`、`/api/monitor/*`、`/api/health`         | admin-service     |
+| 代理       | `/lightrag-webui/**`、`/grafana/**`、`/prometheus/**`              | admin-service     |
 
 ## 目录结构
 
 ```
 TraceQA/
-├── src/main/java/edu/zjut/traceqa/   # 后端（common/config/entity/mapper/dto/service/retrieval/agent/sse/controller）
-├── frontend/app/                     # 前端（pages/components/composables/stores/utils/middleware/api）
-├── frontend/scripts/                 # gen-api 脚本
-├── docker/                           # Prometheus / Grafana 可观测性配置
-├── docs/DEVELOP.md                   # 开发文档
-├── Dockerfile / docker-compose.yml / .env.example
+├── traceqa-common/             # 通用库（api/exception/enums/model/context/rbac/config/client/convert/util）
+├── traceqa-gateway/            # 网关（Spring Cloud Gateway + Nacos + Sa-Token + OpenAPI 聚合）
+├── traceqa-user-service/       # 用户服务（auth + RBAC）
+├── traceqa-file-service/       # 文件服务（MinIO）
+├── traceqa-kb-service/         # 知识库服务（kb + document + 解析 worker）
+├── traceqa-qa-service/         # 问答服务（chat + agent/retrieval + llm + prompts + models）
+├── traceqa-admin-service/      # 管理服务（announcement + monitor + health + 可观测代理）
+├── frontend/app/               # 前端（pages/components/composables/stores/utils/middleware/api）
+├── db/                         # 各微服务独立数据库初始化脚本与表结构
+├── docker/                     # 各服务 Dockerfile + Prometheus / Grafana 配置
+├── docs/DEVELOP.md             # 开发文档
+├── pom.xml                     # 父工程（多模块聚合）
+├── docker-compose.yml          # 一键部署
 └── README.md
 ```
 
 ## 常见问题
 
-- **LightRAG 限流上传失败 / 上传慢？** 已内置低并发 + 重试 + 超时调优（`LIGHTRAG_LLM_TIMEOUT=900`），且小文档不再切块（降低
-  LLM 抽取次数）。仍慢可改本地 Ollama（无限流）或错峰上传。
-- **删除知识库后还能检索到旧内容？** 删除仅逻辑删除数据库记录，不清理 LightRAG 图谱索引，旧内容仍可能被检索到（系统本身不区分知识库）。如需彻底下线，需在
-  LightRAG 侧清理对应文档。
-- **禁用用户还能继续对话？** 禁用即踢下线并阻止再次登录；若会话已建立，服务端每个请求也会校验用户状态。
+- **服务如何被发现？** 各微服务与网关注册到 Nacos，网关经 `lb://服务名` 负载均衡路由。
+- **登录态如何跨服务生效？** sa-token 登录态存于共享 Redis；网关校验后将用户信息以 `X-User-Id` 等请求头透传下游，下游解析为 `UserContext`。
+- **如何查看接口文档？** 访问 `http://localhost:6114/swagger-ui.html`（网关聚合所有微服务）。
+- **LightRAG 限流上传失败 / 上传慢？** 已内置低并发 + 重试 + 超时调优，小文档不再切块；仍慢可改本地 Ollama。
+- **禁用用户还能继续对话？** 网关校验登录 + 各服务二次鉴权，禁用即踢下线并阻止再次登录。
 - **修改了后端接口？** `cd frontend && pnpm gen:api` 重新生成客户端。
-- **如何查看运行指标 / 打开监控大盘？** 管理员在「管理后台 → 系统监控」点「打开 Grafana / Prometheus」，经后端代理鉴权访问；也可直连
-  `:6113`（Grafana）/ `:6112/prometheus`（Prometheus），但需用防火墙限制来源（二者均为匿名/无鉴权）。
-- **上传 zip 批量导入报「压缩包解析失败」？** 通常是文件不是标准 zip（如改名/7z/rar/tar.gz），`invalid LOC header`
-  即为此；请用标准方式重新压缩为 .zip（内含 .md/.txt）。
+- **只开放 80/443/6115/6116？** 微服务各端口在容器内开放供内部通信；请在服务器防火墙阻断 6114、6122-6128、6117-6121 等端口的外网访问。

@@ -18,9 +18,9 @@ RUN corepack prepare pnpm@latest --activate
 # 使用国内 pnpm 镜像源
 RUN pnpm config set registry https://registry.npmmirror.com
 
-# 拷贝源码并构建（API 代理目标在构建期注入，指向后端容器）
+# 拷贝源码并构建（API 代理目标在构建期注入，指向网关容器）
 COPY . .
-ARG API_PROXY_TARGET=http://backend:8080
+ARG API_PROXY_TARGET=http://gateway:8080
 ENV API_PROXY_TARGET=$API_PROXY_TARGET
 RUN pnpm build
 

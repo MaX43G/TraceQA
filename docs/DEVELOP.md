@@ -1,248 +1,168 @@
 # 溯知 · TraceQA 开发文档
 
-> 《数据挖掘》课程 RAG 智能问答平台 —— 开发指南
+> 《数据挖掘》课程 RAG 智能问答平台 —— 微服务架构开发指南
 
 ## 1. 技术栈
 
-| 层次      | 技术                                                                                                                                                                  |
-|-----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 前端      | Nuxt 4（SSR）、Vue 3、TypeScript、Pinia、Ant Design Vue、markdown-it                                                                                                  |
-| API 契约  | 后端 springdoc 生成 OpenAPI → 前端 `@umijs/openapi` 生成 TS 客户端                                                                                                    |
-| 后端      | Spring Boot 4.1、Java 25、Spring AI Alibaba Agent、springdoc-openapi                                                                                                  |
-| ORM       | MyBatis-Plus                                                                                                                                                          |
-| 数据库    | MySQL 8（单库）                                                                                                                                                       |
-| 对象存储  | MinIO（统一管理用户上传文件，如头像；S3 兼容，公开端口 6116）                                                                                                         |
-| 缓存/队列 | Redis（查询与 Agent 决策缓存、文档解析任务队列 Redis Stream；AOF 落盘持久化、无内存上限）                                                                             |
-| 检索      | LightRAG（图谱 + 向量 + 关键词），Agentic 策略规划 / 查询重写 / HyDE / 查询分解 / 三路检索 / RRF 融合 / ReRead / 语义重排（bge-reranker-v2-m3，可选）                 |
-| 可观测性  | Spring Boot Actuator + Micrometer/Prometheus + Prometheus + Grafana（管理员专属）                                                                                     |
-| 部署      | Docker Compose（mysql + redis + lightrag + minio + backend + frontend + caddy + prometheus + grafana）                                                                |
-| HTTPS     | Caddy 反向代理前端 `:6115`；无域名用自签证书（`tls internal`，自动管理/续期）提供安全上下文以放行浏览器麦克风；有域名改 Caddyfile 的 `tls` 即可自动申请 Let's Encrypt |
+| 层次       | 技术 |
+|-----------|------|
+| 前端       | Nuxt 4（SSR）、Vue 3、TypeScript、Pinia、Ant Design Vue、markdown-it |
+| 网关       | Spring Cloud Gateway 2025.1（WebFlux）、Sa-Token（响应式）、springdoc 聚合 |
+| 微服务框架 | Spring Cloud Alibaba 2025.1（Nacos 注册发现/配置）、OpenFeign（服务间 RPC） |
+| 后端       | Spring Boot 4.1、Java 25、Spring AI Alibaba Agent、springdoc-openapi |
+| 鉴权       | Sa-Token（Redis 共享登录态）+ 网关统一校验 + 方法级 RBAC 注解 |
+| ORM        | MyBatis-Plus（各服务独立库） |
+| 数据库     | MySQL 8（traceqa_user / kb / qa / admin 四库） |
+| 对象存储   | MinIO（统一管理用户文件，如头像；S3 兼容，公开端口 6116） |
+| 缓存/队列  | Redis（查询与决策缓存、文档解析任务队列、sa-token、熔断状态） |
+| 注册中心   | Nacos（服务发现/配置） |
+| 检索       | LightRAG（图谱 + 向量 + 关键词），Agentic 策略/重写/HyDE/分解/RRF/ReRead/重排 |
+| 可观测性   | Actuator + Micrometer/Prometheus + Prometheus + Grafana（管理员） |
+| 部署       | Docker Compose（微服务 + 基础设施 + 前端 + Caddy） |
 
-## 2. 目录结构
+## 2. 微服务架构
 
 ```
-TraceQA/
-├── src/main/java/edu/zjut/traceqa/
-│   ├── common/          # 统一响应/错误码/异常/traceId/JWT/RBAC/分页/JSON/Web 配置
-│   ├── config/          # LightRAG 客户端、MinIO 客户端、OpenAI 兼容客户端、Jackson、OpenAPI、提示词默认、数据初始化
-│   ├── entity/          # MyBatis-Plus 实体（含 user.avatar）
-│   ├── mapper/          # 数据访问接口
-│   ├── dto/             # 请求/响应 DTO
-│   ├── service/         # 认证、对话、文档、解析 worker、知识库、提示词、LLM、熔断、管理、文件存储
-│   ├── retrieval/       # 检索增强：复杂度判定、重写/HyDE、图谱/向量检索、RRF、ReRead
-│   ├── agent/           # 多 Agent（意图/调度/重写/图谱/向量/融合/总结）编排器
-│   ├── sse/             # SSE 事件发布
-│   └── controller/      # REST 接口
-├── frontend/
-│   ├── app/
-│   │   ├── pages/       # 首页 / 智能问答(/chat) / 个人信息(/personal) / 登录 / 管理后台
-│   │   ├── components/  # 聊天与后台组件（状态图、引用、模型选择、消息、头像裁剪等）
-│   │   ├── composables/ # SSE 流式消费
-│   │   ├── stores/      # Pinia（auth / chat / model）
-│   │   ├── utils/       # request / markdown / api-types
-│   │   ├── middleware/  # 认证路由守卫
-│   │   └── api/         # OpenAPI 自动生成的 TS 客户端
-│   └── scripts/         # gen-api 脚本
-├── docs/                # 文档
-├── docker/              # Prometheus / Grafana 可观测性配置
-├── docker-compose.yml   # 一键部署
-└── README.md
+浏览器 → Caddy(:80/443/6115) → 前端 Nuxt(:3000) → 网关 gateway(:8080)
+   → user-service / file-service / kb-service / qa-service / admin-service
+注册中心 Nacos；服务间 OpenFeign；登录态 Redis 共享；数据库各服务独立库
 ```
+
+| 模块 | 端口 | 数据表 | 职责 |
+|------|------|--------|------|
+| traceqa-common | 库 | — | 统一响应/异常/实体/DTO/VO/RBAC/Feign 契约/LightRAG 客户端 |
+| traceqa-gateway | 8080 | — | Nacos 路由、Sa-Token 鉴权、OpenAPI 聚合 |
+| traceqa-user-service | 8081 | t_user, t_role | 注册登录、RBAC 用户/角色管理、头像 |
+| traceqa-file-service | 8083 | — | MinIO 文件上传下载 |
+| traceqa-kb-service | 8084 | t_knowledge_base, t_document | 知识库、文档解析入库 |
+| traceqa-qa-service | 8085 | t_chat_session, t_chat_message, t_system_prompt | 会话、多 Agent 检索、LLM、提示词、模型 |
+| traceqa-admin-service | 8086 | t_announcement | 公告、监控、健康、可观测代理 |
+
+### 2.1 网关与鉴权链路
+
+- 网关通过 `SaReactorFilter` 对 `/api/**` 统一登录校验（白名单：`/api/auth/login`、`/api/auth/register`、`/api/health`、`/api/announcement/active`）。
+- 校验通过后，`AuthHeaderGlobalFilter` 将当前用户信息写入请求头（`X-User-Id`、`X-Username`、`X-User-Role`、`X-User-Permissions`、`X-Trace-Id`）透传下游。
+- 各服务的 `UserContextFilter` 解析请求头为 `UserContext`；`RbacAspect` 依据 `@RequirePermission / @RequireRole` 注解完成方法级 RBAC 二次鉴权。
+- 登录态由用户服务写入共享 Redis（`SaTokenDaoRedis`），网关与各服务共用同一套 Redis 实现跨服务登录态。
+
+### 2.2 服务间 RPC（OpenFeign）
+
+- `common/client/FileClient`（→ file-service）：上传头像字节，返回 MinIO URL，被用户服务调用。
+- `common/client/KbClient`（→ kb-service）：获取文档解析队列统计，被管理服务调用。
+- `common/client/QaClient`（→ qa-service）：获取 LLM 熔断状态，被管理服务调用。
+
+### 2.3 端口规划
+
+服务器对外仅开放 **80 / 443 / 6115**（前端 HTTPS）与 **6116**（MinIO 头像直链）；其余微服务/中间件端口在容器内开放供内部通信，需在服务器防火墙阻断外网访问。
 
 ## 3. 本地开发
 
-前置：JDK 25、Node 20+、pnpm、MySQL 8（本地建 `traceqa` 库）、Redis（默认 localhost:6379，可环境变量 `REDIS_HOST` 覆盖）。
+前置：JDK 25、Node 20+、pnpm、Docker（起 Nacos + MySQL + Redis + LightRAG + MinIO）、硅基流动 API Key。
 
 ```bash
-# 1. 后端（默认 dev profile 连本地 MySQL root/123456，可环境变量覆盖）
-.\mvnw.cmd spring-boot:run          # http://localhost:8080
+# 1. 基础设施
+docker compose up -d mysql redis nacos lightrag minio
 
-# 2. 前端
-cd frontend
-pnpm install
-pnpm dev                             # http://localhost:3000
+# 2. 编译后端（多模块聚合）
+.\mvnw.cmd clean package -DskipTests
 
-# 3. LightRAG（可选；未启动时系统自动降级）
-docker run -d --name lightrag -p 9621:9621 \
-  -e LLM_BINDING=openai -e LLM_BASE_URL=https://api.siliconflow.cn/v1 \
-  -e LLM_API_KEY=sk-xxx -e LLM_MODEL=Qwen/Qwen3.5-4B \
-  -e EMBEDDING_BINDING=openai -e EMBEDDING_MODEL=BAAI/bge-m3 \
-  -e LLM_TIMEOUT=900 -e EMBEDDING_TIMEOUT=60 -e OPENAI_LLM_MAX_TOKENS=9000 \
-  -e MAX_ASYNC_LLM=4 -e MAX_ASYNC_EMBEDDING=8 \
-  ghcr.io/hkuds/lightrag:latest
+# 3. 启动各微服务（可分别运行各模块的 *Application）
+#    gateway(8080) → user(8081) / file(8083) / kb(8084) / qa(8085) / admin(8086)
+#    IDEA 中为每个模块添加 Spring Boot Run Configuration 并逐个运行
+
+# 4. 前端（/api 代理到 localhost:8080 网关）
+cd frontend && pnpm install && pnpm dev   # http://localhost:3000
 ```
 
-> 本地运行时按需调参：`LLM_TIMEOUT`（单次抽取超时，硅基流动小模型慢，900s 较稳）、`EMBEDDING_TIMEOUT`（嵌入超时，默认 30s 偏紧）、
-> `OPENAI_LLM_MAX_TOKENS`（抽取输出上限，防无限生成触发超时）、`MAX_ASYNC_LLM`（抽取并发，越高越快但更易限流）。
-
-> Redis 不可用时系统自动降级（无缓存、文档任务改为直接解析），不影响核心功能。
+> 各服务 `application.yaml` 数据库连接默认使用 `MYSQL_HOST/MYSQL_PORT/MYSQL_DATABASE_xxx` 环境变量，本地可用环境变量覆盖；Nacos 地址 `NACOS_SERVER_ADDR` 默认 `localhost:8848`。
 
 默认账号：`admin/admin123456`（管理员）、`user/user123456`。
 
-### 3.1 重新生成前端 API（后端接口变更后）
+### 3.1 重新生成前端 API（接口变更后）
 
 ```bash
 cd frontend && pnpm gen:api   # 依据 http://localhost:8080/v3/api-docs 生成 TS 客户端
 ```
 
-## 4. 多 Agent 工作流
+## 4. 数据库（各服务独立库）
+
+MySQL 容器初始化脚本位于 `db/`：
+
+- `01-init-databases.sh`：创建 `traceqa_user / traceqa_kb / traceqa_qa / traceqa_admin` 四库并授权。
+- `02-user-schema.sql`：`t_user`、`t_role`。
+- `03-kb-schema.sql`：`t_knowledge_base`、`t_document`。
+- `04-qa-schema.sql`：`t_chat_session`、`t_chat_message`、`t_system_prompt`。
+- `05-admin-schema.sql`：`t_announcement`。
+
+各服务在启动时通过 `DataInitializer` 幂等装载预置数据（角色/默认账号、默认知识库、系统提示词、欢迎公告）。
+
+## 5. 多 Agent 工作流（qa-service）
 
 ```
 意图识别 → 检索策略调度 → 查询重写与HyDE → 图谱检索(local+global) → 向量检索(多查询+分解子问题) → 关键词检索 → 融合与补全(RRF+ReRead+LLM精排) → 总结生成
      ↳ 简单问题（LLM 判定）：仅 向量检索 → 总结生成
 ```
 
-- 调度节点用 **LLM 判定**问题复杂度（跨文档聚合/关系推理/主题归纳 → 复杂；单点事实/小文档集/叙事文本 → 简单），LLM 失败时规则兜底。
-- 全程 SSE 推送 `thinking` 节点状态，前端状态图实时可视化（含「关键词检索」节点）。
+- 调度节点用 LLM 判定问题复杂度；全程 SSE 推送 `thinking` 节点状态。
+- 完整检索/Agent 实现见 `RagAgentOrchestrator`、`RetrievalService`、`IntentAgent`、`AnswerAgent`、`RagAgents`。
+- SSE 事件：`thinking` / `delta` / `references` / `stats` / `done` / `error`。
 
-## 5. 检索增强链路（RetrievalService）
+## 6. 文档解析与入库（kb-service）
 
-| 步骤            | 说明                                                                                          |
-|-----------------|-----------------------------------------------------------------------------------------------|
-| 复杂度判定      | LLM（scenario=complexity）+ 快速预检 + 规则兜底，结果缓存                                     |
-| 查询重写 / HyDE | 结合多轮历史消解指代，并行生成；结果缓存                                                      |
-| 查询分解        | 对比/比较类问题按连接词拆分子问题，并入向量多查询                                             |
-| 图谱检索        | `local`（实体局部图）+ `global`（关系全局图）并行，结果缓存                                   |
-| 向量检索        | 原问题 + 重写 + HyDE + 子问题多查询并行，`naive` 模式，结果缓存                               |
-| 关键词检索      | scenario=keyword 提取术语，`hl_keywords` 检索（术语/编号类问题更准）                          |
-| RRF 融合        | 三路结果按倒数排名融合去重                                                                    |
-| ReRead          | 从片段提取关键术语二次检索补全                                                                |
-| 语义重排        | 优先调用外部 Rerank 模型（`BAAI/bge-reranker-v2-m3`）按相关度排序；失败/未配置时回退 LLM 精排 |
-
-> **Agentic 检索策略**：`RetrievalService.classifyQueryAgentic` 让 LLM 动态决定检索策略（SIMPLE=向量 /
-> DEFINITION=向量+关键词 / COMPLEX=图谱+向量+关键词），结果缓存 30 分钟；LLM 失败时回退 `classifyQuery` 规则。Rerank 通过
-> `app.rerank.*` 配置（默认关闭）。
-
-> 查询/决策结果经 `RedisCacheService` 短 TTL 缓存；Redis 不可用时自动降级。
->
-> **知识库粒度**：检索基于单一 LightRAG 全局索引， **不区分知识库、不做按库选择或隔离**——所有已入库文档都会参与检索。上传时指定知识库仅用于归档与管理。
-
-### 5.1 用户禁用
-
-- `AdminService.updateUserStatus` 禁用（status=0）时调用 `StpUtil.logout(userId)` 立即踢出全部会话。
-- `WebConfig.checkUserEnabled()` 拦截器每请求校验（40100 强制登出）；`AuthService.currentUser()` 对禁用账号拒绝并注销，形成双重防线。
-
-## 6. 模型体系
-
-- **服务端模型**：`app.models` 配置（默认 GLM-4-9B + 其余 5 个），共享硅基流动 Key/URL，前端一键切换（`serverModel` 字段）。
-- **自定义模型**：用户填 OpenAI 兼容 Base URL/Key/模型名， **仅存浏览器 localStorage**，随请求发送（不持久化）。
-- 模型路由（`RagAgentOrchestrator.toLlmConfig`）：
-    - `serverModel` → 平台默认 URL/Key + 选中模型（OpenAiCompatClient）
-    - `model+baseUrl+apiKey` → 自定义（OpenAiCompatClient）
-    - 默认 → Spring AI ChatClient
+- 支持 `.md/.txt` 上传与 zip 批量导入，SHA-256 内容指纹去重。
+- 文档经 Redis Stream 队列（`doc:queue`）异步消费，`DocumentParseWorker` 切块（大文档）后逐块写入 LightRAG；重试耗尽进入死信 `doc:queue:dead`。
+- 解析进度由用户触发刷新时查询 LightRAG 聚合（不主动轮询）。
 
 ## 7. 统一响应与错误码
 
-所有 REST 接口返回 `{code, msg, data, traceId, detail?}`；前端仅按 `code` 判断，`detail` 为排障根因（仅出错时存在，不含堆栈）。
+所有 REST 接口返回 `{code, msg, data, traceId, detail?}`；前端仅按 `code` 判断。
 
-| code          | 含义                     |
-|---------------|--------------------------|
-| 200           | 成功                     |
-| 40001         | 参数错误                 |
-| 40100 / 40101 | 未登录 / Token 失效      |
-| 40300         | 无权限（RBAC）           |
-| 40400         | 资源不存在               |
+| code | 含义 |
+|------|------|
+| 200 | 成功 |
+| 40001 | 参数错误 |
+| 40100 / 40101 | 未登录 / Token 失效 |
+| 40300 | 无权限（RBAC） |
+| 40400 | 资源不存在 |
 | 50000 / 50001 | 业务异常 / AI 服务不可用 |
-| 50003         | 系统繁忙                 |
-
-- 全局异常处理器统一拦截，严禁外泄堆栈。
-- LLM 调用带熔断（`CircuitBreakerService`），逐级降级：Agent → ChatClient → 纯检索上下文 → 友好提示。
+| 50002 / 50003 | 文件处理失败 / 系统繁忙 |
 
 ## 8. 数据模型
 
 ```
-t_role (RBAC 角色+权限码) ── t_user (role_code, avatar)
-t_knowledge_base ── t_document (异步解析状态/进度)
-t_chat_session ── t_chat_message (thinking_trace/references JSON)
-t_system_prompt (各 Agent 场景提示词，管理员可编辑)
-t_announcement (系统公告：title/content/enabled)
+traceqa_user : t_role ── t_user(role_code, avatar)
+traceqa_kb   : t_knowledge_base ── t_document(异步解析状态/进度)
+traceqa_qa   : t_chat_session ── t_chat_message(thinking_trace/references JSON)；t_system_prompt
+traceqa_admin: t_announcement
 ```
 
-- 雪花 ID 序列化为字符串传输（避免 JS 精度丢失）。
-- 逻辑删除统一 `deleted` 字段。
-- 系统提示词缺省回退 `PromptDefaults`，保证始终有提示词。
-- 头像字段为 `t_user.avatar`（存量库执行 `docs/table.sql` 补充；新部署由 `schema.sql` 自动建列）。
+- 雪花 ID 序列化为字符串（避免 JS 精度丢失）；逻辑删除统一 `deleted` 字段。
 
-### 8.2 头像与 MinIO 对象存储
+### 8.1 头像与 MinIO（file-service）
 
-- `MinioConfig` 提供 `MinioClient`；`FileStorageService` 负责建桶、上传并返回公开 URL，自动设置 **桶公共只读策略**解决对象直链
-  403。
-- `AuthService.updateAvatar` 接收前端裁剪后的图片写入 MinIO 并回写 `t_user.avatar`；前端 `AvatarCropperModal` 基于
-  cropperjs 高级裁剪后上传。
-- `app.minio.*` 配置（Docker 内网连 `minio:9000`，对外公开 URL 用 `MINIO_PUBLIC_URL`）。
+- `MinioConfig` 提供 `MinioClient`；`FileStorageService` 负责建桶、上传并返回公开 URL，自动设置桶公共只读策略。
+- 用户服务经 `FileClient` 调用文件服务上传头像字节，回写 `t_user.avatar`；`MINIO_PUBLIC_URL` 配置对外公开地址。
 
-### 8.3 语音输入与「猜你想问」
+## 9. 可观测性（admin-service，仅管理员）
 
-- **语音输入**：`ChatInput` 调用浏览器原生 **Web Speech API**（`SpeechRecognition`/`webkitSpeechRecognition`），
-  `continuous + interimResults` 前端实时识别并填入输入框，自动重启保持持续聆听（免费、无需后端参与）。
-- **猜你想问**：`POST /api/chat/followup` 由 AI 解读当前问答，推荐 1-2 个最可能追问的问题；回答完成后前端调用并展示在回答下方，点击即发送。
+- 管理服务暴露 Actuator 指标（`/actuator/prometheus`），Prometheus 抓取，Grafana 可视化。
+- `MonitorService` 经 OpenFeign 聚合 kb-service 队列统计与 qa-service 熔断状态，本地采集 JVM 运行时与活跃会话。
+- `/grafana/**`、`/prometheus/**`、`/lightrag-webui/**` 由管理服务反向代理（管理员 Cookie 鉴权）访问。
 
-### 8.1 文档切分与入库（DocumentParseWorker）
+## 10. 部署
 
-- 文本（md/txt）仅当文件 **> 1MB** 才切块（`TEXT_SPLIT_THRESHOLD_BYTES`），小文档整体提交为一个 LightRAG 文档——避免按 100KB
-  无脑切块导致 LLM 抽取调用成倍放大（700KB 文档曾因切 7 块导致上百次抽取，单次超时即失败）。
-- PDF 仅 > 2MB 才切块；其余格式整体上传。
-- 块间隔 `PART_INTERVAL_MS=1000` 限速；单块轮询 `MAX_POLL_TIMES×POLL_INTERVAL_MS≈30 分钟`。
-- 大文档用 `MAX_PARALLEL_INSERT`（Docker 默认 2）限制并行入库，避免瞬时打爆 LLM 限流。
-
-## 9. 前端关键实现
-
-- **SSE 流式**：`useChatStream` 用 fetch + ReadableStream 解析 `event/data`，打字机渲染 + 思考状态图 + 引用角标。
-- **引用溯源**：仅显示回答中实际引用的文献；点击查看全文弹窗。
-- **中断**：生成中可点「停止」，前端 abort + 后端取消标志（takeWhile）即时终止。
-- **多轮上下文**：最近 6 轮历史注入意图识别、查询重写与总结 prompt。
-- **移动端**：≤768px 会话列表抽屉化，消息/工具栏自适应。
-
-## 10. 可观测性（Actuator + Prometheus + Grafana，仅管理员）
-
-后端基于 **Spring Boot Actuator + Micrometer/Prometheus** 暴露指标，配合 **Prometheus + Grafana**
-实现时间序列可视化管理员大盘；所有指标与大屏均经 **后端反向代理统一鉴权**访问。
-
-### 10.1 组件与路径
-
-| 组件       | 内部地址                                  | 对外路径                                       | 鉴权                                                       |
-|------------|-------------------------------------------|------------------------------------------------|------------------------------------------------------------|
-| Actuator   | `backend:8080/actuator/*`                 | 宿主 `:6114/actuator/*`                        | ADMIN 角色；`/actuator/prometheus` 另接受 `X-Scrape-Token` |
-| Prometheus | `prometheus:9090`（子路径 `/prometheus`） | 宿主 `:6112/prometheus`、代理 `/prometheus/**` | 无（代理层需管理员 Cookie，直连靠防火墙）                  |
-| Grafana    | `grafana:3000`（子路径 `/grafana`）       | 宿主 `:6113`、代理 `/grafana/**`               | 匿名 Admin（免登录）+ 代理层管理员 Cookie                  |
-
-- **代理过滤**：`ObservabilityProxyFilter` 拦截 `/grafana/**`、`/prometheus/**`，校验 `tq_obs` 管理员 Cookie 后转发内网；
-  `POST /api/monitor/observability/session` 签发该 Cookie（仅 ADMIN）。
-- **前端入口**：管理后台 → 系统监控，点「打开 Grafana / Prometheus」先取会话 Cookie 再打开代理路径。
-- **子路径部署**：Prometheus 用 `--web.external-url=/prometheus --web.route-prefix=/prometheus`；Grafana 用
-  `GF_SERVER_SERVE_FROM_SUB_PATH=true` + `GF_SERVER_ROOT_URL=/grafana`，二者自行生成子路径资源引用，代理即可透传。
-- **Actuator 鉴权**：`WebConfig` 的 SaInterceptor 对 `/actuator/**` 要求 `ADMIN`；`/actuator/prometheus` 若带合法
-  `X-Scrape-Token`（`app.observability.scrape-token`）则放行供 Prometheus 抓取。
-
-### 10.2 关键配置
-
-```yaml
-# application.yaml
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics,prometheus,loggers
-      base-path: /actuator
-  endpoint:
-    health: { show-details: always }
-app:
-  observability:
-    scrape-token: ${APP_OBSERVABILITY_SCRAPE_TOKEN:}
-    grafana-base-url: ${OBSERVABILITY_GRAFANA_BASE_URL:http://grafana:3000}
-    prometheus-base-url: ${OBSERVABILITY_PROMETHEUS_BASE_URL:http://prometheus:9090}
+```bash
+cp .env.example .env   # 填入 LLM_API_KEY 等
+docker compose up -d --build
 ```
 
-Prometheus 抓取令牌经 `docker-compose` 的 `sed` 注入 `docker/prometheus.yml` 的 `__SCRAPE_TOKEN__` 占位符（
-`OBSERVABILITY_SCRAPE_TOKEN`）。
+> 若本机此前运行过单体版（MySQL 数据卷已存在），各微服务会报 `Access denied ... to database 'traceqa_user'`。
+> 依次执行迁移脚本补建独立库、授权建表，并将旧 `traceqa` 库数据复制到各微服务独立库后删除旧库：
+> ```bash
+> docker compose exec mysql bash /docker-entrypoint-initdb.d/migrate-existing.sh
+> docker compose exec mysql bash /docker-entrypoint-initdb.d/migrate-data.sh
+> ```
 
-### 10.3 自定义监控指标
-
-除 Actuator/Micrometer 自动指标外，`MonitorService` 额外采集：请求量、延迟分位（P50/P95/P99）、HTTP
-状态分布、慢请求（≥2000ms）、路径错误率、JVM 运行时、最近异常日志，经 `/api/monitor` 供前端「系统监控」页展示。
-
-### 10.4 安全提示
-
-- Grafana 为 **匿名管理员**、Prometheus **无鉴权**，二者均对外暴露端口（`:6113`、`:6112`）。
-  **务必配置服务器防火墙仅放行可信来源**；管理端主入口一律走经后端代理的 `/grafana/`、`/prometheus/`。
-- `OBSERVABILITY_SCRAPE_TOKEN` 与 `GRAFANA_ADMIN_PASSWORD` 部署前请改为强随机值。
+镜像构建采用多阶段：`docker/*.Dockerfile` 基于根构建上下文，`-pl <module> -am` 编译对应模块并打包运行镜像；
+Maven 依赖经 BuildKit 缓存挂载（`--mount=type=cache,target=/root/.m2`）避免每次重建重复下载。
+生产务必修改默认密码与密钥。

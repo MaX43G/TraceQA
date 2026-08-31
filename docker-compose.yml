@@ -1,12 +1,16 @@
 # ============================================================
-# 溯知 / TraceQA 一键部署编排
-# 服务：mysql + redis + lightrag + minio + backend + frontend + caddy(HTTPS入口) + prometheus + grafana + loki + promtail
+# 溯知 / TraceQA 微服务一键部署编排
+# 服务：mysql + redis + nacos + lightrag + minio
+#      + gateway + user/file/kb/qa/admin 微服务 + frontend + caddy + prometheus + grafana
+#
+# 对外仅开放端口：80 / 443 / 6115（Caddy/前端 HTTPS）、6116（MinIO 头像直链）
+# 其余微服务端口在容器内开放，供服务间通信；服务器防火墙需阻断非以上四端口的外网访问
 #
 # 使用：cp .env.example .env && docker compose up -d --build
 # ============================================================
 name: traceqa
 
-# 默认日志轮转（避免 /var/lib/docker 撑爆磁盘）
+# 默认日志轮转
 x-logging: &default-logging
   driver: json-file
   options:
@@ -14,12 +18,11 @@ x-logging: &default-logging
     max-file: "5"
 
 services:
-  # 数据库
+  # ===================== 基础设施 =====================
   mysql:
     image: mysql:8.4.11
     container_name: traceqa-mysql
-    labels:
-      logging: promtail
+    labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
     environment:
@@ -32,7 +35,7 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
     volumes:
-      - ./src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./db:/docker-entrypoint-initdb.d:ro
       - traceqa-mysql-data:/var/lib/mysql
     ports:
       - "6118:3306"
@@ -42,13 +45,10 @@ services:
       timeout: 5s
       retries: 10
 
-  # Redis：查询/Agent 决策缓存 + 文档处理异步队列
-  # 不设内存上限（充分利用服务器资源），开启 AOF 落盘持久化
   redis:
     image: redis:8.8.2
     container_name: traceqa-redis
-    labels:
-      logging: promtail
+    labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
     command: [ "redis-server", "--appendonly", "yes", "--save", "60 1", "--appendfsync", "everysec" ]
@@ -62,12 +62,33 @@ services:
       timeout: 5s
       retries: 5
 
-  # LightRAG 官方 Server（知识图谱 + 向量引擎）
+  # Nacos：服务注册与发现（含配置中心）
+  nacos:
+    image: nacos/nacos-server:v2.5.1
+    container_name: traceqa-nacos
+    labels: { logging: promtail }
+    logging: *default-logging
+    restart: unless-stopped
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: "false"
+      JVM_XMS: 256m
+      JVM_XMX: 512m
+      JVM_XMN: 128m
+      TZ: Asia/Shanghai
+    ports:
+      - "6120:8848"
+      - "6121:9848"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://127.0.0.1:8848/nacos/v1/console/health/readiness" ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
   lightrag:
     image: ghcr.io/hkuds/lightrag:latest
     container_name: traceqa-lightrag
-    labels:
-      logging: promtail
+    labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
     environment:
@@ -112,12 +133,10 @@ services:
       retries: 10
       start_period: 30s
 
-  # MinIO 对象存储：统一管理用户上传的文件（如头像）。
   minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: traceqa-minio
-    labels:
-      logging: promtail
+    labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
     command: [ "server", "/data", "--console-address", ":9001" ]
@@ -128,81 +147,223 @@ services:
     volumes:
       - traceqa-minio-data:/data
     ports:
-      - "6116:9000"
-      - "9001:9001"
+      - "6116:9000"   # 对外公开：头像直链
+      - "9001:9001"   # 控制台（防火墙阻断）
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 15s
       timeout: 5s
       retries: 10
 
-  # Spring Boot 后端（镜像来自 GHCR，本地可用 --build 构建）
-  backend:
-    image: ${BACKEND_IMAGE:-ghcr.io/max43g/traceqa/backend:latest}
+  # ===================== 微服务 =====================
+  gateway:
+    image: ${GATEWAY_IMAGE:-ghcr.io/max43g/traceqa/gateway:latest}
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: traceqa-backend
-    labels:
-      logging: promtail
+      dockerfile: docker/gateway.Dockerfile
+    container_name: traceqa-gateway
+    labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8080
+      NACOS_SERVER_ADDR: nacos:8848
+      REDIS_HOST: redis
+      TZ: Asia/Shanghai
+    ports:
+      - "6114:8080"
+    depends_on:
+      nacos:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  user-service:
+    image: ${USER_SERVICE_IMAGE:-ghcr.io/max43g/traceqa/user-service:latest}
+    build:
+      context: .
+      dockerfile: docker/user-service.Dockerfile
+    container_name: traceqa-user-service
+    labels: { logging: promtail }
+    logging: *default-logging
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8081
+      NACOS_SERVER_ADDR: nacos:8848
       REDIS_HOST: redis
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-traceqa}
+      MYSQL_DATABASE_USER: traceqa_user
       MYSQL_USER: ${MYSQL_USER:-traceqa}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traceqa123}
-      LIGHTRAG_BASE_URL: http://lightrag:9621
-      LIGHTRAG_API_KEY: ""
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-}
+      DEFAULT_USER_PASSWORD: ${DEFAULT_USER_PASSWORD:-}
+      TZ: Asia/Shanghai
+    ports:
+      - "6122:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+
+  file-service:
+    image: ${FILE_SERVICE_IMAGE:-ghcr.io/max43g/traceqa/file-service:latest}
+    build:
+      context: .
+      dockerfile: docker/file-service.Dockerfile
+    container_name: traceqa-file-service
+    labels: { logging: promtail }
+    logging: *default-logging
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8083
+      NACOS_SERVER_ADDR: nacos:8848
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-traceqa}
-      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-https://121.41.72.189}
-      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn}
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-THUDM/GLM-4-9B-0414}
-      APP_JWT_SECRET: ${APP_JWT_SECRET:-traceqa-prod-secret-change-me-please-2026}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-https://121.41.72.189:6116}
+      TZ: Asia/Shanghai
+    ports:
+      - "6123:8083"
+    depends_on:
+      nacos:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  kb-service:
+    image: ${KB_SERVICE_IMAGE:-ghcr.io/max43g/traceqa/kb-service:latest}
+    build:
+      context: .
+      dockerfile: docker/kb-service.Dockerfile
+    container_name: traceqa-kb-service
+    labels: { logging: promtail }
+    logging: *default-logging
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8084
+      NACOS_SERVER_ADDR: nacos:8848
+      REDIS_HOST: redis
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE_KB: traceqa_kb
+      MYSQL_USER: ${MYSQL_USER:-traceqa}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traceqa123}
+      LIGHTRAG_BASE_URL: http://lightrag:9621
+      LIGHTRAG_API_KEY: ""
       APP_STORAGE_ROOT: /app/data/files
-      APP_OBSERVABILITY_SCRAPE_TOKEN: ${OBSERVABILITY_SCRAPE_TOKEN:-traceqa-prometheus-scrape-change-me}
       TZ: Asia/Shanghai
     volumes:
-      - traceqa-backend-data:/app/data
+      - traceqa-kb-data:/app/data
     ports:
-      - "6114:8080"
+      - "6124:8084"
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
+      nacos:
+        condition: service_healthy
       lightrag:
         condition: service_healthy
 
-  # Nuxt SSR 前端
+  qa-service:
+    image: ${QA_SERVICE_IMAGE:-ghcr.io/max43g/traceqa/qa-service:latest}
+    build:
+      context: .
+      dockerfile: docker/qa-service.Dockerfile
+    container_name: traceqa-qa-service
+    labels: { logging: promtail }
+    logging: *default-logging
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8085
+      NACOS_SERVER_ADDR: nacos:8848
+      REDIS_HOST: redis
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE_QA: traceqa_qa
+      MYSQL_USER: ${MYSQL_USER:-traceqa}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traceqa123}
+      LIGHTRAG_BASE_URL: http://lightrag:9621
+      LIGHTRAG_API_KEY: ""
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-THUDM/GLM-4-9B-0414}
+      TZ: Asia/Shanghai
+    ports:
+      - "6125:8085"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      lightrag:
+        condition: service_healthy
+
+  admin-service:
+    image: ${ADMIN_SERVICE_IMAGE:-ghcr.io/max43g/traceqa/admin-service:latest}
+    build:
+      context: .
+      dockerfile: docker/admin-service.Dockerfile
+    container_name: traceqa-admin-service
+    labels: { logging: promtail }
+    logging: *default-logging
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8086
+      NACOS_SERVER_ADDR: nacos:8848
+      REDIS_HOST: redis
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE_ADMIN: traceqa_admin
+      MYSQL_USER: ${MYSQL_USER:-traceqa}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traceqa123}
+      LIGHTRAG_BASE_URL: http://lightrag:9621
+      LIGHTRAG_API_KEY: ""
+      APP_OBSERVABILITY_SCRAPE_TOKEN: ${OBSERVABILITY_SCRAPE_TOKEN:-traceqa-prometheus-scrape-change-me}
+      OBSERVABILITY_GRAFANA_BASE_URL: http://grafana:3000
+      OBSERVABILITY_PROMETHEUS_BASE_URL: http://prometheus:9090
+      TZ: Asia/Shanghai
+    ports:
+      - "6126:8086"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+
+  # ===================== 前端 + 网关入口 =====================
   frontend:
     image: ${FRONTEND_IMAGE:-ghcr.io/max43g/traceqa/frontend:latest}
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        API_PROXY_TARGET: http://backend:8080
+        API_PROXY_TARGET: http://gateway:8080
     container_name: traceqa-frontend
-    labels:
-      logging: promtail
+    labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
     depends_on:
-      - backend
+      - gateway
+    ports:
+      - "6130:3000"
 
-  # Caddy：HTTPS 反向代理入口
   caddy:
     image: caddy:2.11.4-alpine
     container_name: traceqa-caddy
-    labels:
-      logging: promtail
+    labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
     environment:
@@ -221,12 +382,11 @@ services:
       - frontend
       - minio
 
-  # Prometheus：抓取后端 /actuator/prometheus 指标
+  # ===================== 可观测性 =====================
   prometheus:
     image: prom/prometheus:v3.14.0
     container_name: traceqa-prometheus
-    labels:
-      logging: promtail
+    labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
     entrypoint:
@@ -242,16 +402,14 @@ services:
     volumes:
       - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     depends_on:
-      - backend
+      - admin-service
     ports:
-      - "6112:9090"
+      - "6127:9090"
 
-  # Grafana：可观测性可视化大盘
   grafana:
     image: grafana/grafana:13.1.4
     container_name: traceqa-grafana
-    labels:
-      logging: promtail
+    labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
     environment:
@@ -274,16 +432,14 @@ services:
       - ./docker/grafana/dashboard-traceqa.json:/var/lib/grafana/dashboards/traceqa.json:ro
       - traceqa-grafana-data:/var/lib/grafana
     ports:
-      - "6113:3000"
+      - "6128:3000"
     depends_on:
       - prometheus
 
-  # Loki：日志聚合
   loki:
     image: grafana/loki:3.6.16
     container_name: traceqa-loki
-    labels:
-      logging: promtail
+    labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
     command: -config.file=/etc/loki/local-config.yaml
@@ -291,12 +447,10 @@ services:
       - ./docker/loki-config.yaml:/etc/loki/local-config.yaml:ro
       - traceqa-loki-data:/loki
 
-  # Promtail：采集 Docker 容器日志推送到 Loki
   promtail:
     image: grafana/promtail:3.6.11
     container_name: traceqa-promtail
-    labels:
-      logging: promtail
+    labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
     command: -config.file=/etc/promtail/config.yml
@@ -305,13 +459,16 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       - loki
+    ports:
+      - "6131:9080"
+      - "6132:3100"
 
 volumes:
   traceqa-mysql-data:
   traceqa-redis-data:
   traceqa-lightrag-data:
   traceqa-minio-data:
-  traceqa-backend-data:
+  traceqa-kb-data:
   traceqa-grafana-data:
   traceqa-caddy-data:
   traceqa-caddy-config:
