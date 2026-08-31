@@ -5,6 +5,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import edu.zjut.traceqa.common.auth.LoginUser;
 import edu.zjut.traceqa.common.context.AuthHeaders;
 import edu.zjut.traceqa.gateway.metric.GatewayMetrics;
+import org.jspecify.annotations.NullMarked;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -31,7 +32,9 @@ public class AuthHeaderGlobalFilter implements GlobalFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(AuthHeaderGlobalFilter.class);
 
-    /** Bearer 前缀 */
+    /**
+     * Bearer 前缀
+     */
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final GatewayMetrics metrics;
@@ -41,6 +44,7 @@ public class AuthHeaderGlobalFilter implements GlobalFilter, Ordered {
     }
 
     @Override
+    @NullMarked
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
         String method = exchange.getRequest().getMethod().name();
@@ -65,7 +69,9 @@ public class AuthHeaderGlobalFilter implements GlobalFilter, Ordered {
                 });
     }
 
-    /** 复用上游 traceId 或生成新的，并透传 */
+    /**
+     * 复用上游 traceId 或生成新的，并透传
+     */
     private String resolveTraceId(ServerWebExchange exchange) {
         String traceId = exchange.getRequest().getHeaders().getFirst(AuthHeaders.TRACE_ID);
         if (traceId == null || traceId.isBlank()) {
@@ -74,7 +80,9 @@ public class AuthHeaderGlobalFilter implements GlobalFilter, Ordered {
         return traceId;
     }
 
-    /** 依据请求头中的访问令牌将登录用户信息写入下游请求头 */
+    /**
+     * 依据请求头中的访问令牌将登录用户信息写入下游请求头
+     */
     private void injectUser(ServerHttpRequest.Builder builder, HttpHeaders headers) {
         String token = resolveToken(headers);
         if (token == null) {
@@ -99,7 +107,9 @@ public class AuthHeaderGlobalFilter implements GlobalFilter, Ordered {
         }
     }
 
-    /** 从 Authorization 请求头解析访问令牌 */
+    /**
+     * 从 Authorization 请求头解析访问令牌
+     */
     private String resolveToken(HttpHeaders headers) {
         String auth = headers.getFirst(HttpHeaders.AUTHORIZATION);
         if (auth == null || auth.isBlank()) {

@@ -24,76 +24,76 @@ spring:
               enabled: false
           routes:
             # ---- 用户服务：认证 + 用户/角色管理 ----
-                    - id: traceqa-user-service-auth
-                      uri: lb://traceqa-user-service
-                      predicates:
-                        - Path=/api/auth/**
-                    - id: traceqa-user-service-admin
-                      uri: lb://traceqa-user-service
-                      predicates:
-                        - Path=/api/admin/**
+            - id: traceqa-user-service-auth
+              uri: lb://traceqa-user-service
+              predicates:
+                - Path=/api/auth/**
+            - id: traceqa-user-service-admin
+              uri: lb://traceqa-user-service
+              predicates:
+                - Path=/api/admin/**
 
-                    # ---- 文件服务：MinIO 文件上传下载 ----
-                    - id: traceqa-file-service
-                      uri: lb://traceqa-file-service
-                      predicates:
-                        - Path=/api/files/**
+            # ---- 文件服务：MinIO 文件上传下载 ----
+            - id: traceqa-file-service
+              uri: lb://traceqa-file-service
+              predicates:
+                - Path=/api/files/**
 
-                    # ---- 知识库服务：知识库 + 文档 ----
-                    - id: traceqa-kb-service
-                      uri: lb://traceqa-kb-service
-                      predicates:
-                        - Path=/api/kbs/**,/api/documents/**
+            # ---- 知识库服务：知识库 + 文档 ----
+            - id: traceqa-kb-service
+              uri: lb://traceqa-kb-service
+              predicates:
+                - Path=/api/kbs/**,/api/documents/**
 
-                    # ---- 问答服务：对话 + 模型 + 系统提示词 ----
-                    - id: traceqa-qa-service
-                      uri: lb://traceqa-qa-service
-                      predicates:
-                        - Path=/api/chat/**,/api/models/**,/api/prompts/**
+            # ---- 问答服务：对话 + 模型 + 系统提示词 ----
+            - id: traceqa-qa-service
+              uri: lb://traceqa-qa-service
+              predicates:
+                - Path=/api/chat/**,/api/models/**,/api/prompts/**
 
-                    # ---- 管理服务：公告 + 监控 + 健康检查 ----
-                    - id: traceqa-admin-service
-                      uri: lb://traceqa-admin-service
-                      predicates:
-                        - Path=/api/announcement/**,/api/monitor/**,/api/health
+            # ---- 管理服务：公告 + 监控 + 健康检查 ----
+            - id: traceqa-admin-service
+              uri: lb://traceqa-admin-service
+              predicates:
+                - Path=/api/announcement/**,/api/monitor/**,/api/health
 
-                    # ---- 管理服务：可观测性 / LightRAG WebUI 反向代理 ----
-                    - id: traceqa-admin-proxy
-                      uri: lb://traceqa-admin-service
-                      predicates:
-                        - Path=/lightrag-webui/**,/grafana/**,/prometheus/**,/docs,/redoc,/openapi.json
+            # ---- 管理服务：可观测性 / LightRAG WebUI 反向代理 ----
+            - id: traceqa-admin-proxy
+              uri: lb://traceqa-admin-service
+              predicates:
+                - Path=/lightrag-webui/**,/grafana/**,/prometheus/**,/docs,/redoc,/openapi.json
 
-                    # ---- 接口文档聚合（各服务 /v3/api-docs）----
-                    - id: traceqa-user-service-docs
-                      uri: lb://traceqa-user-service
-                      predicates:
-                        - Path=/user/v3/api-docs
-                      filters:
-                        - RewritePath=/user/v3/api-docs, /v3/api-docs
-                    - id: traceqa-file-service-docs
-                      uri: lb://traceqa-file-service
-                      predicates:
-                        - Path=/file/v3/api-docs
-                      filters:
-                        - RewritePath=/file/v3/api-docs, /v3/api-docs
-                    - id: traceqa-kb-service-docs
-                      uri: lb://traceqa-kb-service
-                      predicates:
-                        - Path=/kb/v3/api-docs
-                      filters:
-                        - RewritePath=/kb/v3/api-docs, /v3/api-docs
-                    - id: traceqa-qa-service-docs
-                      uri: lb://traceqa-qa-service
-                      predicates:
-                        - Path=/qa/v3/api-docs
-                      filters:
-                        - RewritePath=/qa/v3/api-docs, /v3/api-docs
-                    - id: traceqa-admin-service-docs
-                      uri: lb://traceqa-admin-service
-                      predicates:
-                        - Path=/admin/v3/api-docs
-                      filters:
-                        - RewritePath=/admin/v3/api-docs, /v3/api-docs
+            # ---- 接口文档聚合（各服务 /v3/api-docs）----
+            - id: traceqa-user-service-docs
+              uri: lb://traceqa-user-service
+              predicates:
+                - Path=/user/v3/api-docs
+              filters:
+                - RewritePath=/user/v3/api-docs, /v3/api-docs
+            - id: traceqa-file-service-docs
+              uri: lb://traceqa-file-service
+              predicates:
+                - Path=/file/v3/api-docs
+              filters:
+                - RewritePath=/file/v3/api-docs, /v3/api-docs
+            - id: traceqa-kb-service-docs
+              uri: lb://traceqa-kb-service
+              predicates:
+                - Path=/kb/v3/api-docs
+              filters:
+                - RewritePath=/kb/v3/api-docs, /v3/api-docs
+            - id: traceqa-qa-service-docs
+              uri: lb://traceqa-qa-service
+              predicates:
+                - Path=/qa/v3/api-docs
+              filters:
+                - RewritePath=/qa/v3/api-docs, /v3/api-docs
+            - id: traceqa-admin-service-docs
+              uri: lb://traceqa-admin-service
+              predicates:
+                - Path=/admin/v3/api-docs
+              filters:
+                - RewritePath=/admin/v3/api-docs, /v3/api-docs
 
   # Redis：Sa-Token 共享登录态
   data:
