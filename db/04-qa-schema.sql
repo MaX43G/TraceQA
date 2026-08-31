@@ -18,15 +18,15 @@ CREATE TABLE IF NOT EXISTS t_chat_session
     deleted           TINYINT      DEFAULT 0
 );
 
--- 聊天消息表
+-- 聊天消息表（content/thinking_trace/references 用 MEDIUMTEXT，避免引用 JSON 超 TEXT 上限）
 CREATE TABLE IF NOT EXISTS t_chat_message
 (
-    id             BIGINT      NOT NULL PRIMARY KEY,
-    session_id     BIGINT      NOT NULL,
-    role           VARCHAR(16) NOT NULL,
-    content        TEXT,
-    thinking_trace TEXT,
-    `references`   TEXT,
+    id             BIGINT       NOT NULL PRIMARY KEY,
+    session_id     BIGINT       NOT NULL,
+    role           VARCHAR(16)  NOT NULL,
+    content        LONGTEXT,
+    thinking_trace LONGTEXT,
+    `references`   LONGTEXT,
     latency_ms     BIGINT   DEFAULT 0,
     status         TINYINT  DEFAULT 1,
     create_time    DATETIME DEFAULT CURRENT_TIMESTAMP,

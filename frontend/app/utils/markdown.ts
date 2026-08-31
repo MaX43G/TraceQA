@@ -98,7 +98,7 @@ export function decorateCitations(content: string, availableIndexes?: Set<number
 
 const md = new MarkdownIt({
     html: true,
-    linkify: true,
+    linkify: false,
     breaks: true,
     highlight(str: string, lang: string): string {
         if (lang && hljs.getLanguage(lang)) {
