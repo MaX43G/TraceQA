@@ -161,12 +161,5 @@ cp .env.example .env   # 填入 LLM_API_KEY 等
 docker compose up -d --build
 ```
 
-> 若本机此前运行过单体版（MySQL 数据卷已存在），各微服务会报 `Access denied ... to database 'traceqa_user'`。
-> 依次执行迁移脚本补建独立库、授权建表，并将旧 `traceqa` 库数据复制到各微服务独立库后删除旧库：
-> ```bash
-> docker compose exec mysql bash /docker-entrypoint-initdb.d/migrate-existing.sh
-> docker compose exec mysql bash /docker-entrypoint-initdb.d/migrate-data.sh
-> ```
-
 镜像构建采用多阶段：`docker/*.Dockerfile` 基于根构建上下文，`-pl <module> -am` 编译对应模块并打包运行镜像； Maven 依赖经
 BuildKit 缓存挂载（`--mount=type=cache,target=/root/.m2`）避免每次重建重复下载。 生产务必修改默认密码与密钥。

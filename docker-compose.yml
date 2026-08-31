@@ -1,4 +1,4 @@
-# ============================================================
+﻿# ============================================================
 # 溯知 / TraceQA 微服务一键部署编排
 # 服务：mysql + redis + nacos + lightrag + minio
 #      + gateway + user/file/kb/qa/admin 微服务 + frontend + caddy + prometheus + grafana
@@ -172,7 +172,7 @@ services:
       REDIS_HOST: redis
       OTEL_SERVICE_NAME: traceqa-gateway
       OTEL_TRACES_EXPORTER: otlp
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
       OTEL_METRICS_EXPORTER: none
       OTEL_LOGS_EXPORTER: none
       TZ: Asia/Shanghai
@@ -207,7 +207,7 @@ services:
       DEFAULT_USER_PASSWORD: ${DEFAULT_USER_PASSWORD:-}
       OTEL_SERVICE_NAME: traceqa-user-service
       OTEL_TRACES_EXPORTER: otlp
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
       OTEL_METRICS_EXPORTER: none
       OTEL_LOGS_EXPORTER: none
       TZ: Asia/Shanghai
@@ -239,7 +239,7 @@ services:
       MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-https://121.41.72.189:6116}
       OTEL_SERVICE_NAME: traceqa-file-service
       OTEL_TRACES_EXPORTER: otlp
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
       OTEL_METRICS_EXPORTER: none
       OTEL_LOGS_EXPORTER: none
       TZ: Asia/Shanghai
@@ -275,7 +275,7 @@ services:
       APP_STORAGE_ROOT: /app/data/files
       OTEL_SERVICE_NAME: traceqa-kb-service
       OTEL_TRACES_EXPORTER: otlp
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
       OTEL_METRICS_EXPORTER: none
       OTEL_LOGS_EXPORTER: none
       TZ: Asia/Shanghai
@@ -319,7 +319,7 @@ services:
       LLM_MODEL: ${LLM_MODEL:-THUDM/GLM-4-9B-0414}
       OTEL_SERVICE_NAME: traceqa-qa-service
       OTEL_TRACES_EXPORTER: otlp
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
       OTEL_METRICS_EXPORTER: none
       OTEL_LOGS_EXPORTER: none
       TZ: Asia/Shanghai
@@ -362,7 +362,7 @@ services:
       OBSERVABILITY_PROMETHEUS_BASE_URL: http://prometheus:9090
       OTEL_SERVICE_NAME: traceqa-admin-service
       OTEL_TRACES_EXPORTER: otlp
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
       OTEL_METRICS_EXPORTER: none
       OTEL_LOGS_EXPORTER: none
       TZ: Asia/Shanghai
