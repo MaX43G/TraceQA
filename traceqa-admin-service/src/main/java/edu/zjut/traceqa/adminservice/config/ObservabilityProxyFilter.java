@@ -4,19 +4,25 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.zip.GZIPInputStream;
 
 /**
  * 可观测性工具反向代理过滤器。
@@ -26,6 +32,8 @@ import java.util.Set;
  */
 @Component
 public class ObservabilityProxyFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(ObservabilityProxyFilter.class);
 
     private static final String GRAFANA_PREFIX = "/grafana";
     private static final String PROMETHEUS_PREFIX = "/prometheus";
@@ -58,6 +66,7 @@ public class ObservabilityProxyFilter extends OncePerRequestFilter {
     protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain chain)
             throws IOException {
         if (!hasValidSession(request)) {
+            log.warn("可观测性代理无有效会话，返回 401：{}", request.getRequestURI());
             response.setStatus(401);
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write("{\"code\":401,\"msg\":\"无可观测性工具访问权限，请由管理员获取会话\"}");
@@ -114,14 +123,22 @@ public class ObservabilityProxyFilter extends OncePerRequestFilter {
                 }
             });
             String contentType = upstream.headers().firstValue("content-type").orElse("");
+            String contentEncoding = upstream.headers().firstValue("content-encoding").orElse("");
             if (contentType.contains("text/html")) {
-                String html = new String(upstream.body().readAllBytes());
+                byte[] raw = upstream.body().readAllBytes();
+                byte[] body = isGzip(contentEncoding) ? gunzip(raw) : raw;
+                String html = new String(body, StandardCharsets.UTF_8);
                 response.setContentType(contentType);
+                response.setCharacterEncoding("UTF-8");
+                if (isGzip(contentEncoding)) {
+                    response.setHeader("Content-Encoding", "identity");
+                }
                 response.getWriter().write(rewriteRootRelativeUrls(html, prefix));
             } else {
                 copyStream(upstream.body(), response.getOutputStream());
             }
         } catch (Exception e) {
+            log.error("代理转发异常：{} -> {}, err={}", uri, target, e.getMessage(), e);
             if (!response.isCommitted()) {
                 reject(response, 502, "可观测性工具暂不可用");
             }
@@ -132,8 +149,9 @@ public class ObservabilityProxyFilter extends OncePerRequestFilter {
      * 将根相对路径（/foo）资源引用改写为带前缀（/grafana/foo）
      */
     private String rewriteRootRelativeUrls(String html, String prefix) {
-        return html.replaceAll("(?i)(href|src|action|url)(\\s*(?:=|:)\\s*['\"])/(?!/)", "$1$2"
-                + prefix + "/");
+        String pf = prefix.substring(1);
+        return html.replaceAll("(?i)(href|src|action|url)(\\s*(?:=|:)\\s*['\"])/(?!/)(?!" + pf + "/)",
+                "$1$2" + prefix + "/");
     }
 
     private HttpRequest.BodyPublisher bodyPublisher(HttpServletRequest request) throws IOException {
@@ -153,6 +171,24 @@ public class ObservabilityProxyFilter extends OncePerRequestFilter {
         while ((n = in.read(buffer)) != -1) {
             out.write(buffer, 0, n);
             out.flush();
+        }
+    }
+
+    /** 是否为 gzip 压缩 */
+    private boolean isGzip(String contentEncoding) {
+        return contentEncoding != null && contentEncoding.toLowerCase().contains("gzip");
+    }
+
+    /** 解压 gzip 字节 */
+    private byte[] gunzip(byte[] data) throws IOException {
+        try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(data));
+             ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int n;
+            while ((n = gis.read(buffer)) != -1) {
+                bos.write(buffer, 0, n);
+            }
+            return bos.toByteArray();
         }
     }
 

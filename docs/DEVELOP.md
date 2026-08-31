@@ -4,21 +4,21 @@
 
 ## 1. 技术栈
 
-| 层次       | 技术 |
-|-----------|------|
-| 前端       | Nuxt 4（SSR）、Vue 3、TypeScript、Pinia、Ant Design Vue、markdown-it |
-| 网关       | Spring Cloud Gateway 2025.1（WebFlux）、Sa-Token（响应式）、springdoc 聚合 |
-| 微服务框架 | Spring Cloud Alibaba 2025.1（Nacos 注册发现/配置）、OpenFeign（服务间 RPC） |
-| 后端       | Spring Boot 4.1、Java 25、Spring AI Alibaba Agent、springdoc-openapi |
-| 鉴权       | Sa-Token（Redis 共享登录态）+ 网关统一校验 + 方法级 RBAC 注解 |
-| ORM        | MyBatis-Plus（各服务独立库） |
-| 数据库     | MySQL 8（traceqa_user / kb / qa / admin 四库） |
-| 对象存储   | MinIO（统一管理用户文件，如头像；S3 兼容，公开端口 6116） |
-| 缓存/队列  | Redis（查询与决策缓存、文档解析任务队列、sa-token、熔断状态） |
-| 注册中心   | Nacos（服务发现/配置） |
+| 层次       | 技术                                                                          |
+|------------|-------------------------------------------------------------------------------|
+| 前端       | Nuxt 4（SSR）、Vue 3、TypeScript、Pinia、Ant Design Vue、markdown-it          |
+| 网关       | Spring Cloud Gateway 2025.1（WebFlux）、Sa-Token（响应式）、springdoc 聚合    |
+| 微服务框架 | Spring Cloud Alibaba 2025.1（Nacos 注册发现/配置）、OpenFeign（服务间 RPC）   |
+| 后端       | Spring Boot 4.1、Java 25、Spring AI Alibaba Agent、springdoc-openapi          |
+| 鉴权       | Sa-Token（Redis 共享登录态）+ 网关统一校验 + 方法级 RBAC 注解                 |
+| ORM        | MyBatis-Plus（各服务独立库）                                                  |
+| 数据库     | MySQL 8（traceqa_user / kb / qa / admin 四库）                                |
+| 对象存储   | MinIO（统一管理用户文件，如头像；S3 兼容，公开端口 6116）                     |
+| 缓存/队列  | Redis（查询与决策缓存、文档解析任务队列、sa-token、熔断状态）                 |
+| 注册中心   | Nacos（服务发现/配置）                                                        |
 | 检索       | LightRAG（图谱 + 向量 + 关键词），Agentic 策略/重写/HyDE/分解/RRF/ReRead/重排 |
-| 可观测性   | Actuator + Micrometer/Prometheus + Prometheus + Grafana（管理员） |
-| 部署       | Docker Compose（微服务 + 基础设施 + 前端 + Caddy） |
+| 可观测性   | Actuator + Micrometer/Prometheus + Prometheus + Grafana（管理员）             |
+| 部署       | Docker Compose（微服务 + 基础设施 + 前端 + Caddy）                            |
 
 ## 2. 微服务架构
 
@@ -28,21 +28,24 @@
 注册中心 Nacos；服务间 OpenFeign；登录态 Redis 共享；数据库各服务独立库
 ```
 
-| 模块 | 端口 | 数据表 | 职责 |
-|------|------|--------|------|
-| traceqa-common | 库 | — | 统一响应/异常/实体/DTO/VO/RBAC/Feign 契约/LightRAG 客户端 |
-| traceqa-gateway | 8080 | — | Nacos 路由、Sa-Token 鉴权、OpenAPI 聚合 |
-| traceqa-user-service | 8081 | t_user, t_role | 注册登录、RBAC 用户/角色管理、头像 |
-| traceqa-file-service | 8083 | — | MinIO 文件上传下载 |
-| traceqa-kb-service | 8084 | t_knowledge_base, t_document | 知识库、文档解析入库 |
-| traceqa-qa-service | 8085 | t_chat_session, t_chat_message, t_system_prompt | 会话、多 Agent 检索、LLM、提示词、模型 |
-| traceqa-admin-service | 8086 | t_announcement | 公告、监控、健康、可观测代理 |
+| 模块                  | 端口 | 数据表                                          | 职责                                                      |
+|-----------------------|------|-------------------------------------------------|-----------------------------------------------------------|
+| traceqa-common        | 库   | —                                               | 统一响应/异常/实体/DTO/VO/RBAC/Feign 契约/LightRAG 客户端 |
+| traceqa-gateway       | 8080 | —                                               | Nacos 路由、Sa-Token 鉴权、OpenAPI 聚合                   |
+| traceqa-user-service  | 8081 | t_user, t_role                                  | 注册登录、RBAC 用户/角色管理、头像                        |
+| traceqa-file-service  | 8083 | —                                               | MinIO 文件上传下载                                        |
+| traceqa-kb-service    | 8084 | t_knowledge_base, t_document                    | 知识库、文档解析入库                                      |
+| traceqa-qa-service    | 8085 | t_chat_session, t_chat_message, t_system_prompt | 会话、多 Agent 检索、LLM、提示词、模型                    |
+| traceqa-admin-service | 8086 | t_announcement                                  | 公告、监控、健康、可观测代理                              |
 
 ### 2.1 网关与鉴权链路
 
-- 网关通过 `SaReactorFilter` 对 `/api/**` 统一登录校验（白名单：`/api/auth/login`、`/api/auth/register`、`/api/health`、`/api/announcement/active`）。
-- 校验通过后，`AuthHeaderGlobalFilter` 将当前用户信息写入请求头（`X-User-Id`、`X-Username`、`X-User-Role`、`X-User-Permissions`、`X-Trace-Id`）透传下游。
-- 各服务的 `UserContextFilter` 解析请求头为 `UserContext`；`RbacAspect` 依据 `@RequirePermission / @RequireRole` 注解完成方法级 RBAC 二次鉴权。
+- 网关通过 `SaReactorFilter` 对 `/api/**` 统一登录校验（白名单：`/api/auth/login`、`/api/auth/register`、`/api/health`、
+  `/api/announcement/active`）。
+- 校验通过后，`AuthHeaderGlobalFilter` 将当前用户信息写入请求头（`X-User-Id`、`X-Username`、`X-User-Role`、
+  `X-User-Permissions`、`X-Trace-Id`）透传下游。
+- 各服务的 `UserContextFilter` 解析请求头为 `UserContext`；`RbacAspect` 依据 `@RequirePermission / @RequireRole` 注解完成方法级
+  RBAC 二次鉴权。
 - 登录态由用户服务写入共享 Redis（`SaTokenDaoRedis`），网关与各服务共用同一套 Redis 实现跨服务登录态。
 
 ### 2.2 服务间 RPC（OpenFeign）
@@ -74,7 +77,8 @@ docker compose up -d mysql redis nacos lightrag minio
 cd frontend && pnpm install && pnpm dev   # http://localhost:3000
 ```
 
-> 各服务 `application.yaml` 数据库连接默认使用 `MYSQL_HOST/MYSQL_PORT/MYSQL_DATABASE_xxx` 环境变量，本地可用环境变量覆盖；Nacos 地址 `NACOS_SERVER_ADDR` 默认 `localhost:8848`。
+> 各服务 `application.yaml` 数据库连接默认使用 `MYSQL_HOST/MYSQL_PORT/MYSQL_DATABASE_xxx` 环境变量，本地可用环境变量覆盖；Nacos
+> 地址 `NACOS_SERVER_ADDR` 默认 `localhost:8848`。
 
 默认账号：`admin/admin123456`（管理员）、`user/user123456`。
 
@@ -110,22 +114,23 @@ MySQL 容器初始化脚本位于 `db/`：
 ## 6. 文档解析与入库（kb-service）
 
 - 支持 `.md/.txt` 上传与 zip 批量导入，SHA-256 内容指纹去重。
-- 文档经 Redis Stream 队列（`doc:queue`）异步消费，`DocumentParseWorker` 切块（大文档）后逐块写入 LightRAG；重试耗尽进入死信 `doc:queue:dead`。
+- 文档经 Redis Stream 队列（`doc:queue`）异步消费，`DocumentParseWorker` 切块（大文档）后逐块写入 LightRAG；重试耗尽进入死信
+  `doc:queue:dead`。
 - 解析进度由用户触发刷新时查询 LightRAG 聚合（不主动轮询）。
 
 ## 7. 统一响应与错误码
 
 所有 REST 接口返回 `{code, msg, data, traceId, detail?}`；前端仅按 `code` 判断。
 
-| code | 含义 |
-|------|------|
-| 200 | 成功 |
-| 40001 | 参数错误 |
-| 40100 / 40101 | 未登录 / Token 失效 |
-| 40300 | 无权限（RBAC） |
-| 40400 | 资源不存在 |
+| code          | 含义                     |
+|---------------|--------------------------|
+| 200           | 成功                     |
+| 40001         | 参数错误                 |
+| 40100 / 40101 | 未登录 / Token 失效      |
+| 40300         | 无权限（RBAC）           |
+| 40400         | 资源不存在               |
 | 50000 / 50001 | 业务异常 / AI 服务不可用 |
-| 50002 / 50003 | 文件处理失败 / 系统繁忙 |
+| 50002 / 50003 | 文件处理失败 / 系统繁忙  |
 
 ## 8. 数据模型
 
@@ -163,6 +168,5 @@ docker compose up -d --build
 > docker compose exec mysql bash /docker-entrypoint-initdb.d/migrate-data.sh
 > ```
 
-镜像构建采用多阶段：`docker/*.Dockerfile` 基于根构建上下文，`-pl <module> -am` 编译对应模块并打包运行镜像；
-Maven 依赖经 BuildKit 缓存挂载（`--mount=type=cache,target=/root/.m2`）避免每次重建重复下载。
-生产务必修改默认密码与密钥。
+镜像构建采用多阶段：`docker/*.Dockerfile` 基于根构建上下文，`-pl <module> -am` 编译对应模块并打包运行镜像； Maven 依赖经
+BuildKit 缓存挂载（`--mount=type=cache,target=/root/.m2`）避免每次重建重复下载。 生产务必修改默认密码与密钥。

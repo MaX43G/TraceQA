@@ -34,6 +34,15 @@ public class MonitorController {
     private LightRagWebuiSessionStore webuiSessionStore;
     @Resource
     private ObservabilitySessionStore observabilitySessionStore;
+    @Resource
+    private edu.zjut.traceqa.adminservice.config.AdminProperties adminProperties;
+
+    /**
+     * 会话 Cookie 是否标记 Secure
+     */
+    private boolean cookieSecure() {
+        return adminProperties.isCookieSecure();
+    }
 
     /**
      * 查询系统运行指标
@@ -105,7 +114,7 @@ public class MonitorController {
         String token = webuiSessionStore.create();
         Cookie cookie = new Cookie("tq_webui", token);
         cookie.setHttpOnly(true);
-        cookie.setSecure(true);
+        cookie.setSecure(cookieSecure());
         cookie.setPath("/");
         cookie.setMaxAge(60 * 60);
         cookie.setAttribute("SameSite", "Lax");
@@ -123,7 +132,7 @@ public class MonitorController {
         String token = observabilitySessionStore.create();
         Cookie cookie = new Cookie("tq_obs", token);
         cookie.setHttpOnly(true);
-        cookie.setSecure(true);
+        cookie.setSecure(cookieSecure());
         cookie.setPath("/");
         cookie.setMaxAge(60 * 60);
         cookie.setAttribute("SameSite", "Lax");

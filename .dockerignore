@@ -9,9 +9,3 @@ node_modules
 *.md
 HELP.md
 .env
-
-# 旧单体源码（已被微服务模块取代）
-src
-
-# 敏感配置不进镜像
-src/main/resources/application-dev.yaml

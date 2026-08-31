@@ -1,0 +1,27 @@
+# 溯知 / TraceQA Tempo 追踪后端配置
+server:
+  http_listen_port: 3200
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+
+# 简化查询验证
+query_frontend:
+  search:
+    enabled: true
+  trace_by_id:
+    enabled: true

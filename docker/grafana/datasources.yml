@@ -1,4 +1,4 @@
-# nonk8s
+# Grafana 数据源（provisoning）
 apiVersion: 1
 datasources:
   - name: Prometheus
@@ -8,9 +8,40 @@ datasources:
     isDefault: true
     uid: PROM
     editable: false
+
+  # Loki 日志；通过衍生字段（Derived fields）提取 trace_id，实现「日志 -> 追踪」
   - name: Loki
     type: loki
     access: proxy
     url: http://loki:3100
     uid: LOKI
     editable: false
+    jsonData:
+      derivedFields:
+        - datasourceUid: TEMPO
+          matcherRegex: '"trace_id":"([0-9a-f]{32})"'
+          name: trace_id
+          url: "$${__value.raw}"
+        - datasourceUid: TEMPO
+          matcherRegex: '"traceId":"([0-9a-f]{32})"'
+          name: traceId
+          url: "$${__value.raw}"
+
+  # Tempo 追踪；配置「追踪 -> 日志」（Trace to logs）链接到 Loki，按 trace_id 关联
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    uid: TEMPO
+    editable: false
+    jsonData:
+      tracesToLogs:
+        datasourceUid: LOKI
+        tags:
+          - trace_id
+          - traceId
+        mapTagNamesEnabled: true
+        filterByTraceID: true
+        spanStartTimeShift: 1h
+        spanEndTimeShift: -1h
+        query: '{app="${__tags.app}"}'

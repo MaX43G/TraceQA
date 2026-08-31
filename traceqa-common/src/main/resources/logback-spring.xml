@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  溯知 / TraceQA 统一 JSON 结构化日志配置。
+  - 输出为 Logstash JSON 格式（Promtail/Loki 可直接解析）；
+  - 将 MDC（traceId / trace_id / span_id 等）扁平化为顶层 JSON 字段，
+    便于 Grafana Loki 通过衍生字段（Derived fields）提取 traceId 并实现 Traces to Logs。
+-->
+<configuration>
+    <!-- 从 spring.application.name 读取应用名，用于日志 JSON 的 app 字段 -->
+    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="traceqa"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- MDC 键扁平化为顶层字段（traceId、trace_id、span_id 等） -->
+            <includeMdcKeyName>true</includeMdcKeyName>
+            <customFields>{"app":"${appName}"}</customFields>
+            <timeZone>Asia/Shanghai</timeZone>
+            <includeContext>false</includeContext>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

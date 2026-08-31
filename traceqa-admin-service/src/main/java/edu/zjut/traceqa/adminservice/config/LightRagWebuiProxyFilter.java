@@ -8,16 +8,20 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.zip.GZIPInputStream;
 
 /**
  * LightRAG WebUI 反向代理过滤器。
@@ -109,9 +113,16 @@ public class LightRagWebuiProxyFilter extends OncePerRequestFilter {
                 }
             });
             String contentType = upstream.headers().firstValue("content-type").orElse("");
+            String contentEncoding = upstream.headers().firstValue("content-encoding").orElse("");
             if (contentType.contains("text/html")) {
-                String html = new String(upstream.body().readAllBytes());
+                byte[] raw = upstream.body().readAllBytes();
+                byte[] body = isGzip(contentEncoding) ? gunzip(raw) : raw;
+                String html = new String(body, StandardCharsets.UTF_8);
                 response.setContentType(contentType);
+                response.setCharacterEncoding("UTF-8");
+                if (isGzip(contentEncoding)) {
+                    response.setHeader("Content-Encoding", "identity");
+                }
                 response.getWriter().write(rewriteRootRelativeUrls(html));
             } else {
                 copyStream(upstream.body(), response.getOutputStream());
@@ -124,8 +135,8 @@ public class LightRagWebuiProxyFilter extends OncePerRequestFilter {
     }
 
     private String rewriteRootRelativeUrls(String html) {
-        return html.replaceAll("(?i)(href|src|action|url)(\\s*(?:=|:)\\s*['\"])/(?!/)", "$1$2"
-                + "/lightrag-webui/");
+        return html.replaceAll("(?i)(href|src|action|url)(\\s*(?:=|:)\\s*['\"])/(?!/)(?!lightrag-webui/)",
+                "$1$2" + "/lightrag-webui/");
     }
 
     private HttpRequest.BodyPublisher bodyPublisher(HttpServletRequest request) throws IOException {
@@ -141,6 +152,24 @@ public class LightRagWebuiProxyFilter extends OncePerRequestFilter {
         while ((n = in.read(buffer)) != -1) {
             out.write(buffer, 0, n);
             out.flush();
+        }
+    }
+
+    /** 是否为 gzip 压缩 */
+    private boolean isGzip(String contentEncoding) {
+        return contentEncoding != null && contentEncoding.toLowerCase().contains("gzip");
+    }
+
+    /** 解压 gzip 字节 */
+    private byte[] gunzip(byte[] data) throws IOException {
+        try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(data));
+             ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int n;
+            while ((n = gis.read(buffer)) != -1) {
+                bos.write(buffer, 0, n);
+            }
+            return bos.toByteArray();
         }
     }
 

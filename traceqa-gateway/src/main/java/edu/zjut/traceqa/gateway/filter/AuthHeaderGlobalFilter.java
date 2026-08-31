@@ -4,6 +4,7 @@ import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import edu.zjut.traceqa.common.auth.LoginUser;
 import edu.zjut.traceqa.common.context.AuthHeaders;
+import edu.zjut.traceqa.gateway.metric.GatewayMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -33,15 +34,35 @@ public class AuthHeaderGlobalFilter implements GlobalFilter, Ordered {
     /** Bearer 前缀 */
     private static final String BEARER_PREFIX = "Bearer ";
 
+    private final GatewayMetrics metrics;
+
+    public AuthHeaderGlobalFilter(GatewayMetrics metrics) {
+        this.metrics = metrics;
+    }
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
+        String method = exchange.getRequest().getMethod().name();
+        String traceId = resolveTraceId(exchange);
         ServerHttpRequest.Builder builder = exchange.getRequest().mutate();
-        builder.header(AuthHeaders.TRACE_ID, resolveTraceId(exchange));
+        builder.header(AuthHeaders.TRACE_ID, traceId);
         if (path.startsWith("/api/")) {
             injectUser(builder, exchange.getRequest().getHeaders());
         }
-        return chain.filter(exchange.mutate().request(builder.build()).build());
+        long start = System.currentTimeMillis();
+        boolean internal = path.startsWith("/internal/");
+        return chain.filter(exchange.mutate().request(builder.build()).build())
+                .doFinally(_ -> {
+                    if (internal) {
+                        return;
+                    }
+                    int status = exchange.getResponse().getStatusCode() == null
+                            ? 500 : exchange.getResponse().getStatusCode().value();
+                    long cost = System.currentTimeMillis() - start;
+                    metrics.record(path, method, status, cost);
+                    log.info("网关访问日志：{} {} -> {}，{}ms，traceId={}", method, path, status, cost, traceId);
+                });
     }
 
     /** 复用上游 traceId 或生成新的，并透传 */

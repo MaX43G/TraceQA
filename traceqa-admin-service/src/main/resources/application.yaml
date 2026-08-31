@@ -47,6 +47,8 @@ mybatis-plus:
 
 # 应用配置
 app:
+  # 会话 Cookie 是否标记 Secure（HTTPS 部署建议 true，本地 HTTP 调试设 false）
+  cookie-secure: ${APP_COOKIE_SECURE:false}
   observability:
     scrape-token: ${APP_OBSERVABILITY_SCRAPE_TOKEN:}
     grafana-base-url: ${OBSERVABILITY_GRAFANA_BASE_URL:http://grafana:3000}
