@@ -22,6 +22,11 @@ import java.util.List;
 @RequestMapping("/api/models")
 public class ModelController {
 
+    /**
+     * 默认模型名兜底（配置缺失时使用）
+     */
+    private static final String FALLBACK_DEFAULT_MODEL = "THUDM/GLM-4-9B-0414";
+
     @Resource
     private QaProperties properties;
 
@@ -32,27 +37,48 @@ public class ModelController {
     private String defaultBaseUrl;
 
     /**
-     * 查询可用模型列表
+     * 查询可用模型列表。
+     *
+     * <p>保证至少返回一个非空的默认模型（避免前端下拉框出现空选项）。
+     * 默认模型名优先取 {@code spring.ai.openai.chat.options.model}，为空时回退到
+     * 配置列表中首个模型名，再兜底到 {@link #FALLBACK_DEFAULT_MODEL}。</p>
      */
     @Operation(summary = "查询可用模型列表")
     @GetMapping
     public ApiResponse<List<ModelVO>> list() {
+        String effectiveDefault = resolveDefaultModel();
         List<ModelVO> result = new ArrayList<>();
         boolean hasDefault = false;
         for (QaProperties.ModelItem item : properties.getModels()) {
             String model = item.getModel() == null || item.getModel().isBlank()
-                    ? defaultModelName : item.getModel();
+                    ? effectiveDefault : item.getModel();
             String baseUrl = item.getBaseUrl() == null || item.getBaseUrl().isBlank()
                     ? defaultBaseUrl : item.getBaseUrl();
-            boolean isDefault = defaultModelName != null && defaultModelName.equals(model);
+            String name = item.getName() == null || item.getName().isBlank() ? model : item.getName();
+            boolean isDefault = effectiveDefault.equals(model);
             if (isDefault) {
                 hasDefault = true;
             }
-            result.add(new ModelVO(item.getName(), model, baseUrl, isDefault));
+            result.add(new ModelVO(name, model, baseUrl, isDefault));
         }
         if (!hasDefault) {
-            result.addFirst(new ModelVO(defaultModelName, defaultModelName, defaultBaseUrl, true));
+            result.addFirst(new ModelVO(effectiveDefault, effectiveDefault, defaultBaseUrl, true));
         }
         return ApiResponse.ok(result);
+    }
+
+    /**
+     * 解析默认模型名（保证非空）。
+     */
+    private String resolveDefaultModel() {
+        if (defaultModelName != null && !defaultModelName.isBlank()) {
+            return defaultModelName;
+        }
+        for (QaProperties.ModelItem item : properties.getModels()) {
+            if (item.getModel() != null && !item.getModel().isBlank()) {
+                return item.getModel();
+            }
+        }
+        return FALLBACK_DEFAULT_MODEL;
     }
 }
