@@ -38,10 +38,13 @@ datasources:
       tracesToLogs:
         datasourceUid: LOKI
         tags:
+          - service.name
           - trace_id
-          - traceId
+        mappedTags:
+          - key: service.name
+            value: app
         mapTagNamesEnabled: true
         filterByTraceID: true
         spanStartTimeShift: 1h
         spanEndTimeShift: -1h
-        query: '{app="${__tags.app}"}'
+        query: '{app="${__tags.service.name}"}'
