@@ -456,6 +456,7 @@ services:
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
       GF_SERVER_ROOT_URL: /grafana
       GF_SERVER_ENABLE_GZIP: "true"
+      GF_LIVE_ENABLED: "false"
       TZ: Asia/Shanghai
     volumes:
       - ./docker/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro

@@ -11,6 +11,14 @@ distributor:
         http:
           endpoint: 0.0.0.0:4318
 
+# 指标生成器：供 Grafana Explore Traces 的 rate()/breakdown TraceQL 查询
+metrics_generator:
+  processor:
+    local_blocks:
+      flush_to_storage: true
+  storage:
+    path: /var/tempo/metrics
+
 storage:
   trace:
     backend: local
@@ -18,10 +26,3 @@ storage:
       path: /var/tempo/wal
     local:
       path: /var/tempo/blocks
-
-# 简化查询验证
-query_frontend:
-  search:
-    enabled: true
-  trace_by_id:
-    enabled: true
