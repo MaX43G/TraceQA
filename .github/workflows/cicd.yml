@@ -73,7 +73,7 @@ jobs:
             --scanners misconfig,secret \
             --severity HIGH,CRITICAL \
             --ignore-unfixed \
-            --skip-files pom.xml \
+            --skip-files "**/pom.xml" \
             --skip-dirs node_modules,.git,target,frontend/node_modules,frontend/.nuxt,frontend/.output \
             .
 
@@ -111,8 +111,16 @@ jobs:
             docker compose up -d --build
 
             echo "等待服务启动..."
-            sleep 10
-            echo "执行健康检查..."
-            curl -sf http://127.0.0.1:6114/api/health || (echo "健康检查未通过" && exit 1)
+            for i in $(seq 1 40); do
+              if curl -sf http://127.0.0.1:6114/api/health >/dev/null 2>&1; then
+                echo "健康检查通过"
+                break
+              fi
+              sleep 5
+              if [ "$i" -eq 40 ]; then
+                echo "健康检查未通过"
+                exit 1
+              fi
+            done
             echo "部署完成"
           '

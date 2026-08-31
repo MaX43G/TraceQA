@@ -82,10 +82,38 @@ export const useModelStore = defineStore('model', {
             try {
                 const res = await fetchModels()
                 this.serverModels = res.data ?? []
+                this.validateSelection()
             } catch {
                 this.serverModels = []
             } finally {
                 this.loaded = true
+            }
+        },
+
+        /**
+         * 校验当前选中的模型是否有效：持久化的服务端模型若已不存在，
+         * 回退到默认模型或第一个可用模型。
+         */
+        validateSelection(): void {
+            if (this.serverModels.length === 0) {
+                return
+            }
+            // 当前选中是服务端模型
+            if (this.selected.startsWith('server:')) {
+                const model = this.selected.slice('server:'.length)
+                if (this.serverModels.some((m) => m.model === model)) {
+                    return
+                }
+                // 失效：回退到默认或第一个模型
+                const fallback = this.serverModels.find((m) => m.isDefault) ?? this.serverModels[0]
+                this.selected = fallback?.isDefault ? 'default' : `server:${fallback?.model}`
+                this.persist()
+                return
+            }
+            // 选中默认，但服务端列表里没有默认标记 → 显式选中第一个模型
+            if (this.selected === 'default' && !this.serverModels.some((m) => m.isDefault)) {
+                this.selected = `server:${this.serverModels[0]?.model}`
+                this.persist()
             }
         },
 
