@@ -9,7 +9,7 @@ COPY settings.xml /root/.m2/settings.xml
 
 COPY . .
 
-RUN --mount=type=cache,target=/root/.m2 mvn -pl traceqa-admin-service -am package -DskipTests -B
+RUN --mount=type=cache,target=/root/.m2/repository mvn -T 1C -pl traceqa-admin-service -am package -DskipTests -B
 
 FROM eclipse-temurin:25-jre-noble
 
@@ -25,7 +25,7 @@ RUN apt-get update \
 
 # 下载 OTel Java Agent（经 aliyun 镜像源）
 RUN curl -fsSL -o /app/opentelemetry-javaagent.jar \
-    "https://maven.aliyun.com/repository/public/io/opentelemetry/javaagent/opentelemetry-javaagent/${OTEL_AGENT_VERSION}/opentelemetry-javaagent-${OTEL_AGENT_VERSION}.jar"
+    "https://maven.aliyun.com/repository/public/io/opentelemetry/javaagent/opentelemetry-javaagent/2.31.1/opentelemetry-javaagent-2.31.1.jar"
 COPY --from=build /app/traceqa-admin-service/target/*.jar app.jar
 
 RUN groupadd -r appuser && useradd -r -g appuser appuser \
@@ -39,5 +39,8 @@ USER appuser
 EXPOSE 8086
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
+
+
+
 
 

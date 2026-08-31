@@ -1,4 +1,4 @@
-# ============================================================
+﻿# ============================================================
 # 溯知 / TraceQA 网关镜像（Spring Cloud Gateway + Nacos）
 # 多阶段构建：阶段一编译（Maven），阶段二运行（JRE 25）
 # ============================================================
@@ -12,7 +12,7 @@ COPY settings.xml /root/.m2/settings.xml
 
 COPY . .
 
-RUN --mount=type=cache,target=/root/.m2 mvn -pl traceqa-gateway -am package -DskipTests -B
+RUN --mount=type=cache,target=/root/.m2/repository mvn -T 1C -pl traceqa-gateway -am package -DskipTests -B
 
 # ---- 运行阶段 ----
 FROM eclipse-temurin:25-jre-noble
@@ -46,3 +46,4 @@ HEALTHCHECK --interval=15s --timeout=5s --retries=5 \
   CMD curl -fsS http://127.0.0.1:8080/actuator/health || exit 1
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
+
