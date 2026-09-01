@@ -7,12 +7,13 @@
  */
 import {execSync} from 'node:child_process'
 import {mkdirSync} from 'node:fs'
+import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 
 const VERSION = '0.26.4'
 const DEST = join(process.cwd(), 'public', 'pyodide')
-const URL = `https://github.com/pyodide/pyodide/releases/download/v${VERSION}/pyodide-${VERSION}.tar.bz2`
-const TMP = '/tmp/pyodide.tar.bz2'
+const URL = `https://github.com/pyodide/pyodide/releases/download/${VERSION}/pyodide-${VERSION}.tar.bz2`
+const TMP = join(tmpdir(), 'pyodide.tar.bz2')
 
 mkdirSync(DEST, {recursive: true})
 console.log(`下载 Pyodide ${VERSION} ...`)
