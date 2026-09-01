@@ -32,6 +32,9 @@
         <a-tab-pane key="monitor" tab="系统监控">
           <MonitorPanel v-if="activeKey === 'monitor'"/>
         </a-tab-pane>
+        <a-tab-pane key="resource" tab="系统资源">
+          <SystemResourcePanel v-if="activeKey === 'resource'"/>
+        </a-tab-pane>
       </a-tabs>
     </a-card>
   </div>
@@ -50,6 +53,7 @@ import UserManager from '@/components/admin/UserManager.vue'
 import LightRagManager from '@/components/admin/LightRagManager.vue'
 import MonitorPanel from '@/components/admin/MonitorPanel.vue'
 import AnnouncementManager from '@/components/admin/AnnouncementManager.vue'
+import SystemResourcePanel from '@/components/admin/SystemResourcePanel.vue'
 
 useSeoMeta({
   title: '管理后台 - 溯知 · TraceQA',

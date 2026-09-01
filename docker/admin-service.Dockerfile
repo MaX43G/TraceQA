@@ -35,7 +35,11 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser \
 
 ENV JAVA_OPTS="-javaagent:/app/opentelemetry-javaagent.jar -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=25.0 -Dnacos.logging.default.config.enabled=false"
 
-USER appuser
+# 说明：管理服务需访问宿主机 Docker Engine（/var/run/docker.sock 挂载）以提供
+# 「系统资源检测 / 无用资源清理」能力。挂载 socket 已等价于宿主机 root 权限，
+# 故此处以 root 运行（与 Portainer 等容器管理工具一致）。若不需要该能力，
+# 可移除此行并去掉 compose 中的 socket 挂载。
+USER root
 
 EXPOSE 8086
 
