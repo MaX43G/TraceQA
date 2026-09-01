@@ -69,10 +69,10 @@ public class SystemResourceService {
         result.put("available", true);
         long freedBytes = 0;
         List<Map<String, Object>> steps = new ArrayList<>();
-        steps.add(pruneStep("/containers/prune", "POST", "已停止容器"));
-        steps.add(pruneStep("/images/prune", "POST", "悬空/未使用镜像"));
-        steps.add(pruneStep("/build/prune", "POST", "构建缓存"));
-        steps.add(pruneStep("/volumes/prune", "POST", "未使用数据卷"));
+        steps.add(pruneStep("/containers/prune", "已停止容器"));
+        steps.add(pruneStep("/images/prune", "悬空/未使用镜像"));
+        steps.add(pruneStep("/build/prune", "构建缓存"));
+        steps.add(pruneStep("/volumes/prune", "未使用数据卷"));
         for (Map<String, Object> s : steps) {
             freedBytes += ((Number) s.getOrDefault("freedBytes", 0L)).longValue();
         }
@@ -141,8 +141,7 @@ public class SystemResourceService {
 
     private long hostUptime() {
         try {
-            String line = new String(
-                    java.nio.file.Files.readAllBytes(java.nio.file.Path.of("/proc/uptime")), StandardCharsets.UTF_8);
+            String line = java.nio.file.Files.readString(java.nio.file.Path.of("/proc/uptime"));
             String sec = line.trim().split("\\s+")[0];
             return Math.round(Double.parseDouble(sec));
         } catch (Exception e) {
@@ -219,10 +218,10 @@ public class SystemResourceService {
 
     // ==================== 清理 ====================
 
-    private Map<String, Object> pruneStep(String path, String method, String label) {
+    private Map<String, Object> pruneStep(String path, String label) {
         Map<String, Object> step = new LinkedHashMap<>();
         long before = dockerDfReclaimable();
-        String resp = dockerApi(path, method);
+        String resp = dockerApi(path, "POST");
         long reclaimed = 0;
         try {
             reclaimed = objectMapper.readTree(resp).path("SpaceReclaimed").asLong(0);
@@ -257,14 +256,14 @@ public class SystemResourceService {
         List<String> cmd = new ArrayList<>(List.of(
                 "curl", "-s", "-m", "15", "-X", method,
                 "--unix-socket", DOCKER_SOCKET, "http://localhost" + path));
-        return exec(cmd, 20);
+        return exec(cmd);
     }
 
     /** 执行命令并返回 stdout+stderr */
-    private String exec(List<String> cmd, int timeoutSeconds) {
+    private String exec(List<String> cmd) {
         try {
             Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
-            if (!p.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
+            if (!p.waitFor(20, TimeUnit.SECONDS)) {
                 p.destroyForcibly();
                 return "{\"error\":\"timeout\"}";
             }
