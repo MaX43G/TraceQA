@@ -14,7 +14,7 @@ public class AdminProperties {
     /**
      * 会话 Cookie 是否标记 Secure
      */
-    private boolean cookieSecure = false;
+    private boolean cookieSecure = true;
 
     /**
      * 可观测性配置
