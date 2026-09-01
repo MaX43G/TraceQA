@@ -152,3 +152,118 @@ body {
 .ant-tabs-tabpane {
     border-radius: 14px;
 }
+
+/* ===== 代码块工具栏（复制 / 运行） ===== */
+.code-block {
+    position: relative;
+    margin: 8px 0;
+    border: 1px solid #e5e6eb;
+    border-radius: 8px;
+    overflow: hidden;
+}
+.code-block-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 10px;
+    background: #f6f7f9;
+    font-size: 12px;
+}
+.code-block-lang {
+    color: #86909c;
+    font-weight: 600;
+}
+.code-block-actions {
+    display: inline-flex;
+    gap: 6px;
+}
+.code-block-btn {
+    border: 1px solid #d9d9d9;
+    background: #fff;
+    color: #4e5969;
+    border-radius: 4px;
+    padding: 1px 8px;
+    font-size: 12px;
+    line-height: 20px;
+    cursor: pointer;
+}
+.code-block-btn:hover {
+    border-color: var(--tq-primary);
+    color: var(--tq-primary);
+}
+.code-block .hljs {
+    margin: 0;
+    border-radius: 0;
+}
+.code-block-output {
+    margin: 0;
+    padding: 10px 12px;
+    background: #1f2329;
+    color: #d1d5db;
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 320px;
+    overflow: auto;
+    border-top: 1px solid #333;
+}
+
+/* ===== 任务清单 ===== */
+.task-list-item {
+    list-style: none;
+}
+.task-list-item-checkbox {
+    margin-right: 6px;
+}
+
+/* ===== 提示框 / 告警（callout） ===== */
+.tq-callout {
+    border-left: 4px solid #1677ff;
+    background: #eef4ff;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin: 10px 0;
+}
+.tq-callout-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #1677ff;
+}
+.tq-callout-tip {
+    border-left-color: #00b42a;
+    background: #e8ffea;
+}
+.tq-callout-tip .tq-callout-title {
+    color: #00b42a;
+}
+.tq-callout-warning {
+    border-left-color: #ff7d00;
+    background: #fff7e8;
+}
+.tq-callout-warning .tq-callout-title {
+    color: #ff7d00;
+}
+.tq-callout-danger {
+    border-left-color: #f53f3f;
+    background: #ffece8;
+}
+.tq-callout-danger .tq-callout-title {
+    color: #f53f3f;
+}
+.tq-callout-info {
+    border-left-color: #14c9c9;
+    background: #e8fffb;
+}
+.tq-callout-info .tq-callout-title {
+    color: #0aa5a5;
+}
+
+/* ===== 脚注 ===== */
+.footnotes {
+    font-size: 13px;
+    color: #4e5969;
+    border-top: 1px solid #e5e6eb;
+    margin-top: 16px;
+    padding-top: 8px;
+}

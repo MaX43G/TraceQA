@@ -12,6 +12,8 @@ import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
 import katex from 'katex'
 import DOMPurify from 'dompurify'
+import taskLists from 'markdown-it-task-lists'
+import footnote from 'markdown-it-footnote'
 
 /** 引用标记正则：匹配 [citation:1] 形式 */
 const CITATION_RE = /\[citation:(\d+)]/g
@@ -47,7 +49,7 @@ function protectCjk(tex: string): string {
  * 也尽量渲染而非整段丢弃，保证内容完整可见。
  */
 function renderTex(tex: string, displayMode: boolean): string {
-    const options = { displayMode, throwOnError: false, strict: false }
+    const options = {displayMode, throwOnError: false, strict: false}
     return katex.renderToString(protectCjk(tex.trim()), options)
 }
 
@@ -115,22 +117,83 @@ const md = new MarkdownIt({
     }
 })
 
-/**
- * 渲染 Markdown 为 HTML 字符串。
- *
- * <p>渲染结果经 DOMPurify 消毒后返回，避免用户/AI 内容中的原始 HTML 引入 XSS。</p>
- *
- * @param content          原始 Markdown（可能包含 [citation:N]）
- * @param availableIndexes 实际存在引用的序号集合（可选，用于过滤无内容角标）
- * @returns 可安全用于 v-html 的 HTML
- */
+// 插件：任务清单（- [ ] / - [x]）
+md.use(taskLists, {enabled: true, label: false})
+// 插件：脚注（[^1]）
+md.use(footnote)
+
+// 代码块工具栏：包装高亮后的代码，提供「复制 / 运行」按钮
+const defaultFence = md.renderer.rules.fence!
+md.renderer.rules.fence = function (tokens, idx, options, env, self) {
+    const token = tokens[idx]!
+    const lang = (token.info.trim().split(/\s+/)[0] || '').toLowerCase()
+    const body = defaultFence(tokens, idx, options, env, self)
+    const runnable = ['javascript', 'js', 'python', 'py'].includes(lang)
+    const codeB64 = encodeBase64(token.content)
+    const runBtn = runnable
+        ? `<button class="code-block-btn" data-action="run" data-lang="${escapeHtml(lang)}" data-code="${codeB64}">运行</button>`
+        : ''
+    return `<div class="code-block">
+        <div class="code-block-bar">
+            <span class="code-block-lang">${escapeHtml(lang || 'text')}</span>
+            <span class="code-block-actions">
+                <button class="code-block-btn" data-action="copy" data-code="${codeB64}">复制</button>
+                ${runBtn}
+            </span>
+        </div>
+        ${body}
+    </div>`
+}
+
+/** 文本 -> Base64（兼容中文，UTF-8 安全，使用 TextEncoder 避免弃用 API） */
+function encodeBase64(text: string): string {
+    const bytes = new TextEncoder().encode(text)
+    let binary = ''
+    for (const b of bytes) {
+        binary += String.fromCharCode(b)
+    }
+    return btoa(binary)
+}
+
+/** HTML 转义 */
+function escapeHtml(text: string): string {
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+// 链接在新标签页打开，并加上安全 rel
+const defaultLinkOpen = md.renderer.rules.link_open!
+md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
+    const token = tokens[idx]!
+    token.attrSet('target', '_blank')
+    token.attrSet('rel', 'noopener noreferrer')
+    return defaultLinkOpen(tokens, idx, options, env, self)
+}
+
+// 提示框/告警：> [!NOTE] / [!TIP] / [!WARNING] / [!DANGER] / [!INFO]
+const calloutRe = /^\s*\[!(NOTE|TIP|WARNING|DANGER|INFO)]\s*/i
+const defaultBqOpen = md.renderer.rules.blockquote_open!
+md.renderer.rules.blockquote_open = function (tokens, idx, options, env, self) {
+    const inline = tokens[idx + 1]
+    if (inline && inline.type === 'inline' && inline.children && inline.children.length) {
+        const first = inline.children[0]!
+        const m = calloutRe.exec(first.content || '')
+        if (m) {
+            const type = m[1]?.toLowerCase()
+            first.content = (first.content || '').replace(calloutRe, '')
+            return `<blockquote class="tq-callout tq-callout-${type}">` +
+                `<div class="tq-callout-title">${m[1]?.toUpperCase()}</div>`
+        }
+    }
+    return defaultBqOpen(tokens, idx, options, env, self)
+}
+
 export function renderMarkdown(content: string, availableIndexes?: Set<number>): string {
     if (!content) {
         return ''
     }
     const rendered = md.render(renderMath(decorateCitations(content, availableIndexes)))
     return DOMPurify.sanitize(rendered, {
-        ADD_ATTR: ['style', 'data-idx'],
-        ADD_TAGS: ['sup']
+        ADD_ATTR: ['style', 'data-idx', 'data-action', 'data-lang', 'data-code', 'type', 'checked', 'disabled'],
+        ADD_TAGS: ['sup', 'input', 'section', 'hr']
     })
 }
