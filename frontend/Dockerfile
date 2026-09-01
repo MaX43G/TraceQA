@@ -13,7 +13,7 @@ RUN npm config set registry https://registry.npmmirror.com
 # 启用 corepack 并指定 pnpm 版本（避免 corepack 去 npmjs.org 查询）
 RUN npm install -g corepack && corepack enable
 ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
-RUN corepack prepare pnpm@latest --activate
+RUN corepack prepare pnpm@11.21.0 --activate
 
 # 使用国内 pnpm 镜像源
 RUN pnpm config set registry https://registry.npmmirror.com
