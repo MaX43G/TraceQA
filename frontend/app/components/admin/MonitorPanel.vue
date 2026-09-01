@@ -147,7 +147,7 @@
 /**
  * 系统监控面板：展示请求量/延迟分位/状态分布/JVM/慢请求/缓存/熔断/会话/异常等后端运行指标（管理员）。
  * LightRAG 引擎相关信息见独立的「LightRAG 管理」页（LightRagManager）。
- * 每 5 秒自动刷新。
+ * 每分钟自动刷新。
  */
 import {getAuthHeaders} from '@/utils/request'
 import {BarChartOutlined, LineChartOutlined} from '@ant-design/icons-vue'
@@ -360,7 +360,7 @@ async function load(): Promise<void> {
 
 onMounted(() => {
   load()
-  useIntervalFn(() => load(), 5000)
+  useIntervalFn(() => load(), 60000)
 })
 </script>
 

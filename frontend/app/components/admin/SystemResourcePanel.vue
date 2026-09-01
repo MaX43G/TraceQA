@@ -87,16 +87,22 @@
       <a-card size="small" title="清理系统无用资源" style="margin-top: 16px">
         <a-space direction="vertical" style="width: 100%">
           <a-descriptions :column="2" size="small">
-            <a-descriptions-item label="Docker 占用空间">{{ data.docker?.totalSizeHuman ?? '-' }}</a-descriptions-item>
+            <a-descriptions-item label="Docker 占用空间">{{ reclaimable?.totalSizeHuman ?? '-' }}</a-descriptions-item>
             <a-descriptions-item label="可回收空间">
-              <a-tag v-if="data.docker?.available" :color="data.docker.reclaimableBytes ? 'orange' : 'green'">
-                {{ data.docker?.reclaimableHuman ?? '-' }}
+              <a-tag v-if="data?.docker?.available" :color="reclaimable?.reclaimableBytes ? 'orange' : 'green'">
+                {{ reclaimable?.reclaimableHuman ?? '-' }}
               </a-tag>
               <span v-else>不可用</span>
             </a-descriptions-item>
           </a-descriptions>
           <a-space>
-            <a-button type="primary" danger :loading="cleaning" :disabled="!data.docker?.available"
+            <a-button :loading="reclaimableLoading" :disabled="!data?.docker?.available" @click="loadReclaimable">
+              <template #icon>
+                <ReloadOutlined/>
+              </template>
+              刷新可回收空间
+            </a-button>
+            <a-button type="primary" danger :loading="cleaning" :disabled="!data?.docker?.available"
                       @click="confirmClean">
               <template #icon>
                 <DeleteOutlined/>
@@ -118,7 +124,7 @@
     >
       <p>确定要执行 Docker 无用资源清理吗？</p>
       <p>将删除：未使用镜像、构建缓存、已停止容器、未使用数据卷（不会删除正在运行的容器与使用中的数据）。</p>
-      <p v-if="data?.docker?.reclaimableBytes">预计可回收约 <b>{{ data.docker.reclaimableHuman }}</b>。</p>
+      <p v-if="reclaimable?.reclaimableBytes">预计可回收约 <b>{{ reclaimable.reclaimableHuman }}</b>。</p>
     </a-modal>
   </div>
 </template>
@@ -126,10 +132,10 @@
 <script setup lang="ts">
 /**
  * 系统资源检测面板：CPU / 内存 / 磁盘占用、设备基础信息与 Docker 无用资源清理（管理员）。
- * 每 5 秒自动刷新。
+ * 每分钟自动刷新。
  */
 import {getAuthHeaders} from '@/utils/request'
-import {DeleteOutlined} from '@ant-design/icons-vue'
+import {DeleteOutlined, ReloadOutlined} from '@ant-design/icons-vue'
 import {useIntervalFn} from '@vueuse/core'
 import {message} from 'ant-design-vue'
 
@@ -165,16 +171,22 @@ interface SystemData {
   }
   docker?: {
     available: boolean
-    totalSizeHuman?: string
-    reclaimableHuman?: string
-    reclaimableBytes?: number
   }
 }
 
+interface DockerReclaimable {
+  available?: boolean
+  totalSizeHuman?: string
+  reclaimableHuman?: string
+  reclaimableBytes?: number
+}
+
 const data = ref<SystemData | null>(null)
+const reclaimable = ref<DockerReclaimable | null>(null)
 const loading = ref(true)
 const cleaning = ref(false)
 const cleanOpen = ref(false)
+const reclaimableLoading = ref(false)
 
 const cpuPercent = computed<number>(() => Math.round(data.value?.cpu?.percent ?? 0))
 const memPercent = computed<number>(() => Math.round(data.value?.memory?.usedPercent ?? 0))
@@ -207,6 +219,24 @@ function confirmClean(): void {
   cleanOpen.value = true
 }
 
+async function loadReclaimable(): Promise<void> {
+  if (!data.value?.docker?.available) {
+    return
+  }
+  reclaimableLoading.value = true
+  try {
+    const res = await fetch('/api/monitor/system/reclaimable', {headers: getAuthHeaders()})
+    const json = (await res.json()) as { code?: number; data?: DockerReclaimable }
+    if (json.code === 200 && json.data) {
+      reclaimable.value = json.data
+    }
+  } catch {
+    // 忽略
+  } finally {
+    reclaimableLoading.value = false
+  }
+}
+
 async function doClean(): Promise<void> {
   cleaning.value = true
   try {
@@ -223,7 +253,7 @@ async function doClean(): Promise<void> {
       } else {
         await message.success(`清理完成，释放约 ${json.data.freedHuman ?? '0'} 空间`)
       }
-      await load()
+      await Promise.all([load(), loadReclaimable()])
     } else {
       await message.error(json.msg || '清理失败')
     }
@@ -251,7 +281,8 @@ async function load(): Promise<void> {
 
 onMounted(() => {
   load()
-  useIntervalFn(() => load(), 5000)
+  loadReclaimable()
+  useIntervalFn(() => load(), 60000)
 })
 </script>
 

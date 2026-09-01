@@ -36,6 +36,16 @@ public class SystemResourceController {
     }
 
     /**
+     * Docker 可回收空间（计算较慢，带 TTL 缓存，按需调用）
+     */
+    @Operation(summary = "Docker 可回收空间检测")
+    @RequireRole("ADMIN")
+    @GetMapping("/reclaimable")
+    public ApiResponse<Map<String, Object>> reclaimable() {
+        return ApiResponse.ok(systemResourceService.reclaimableInfo());
+    }
+
+    /**
      * 清理系统无用资源
      *
      * @param req 请求体，{mode: "docker"}，当前支持 Docker 无用资源清理

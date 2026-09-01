@@ -33,13 +33,23 @@ public class SystemResourceService {
 
     private static final Logger log = LoggerFactory.getLogger(SystemResourceService.class);
 
-    /** Docker Engine API 的 unix socket 路径 */
+    /**
+     * Docker Engine API 的 unix socket 路径
+     */
     private static final String DOCKER_SOCKET = "/var/run/docker.sock";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
-     * 系统资源快照：CPU / 内存 / 磁盘 / 负载 / 基础信息 / Docker 可回收空间
+     * Docker df 结果缓存（GET /system/df 计算开销大，做 TTL 缓存）
+     */
+    private volatile Map<String, Object> dockerDfCache = Map.of("available", false);
+    private volatile long dockerDfExpireAt = 0;
+    private static final long DOCKER_DF_TTL_MS = 600_000;
+
+    /**
+     * 系统资源快照：CPU / 内存 / 磁盘 / 负载 / 基础信息 / Docker 可用性。
+     *
      */
     public Map<String, Object> snapshot() {
         Map<String, Object> data = new LinkedHashMap<>();
@@ -49,8 +59,15 @@ public class SystemResourceService {
         data.put("loadAverage", loadAverage());
         data.put("uptimeSeconds", hostUptime());
         data.put("host", hostInfo());
-        data.put("docker", dockerSummary());
+        data.put("docker", Map.of("available", dockerAvailable()));
         return data;
+    }
+
+    /**
+     * Docker 可回收空间（独立接口，按需调用；带 60s TTL 缓存）。
+     */
+    public Map<String, Object> reclaimableInfo() {
+        return dockerSummary();
     }
 
     /**
@@ -167,11 +184,15 @@ public class SystemResourceService {
     }
 
     private Map<String, Object> dockerSummary() {
-        Map<String, Object> m = new LinkedHashMap<>();
         if (!dockerAvailable()) {
-            m.put("available", false);
-            return m;
+            return Map.of("available", false);
         }
+        long now = System.currentTimeMillis();
+        if (now < dockerDfExpireAt) {
+            return dockerDfCache;
+        }
+        // 计算 /system/df（较慢），结果缓存 TTL
+        Map<String, Object> m = new LinkedHashMap<>();
         m.put("available", true);
         String df = dockerApi("/system/df", "GET");
         try {
@@ -194,6 +215,8 @@ public class SystemResourceService {
         } catch (Exception e) {
             m.put("error", "解析 Docker df 失败：" + e.getMessage());
         }
+        dockerDfCache = m;
+        dockerDfExpireAt = now + DOCKER_DF_TTL_MS;
         return m;
     }
 
@@ -251,7 +274,9 @@ public class SystemResourceService {
         return java.nio.file.Files.exists(java.nio.file.Path.of(DOCKER_SOCKET));
     }
 
-    /** 调用 Docker Engine API（经 unix socket + curl） */
+    /**
+     * 调用 Docker Engine API（经 unix socket + curl）
+     */
     private String dockerApi(String path, String method) {
         List<String> cmd = new ArrayList<>(List.of(
                 "curl", "-s", "-m", "15", "-X", method,
@@ -259,7 +284,9 @@ public class SystemResourceService {
         return exec(cmd);
     }
 
-    /** 执行命令并返回 stdout+stderr */
+    /**
+     * 执行命令并返回 stdout+stderr
+     */
     private String exec(List<String> cmd) {
         try {
             Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
