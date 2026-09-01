@@ -16,6 +16,12 @@
           </template>
           打开 Prometheus
         </a-button>
+        <a-button :loading="refreshing" @click="load(true)">
+          <template #icon>
+            <ReloadOutlined/>
+          </template>
+          刷新
+        </a-button>
       </a-space>
 
       <!-- 概览卡片 -->
@@ -150,8 +156,8 @@
  * 每分钟自动刷新。
  */
 import {getAuthHeaders} from '@/utils/request'
-import {BarChartOutlined, LineChartOutlined} from '@ant-design/icons-vue'
-import { useIntervalFn } from '@vueuse/core'
+import {BarChartOutlined, LineChartOutlined, ReloadOutlined} from '@ant-design/icons-vue'
+import {useIntervalFn} from '@vueuse/core'
 import VChart from '@/components/common/VChart.vue'
 
 interface SlowRequest {
@@ -182,6 +188,7 @@ interface MonitorData {
 
 const data = ref<MonitorData | null>(null)
 const loading = ref(true)
+const refreshing = ref(false)
 
 const topPaths = computed<{ path: string; count: number }[]>(() => {
   const paths = data.value?.topPaths ?? {}
@@ -344,16 +351,19 @@ async function openPrometheus(): Promise<void> {
   }
 }
 
-async function load(): Promise<void> {
+async function load(manual = false): Promise<void> {
   try {
+    if (manual) {
+      refreshing.value = true
+    }
     const res = await fetch('/api/monitor', {headers: getAuthHeaders()})
     const json = (await res.json()) as { code?: number; data?: MonitorData }
     if (json.code === 200 && json.data) {
       data.value = json.data
     }
   } catch {
-    // 忽略，保留上次数据
   } finally {
+    refreshing.value = false
     loading.value = false
   }
 }

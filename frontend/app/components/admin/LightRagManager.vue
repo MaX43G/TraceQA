@@ -298,7 +298,6 @@ async function load(manual = false): Promise<void> {
       lightrag.value = json.data
     }
   } catch {
-    // 忽略，保留上次数据
   } finally {
     loading.value = false
     refreshing.value = false

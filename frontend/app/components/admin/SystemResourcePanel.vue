@@ -14,6 +14,14 @@
     />
 
     <template v-if="data">
+      <a-space style="margin-bottom: 12px">
+        <a-button :loading="refreshing" @click="load(true)">
+          <template #icon>
+            <ReloadOutlined/>
+          </template>
+          刷新
+        </a-button>
+      </a-space>
       <!-- 指标卡片 -->
       <a-row :gutter="16">
         <a-col :xs="12" :md="6">
@@ -265,7 +273,12 @@ async function doClean(): Promise<void> {
   }
 }
 
-async function load(): Promise<void> {
+const refreshing = ref(false)
+
+async function load(manual = false): Promise<void> {
+  if (manual) {
+    refreshing.value = true
+  }
   try {
     const res = await fetch('/api/monitor/system', {headers: getAuthHeaders()})
     const json = (await res.json()) as { code?: number; data?: SystemData }
@@ -275,6 +288,7 @@ async function load(): Promise<void> {
   } catch {
     // 忽略，保留上次数据
   } finally {
+    refreshing.value = false
     loading.value = false
   }
 }
