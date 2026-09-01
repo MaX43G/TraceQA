@@ -1,10 +1,6 @@
--- ============================================================
--- 用户服务数据库结构（traceqa_user）
--- 表：t_role、t_user
--- ============================================================
-USE traceqa_user;
+-- 溯知 / TraceQA 用户服务初始表结构（Flyway V1）
+-- t_role、t_user
 
--- 角色表（RBAC）
 CREATE TABLE IF NOT EXISTS t_role
 (
     id          BIGINT      NOT NULL PRIMARY KEY,
@@ -17,7 +13,6 @@ CREATE TABLE IF NOT EXISTS t_role
     deleted     TINYINT       DEFAULT 0
 );
 
--- 用户表
 CREATE TABLE IF NOT EXISTS t_user
 (
     id          BIGINT       NOT NULL PRIMARY KEY,
@@ -32,5 +27,5 @@ CREATE TABLE IF NOT EXISTS t_user
     deleted     TINYINT      DEFAULT 0
 );
 
-CREATE INDEX idx_role_code ON t_role (code);
-CREATE INDEX idx_user_username ON t_user (username);
+CREATE INDEX IF NOT EXISTS idx_role_code ON t_role (code);
+CREATE INDEX IF NOT EXISTS idx_user_username ON t_user (username);

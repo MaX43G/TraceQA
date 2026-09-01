@@ -1,4 +1,4 @@
-# 溯知 / TraceQA 问答服务配置
+﻿# 溯知 / TraceQA 问答服务配置
 server:
   port: ${SERVER_PORT:8085}
 
@@ -7,6 +7,8 @@ spring:
     name: traceqa-qa-service
   main:
     web-application-type: servlet
+    virtual-threads:
+      enabled: true
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
   cloud:
@@ -27,6 +29,9 @@ spring:
   sql:
     init:
       mode: never
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE_QA:traceqa_qa}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true

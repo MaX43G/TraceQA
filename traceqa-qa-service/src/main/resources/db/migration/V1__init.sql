@@ -1,10 +1,6 @@
--- ============================================================
--- 问答服务数据库结构（traceqa_qa）
--- 表：t_chat_session、t_chat_message、t_system_prompt
--- ============================================================
-USE traceqa_qa;
+-- 溯知 / TraceQA 问答服务初始表结构（Flyway V1）
+-- t_chat_session、t_chat_message、t_system_prompt
 
--- 聊天会话表
 CREATE TABLE IF NOT EXISTS t_chat_session
 (
     id                BIGINT NOT NULL PRIMARY KEY,
@@ -18,7 +14,7 @@ CREATE TABLE IF NOT EXISTS t_chat_session
     deleted           TINYINT      DEFAULT 0
 );
 
--- 聊天消息表（content/thinking_trace/references 用 MEDIUMTEXT，避免引用 JSON 超 TEXT 上限）
+-- content/thinking_trace/references 用 MEDIUMTEXT，避免引用 JSON 超 TEXT 上限
 CREATE TABLE IF NOT EXISTS t_chat_message
 (
     id             BIGINT       NOT NULL PRIMARY KEY,
@@ -34,7 +30,6 @@ CREATE TABLE IF NOT EXISTS t_chat_message
     deleted        TINYINT  DEFAULT 0
 );
 
--- 系统提示词表
 CREATE TABLE IF NOT EXISTS t_system_prompt
 (
     id          BIGINT      NOT NULL PRIMARY KEY,
@@ -48,6 +43,6 @@ CREATE TABLE IF NOT EXISTS t_system_prompt
     deleted     TINYINT      DEFAULT 0
 );
 
-CREATE INDEX idx_msg_session ON t_chat_message (session_id);
-CREATE INDEX idx_session_user ON t_chat_session (user_id);
-CREATE INDEX idx_prompt_scenario ON t_system_prompt (scenario);
+CREATE INDEX IF NOT EXISTS idx_msg_session ON t_chat_message (session_id);
+CREATE INDEX IF NOT EXISTS idx_session_user ON t_chat_session (user_id);
+CREATE INDEX IF NOT EXISTS idx_prompt_scenario ON t_system_prompt (scenario);

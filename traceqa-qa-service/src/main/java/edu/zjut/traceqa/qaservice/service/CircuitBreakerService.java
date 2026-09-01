@@ -1,132 +1,82 @@
 package edu.zjut.traceqa.qaservice.service;
 
-import edu.zjut.traceqa.qaservice.config.QaProperties;
-import jakarta.annotation.PostConstruct;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.concurrent.TimeUnit;
+
 /**
- * LLM 调用熔断服务（Redis 持久化状态机）。
+ * LLM 调用熔断服务（基于 Resilience4j）。
  *
- * <p>状态机 {@code CLOSED -> OPEN -> HALF_OPEN -> CLOSED}，状态存于共享 Redis，
- * 支持多实例/重启后延续。Redis 不可用时自动降级为放行（不熔断）。</p>
+ * <p>封装 Resilience4j 的 {@code CircuitBreaker}（实例名 {@code llm}），
+ * 提供 {@code allowRequest/recordSuccess/recordFailure/currentState} 接口，
+ * 供 {@link LlmService} 调用并暴露给监控。状态机由 Resilience4j 依据滑动窗口与失败率自动维护。</p>
  */
 @Service
 public class CircuitBreakerService {
 
     private static final Logger log = LoggerFactory.getLogger(CircuitBreakerService.class);
 
-    private static final String CB_KEY = "cb:llm";
-    private static final String F_FAILURES = "failures";
-    private static final String F_OPENED_AT = "openedAt";
-    private static final String F_HALF_OPEN = "halfOpen";
-
-    private final QaProperties properties;
-    private final StringRedisTemplate stringRedisTemplate;
-
-    private int failureThreshold;
-    private long openMillis;
-    private int halfOpenMaxCalls;
-
-    public CircuitBreakerService(QaProperties properties, StringRedisTemplate stringRedisTemplate) {
-        this.properties = properties;
-        this.stringRedisTemplate = stringRedisTemplate;
-    }
+    private final CircuitBreaker breaker;
 
     /**
-     * 初始化熔断参数
+     * 从 Resilience4j 注册表获取名为 {@code llm} 的熔断器实例。
+     *
+     * @param registry Resilience4j 熔断器注册表（由 spring-boot3 自动装配）
      */
-    @PostConstruct
-    public void init() {
-        QaProperties.CircuitBreaker cb = properties.getCircuitBreaker();
-        this.failureThreshold = cb.getFailureThreshold();
-        this.openMillis = cb.getOpenMillis();
-        this.halfOpenMaxCalls = cb.getHalfOpenMaxCalls();
+    public CircuitBreakerService(CircuitBreakerRegistry registry) {
+        this.breaker = registry.circuitBreaker("llm");
     }
 
     /**
-     * 是否允许发起 LLM 请求
+     * 是否允许发起 LLM 请求（尝试获取一次许可）。
+     *
+     * @return 允许返回 true；熔断打开返回 false
      */
     public boolean allowRequest() {
-        try {
-            if (currentState() == State.HALF_OPEN) {
-                return halfOpenIncrement() <= halfOpenMaxCalls;
-            }
-            return currentState() == State.CLOSED;
-        } catch (Exception e) {
-            log.debug("熔断判断降级（Redis 不可用）：{}", e.getMessage());
-            return true;
-        }
+        return breaker.tryAcquirePermission();
     }
 
     /**
-     * 记录一次成功，重置计数
+     * 记录一次调用成功。
      */
     public void recordSuccess() {
         try {
-            stringRedisTemplate.opsForHash().put(CB_KEY, F_FAILURES, "0");
-            stringRedisTemplate.opsForHash().put(CB_KEY, F_OPENED_AT, "0");
-            stringRedisTemplate.opsForHash().put(CB_KEY, F_HALF_OPEN, "0");
+            breaker.onSuccess(0, TimeUnit.NANOSECONDS);
         } catch (Exception e) {
-            log.debug("熔断成功记录降级：{}", e.getMessage());
+            log.debug("熔断成功记录异常：{}", e.getMessage());
         }
     }
 
     /**
-     * 记录一次失败，达到阈值则打开熔断
+     * 记录一次调用失败。
      */
     public void recordFailure() {
         try {
-            if (currentState() != State.CLOSED) {
-                return;
-            }
-            Long failures = stringRedisTemplate.opsForHash().increment(CB_KEY, F_FAILURES, 1);
-            if (failures != null && failures >= failureThreshold) {
-                stringRedisTemplate.opsForHash().put(CB_KEY, F_OPENED_AT, String.valueOf(System.currentTimeMillis()));
-            }
+            breaker.onError(0, TimeUnit.NANOSECONDS, new RuntimeException("LLM call failed"));
         } catch (Exception e) {
-            log.debug("熔断失败记录降级：{}", e.getMessage());
+            log.debug("熔断失败记录异常：{}", e.getMessage());
         }
     }
 
     /**
-     * 当前熔断状态
+     * 当前熔断状态。
+     *
+     * @return CLOSED / OPEN / HALF_OPEN
      */
     public State currentState() {
-        try {
-            long openedAt = longOf(stringRedisTemplate.opsForHash().get(CB_KEY, F_OPENED_AT));
-            if (openedAt == 0) {
-                return State.CLOSED;
-            }
-            if (System.currentTimeMillis() - openedAt >= openMillis) {
-                return State.HALF_OPEN;
-            }
-            return State.OPEN;
-        } catch (Exception e) {
-            return State.CLOSED;
-        }
-    }
-
-    private long halfOpenIncrement() {
-        Long value = stringRedisTemplate.opsForHash().increment(CB_KEY, F_HALF_OPEN, 1);
-        return value == null ? 0 : value;
-    }
-
-    private long longOf(Object value) {
-        if (value == null) {
-            return 0;
-        }
-        try {
-            return Long.parseLong(String.valueOf(value));
-        } catch (NumberFormatException e) {
-            return 0;
-        }
+        return switch (breaker.getState()) {
+            case OPEN -> State.OPEN;
+            case HALF_OPEN -> State.HALF_OPEN;
+            default -> State.CLOSED;
+        };
     }
 
     /**
-     * 熔断状态枚举
+     * 熔断状态枚举（与监控展示保持一致）。
      */
     public enum State {
         CLOSED, OPEN, HALF_OPEN

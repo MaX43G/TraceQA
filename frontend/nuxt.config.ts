@@ -84,6 +84,7 @@ export default defineNuxtConfig({
     css: [
         'ant-design-vue/dist/reset.css',
         'katex/dist/katex.min.css',
+        'highlight.js/styles/github-dark.css',
         '@/assets/css/main.css'
     ],
 

@@ -155,15 +155,11 @@ docker compose up -d --build
 ```
 
 > **已有 MySQL 数据卷需迁移**：`docker-entrypoint-initdb.d` 仅在 MySQL 数据卷首次初始化时执行。若本机此前已运行过单体版 TraceQA（已存在 `traceqa` 库），
-> 首次启动微服务会报 `Access denied for user 'traceqa'@'%' to database 'traceqa_user'`。执行迁移脚本（幂等）：
+> 首次启动微服务会报 `Access denied for user 'traceqa'@'%' to database 'traceqa_user'`。补建独立库并授权即可（表结构由各服务 Flyway 自动创建）：
 > ```bash
-> # 1) 补建各微服务独立库、授权并建表
 > docker compose exec mysql bash /docker-entrypoint-initdb.d/migrate-existing.sh
-> # 2) 将旧单体 traceqa 库数据复制到各微服务独立库，完成后删除旧 traceqa 数据库（含旧表）
-> docker compose exec mysql bash /docker-entrypoint-initdb.d/migrate-data.sh
+> docker compose up -d --build   # 启动服务，Flyway 自动建表
 > ```
-> 或彻底重置数据卷后重新初始化（会清空 MySQL/Redis/MinIO 数据，旧数据不保留）：`docker compose down -v && docker compose up -d --build`。
-
 启动后访问：
 
 | 服务                           | 地址                                                                                                     |

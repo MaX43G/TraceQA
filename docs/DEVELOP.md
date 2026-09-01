@@ -4,21 +4,23 @@
 
 ## 1. 技术栈
 
-| 层次       | 技术                                                                          |
-|------------|-------------------------------------------------------------------------------|
-| 前端       | Nuxt 4（SSR）、Vue 3、TypeScript、Pinia、Ant Design Vue、markdown-it          |
-| 网关       | Spring Cloud Gateway 2025.1（WebFlux）、Sa-Token（响应式）、springdoc 聚合    |
-| 微服务框架 | Spring Cloud Alibaba 2025.1（Nacos 注册发现/配置）、OpenFeign（服务间 RPC）   |
-| 后端       | Spring Boot 4.1、Java 25、Spring AI Alibaba Agent、springdoc-openapi          |
-| 鉴权       | Sa-Token（Redis 共享登录态）+ 网关统一校验 + 方法级 RBAC 注解                 |
-| ORM        | MyBatis-Plus（各服务独立库）                                                  |
-| 数据库     | MySQL 8（traceqa_user / kb / qa / admin 四库）                                |
-| 对象存储   | MinIO（统一管理用户文件，如头像；S3 兼容，公开端口 6116）                     |
-| 缓存/队列  | Redis（查询与决策缓存、文档解析任务队列、sa-token、熔断状态）                 |
-| 注册中心   | Nacos（服务发现/配置）                                                        |
-| 检索       | LightRAG（图谱 + 向量 + 关键词），Agentic 策略/重写/HyDE/分解/RRF/ReRead/重排 |
-| 可观测性   | Actuator + Micrometer/Prometheus + Prometheus + Grafana（管理员）             |
-| 部署       | Docker Compose（微服务 + 基础设施 + 前端 + Caddy）                            |
+| 层次       | 技术                                                                             |
+|------------|----------------------------------------------------------------------------------|
+| 前端       | Nuxt 4（SSR）、Vue 3、TypeScript、Pinia、Ant Design Vue、markdown-it             |
+| 网关       | Spring Cloud Gateway 2025.1（WebFlux）、Sa-Token（响应式）、springdoc 聚合       |
+| 微服务框架 | Spring Cloud Alibaba 2025.1（Nacos 注册发现/配置）、OpenFeign（服务间 RPC）      |
+| 后端       | Spring Boot 4.1、Java 25（虚拟线程）、Spring AI Alibaba Agent、springdoc-openapi |
+| 数据迁移   | Flyway（各服务独立库版本化迁移）                                                 |
+| 容错       | Resilience4j（LLM 熔断）、OpenFeign（服务间 RPC）                                |
+| 鉴权       | Sa-Token（Redis 共享登录态）+ 网关统一校验 + 方法级 RBAC 注解                    |
+| ORM        | MyBatis-Plus（各服务独立库）                                                     |
+| 数据库     | MySQL 8（traceqa_user / kb / qa / admin 四库）                                   |
+| 对象存储   | MinIO（统一管理用户文件，如头像；S3 兼容，公开端口 6116）                        |
+| 缓存/队列  | Redis（查询与决策缓存、文档解析任务队列、sa-token、熔断状态）                    |
+| 注册中心   | Nacos（服务发现/配置）                                                           |
+| 检索       | LightRAG（图谱 + 向量 + 关键词），Agentic 策略/重写/HyDE/分解/RRF/ReRead/重排    |
+| 可观测性   | Actuator + Micrometer/Prometheus + Prometheus + Grafana（管理员）                |
+| 部署       | Docker Compose（微服务 + 基础设施 + 前端 + Caddy）                               |
 
 ## 2. 微服务架构
 
@@ -93,12 +95,7 @@ cd frontend && pnpm gen:api   # 依据 http://localhost:8080/v3/api-docs 生成 
 MySQL 容器初始化脚本位于 `db/`：
 
 - `01-init-databases.sh`：创建 `traceqa_user / traceqa_kb / traceqa_qa / traceqa_admin` 四库并授权。
-- `02-user-schema.sql`：`t_user`、`t_role`。
-- `03-kb-schema.sql`：`t_knowledge_base`、`t_document`。
-- `04-qa-schema.sql`：`t_chat_session`、`t_chat_message`、`t_system_prompt`。
-- `05-admin-schema.sql`：`t_announcement`。
-
-各服务在启动时通过 `DataInitializer` 幂等装载预置数据（角色/默认账号、默认知识库、系统提示词、欢迎公告）。
+- 各服务的数据库表通过Flyway版本化迁移
 
 ## 5. 多 Agent 工作流（qa-service）
 

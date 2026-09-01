@@ -1,10 +1,6 @@
--- ============================================================
--- 管理服务数据库结构（traceqa_admin）
--- 表：t_announcement
--- ============================================================
-USE traceqa_admin;
+-- 溯知 / TraceQA 管理服务初始表结构（Flyway V1）
+-- t_announcement
 
--- 系统公告表
 CREATE TABLE IF NOT EXISTS t_announcement
 (
     id          BIGINT NOT NULL PRIMARY KEY,

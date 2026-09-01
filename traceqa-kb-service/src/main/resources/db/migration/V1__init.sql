@@ -1,10 +1,6 @@
--- ============================================================
--- 知识库服务数据库结构（traceqa_kb）
--- 表：t_knowledge_base、t_document
--- ============================================================
-USE traceqa_kb;
+-- 溯知 / TraceQA 知识库服务初始表结构（Flyway V1）
+-- t_knowledge_base、t_document
 
--- 知识库表
 CREATE TABLE IF NOT EXISTS t_knowledge_base
 (
     id          BIGINT       NOT NULL PRIMARY KEY,
@@ -17,7 +13,6 @@ CREATE TABLE IF NOT EXISTS t_knowledge_base
     deleted     TINYINT      DEFAULT 0
 );
 
--- 文档表（异步解析进度）
 CREATE TABLE IF NOT EXISTS t_document
 (
     id                BIGINT       NOT NULL PRIMARY KEY,
@@ -40,4 +35,4 @@ CREATE TABLE IF NOT EXISTS t_document
     deleted           TINYINT      DEFAULT 0
 );
 
-CREATE INDEX idx_doc_kb ON t_document (knowledge_base_id);
+CREATE INDEX IF NOT EXISTS idx_doc_kb ON t_document (knowledge_base_id);
