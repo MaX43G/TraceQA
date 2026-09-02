@@ -94,7 +94,6 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
-    mem_limit: 4g
     environment:
       LLM_BINDING: openai
       LLM_BINDING_HOST: ${LIGHTRAG_LLM_BASE_URL:-https://api.siliconflow.cn/v1}
