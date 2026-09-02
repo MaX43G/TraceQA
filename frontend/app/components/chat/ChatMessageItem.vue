@@ -19,12 +19,11 @@
         <ThinkingTracePanel v-if="hasThinking" :nodes="msg.thinkingTrace ?? []"/>
         <RetrievalStatsPanel v-if="msg.stats" :stats="msg.stats"/>
         <div class="chat-msg__ai-bubble">
-          <MarkdownViewer :content="displayContent" :typing="props.streaming" :available-indexes="usedIndexes"
-                          @cite-click="handleCite"/>
+          <MarkdownViewer :content="displayContent" :typing="props.streaming" @cite-click="handleCite"/>
           <div v-if="props.streaming" class="chat-msg__streaming">正在生成…</div>
         </div>
         <CitationPanel v-if="hasReferences" ref="citationPanel" :references="msg.references ?? []"
-                       :used-indexes="usedIndexes" @view="openViewer"/>
+                       @view="openViewer"/>
         <div v-if="props.msg.followup?.length && !props.streaming" class="chat-msg__followup">
           <span class="chat-msg__followup-label">猜你想问</span>
           <a-tag v-for="(q, i) in props.msg.followup" :key="i" class="chat-msg__followup-tag" @click="emit('ask', q)">
@@ -125,19 +124,6 @@ const hasThinking = computed<boolean>(() => (props.msg.thinkingTrace?.length ?? 
 
 /** 是否存在引用来源 */
 const hasReferences = computed<boolean>(() => (props.msg.references?.length ?? 0) > 0)
-
-/** 回答中实际引用的序号（[citation:N] ∩ references），用于过滤无内容角标与未引用文献 */
-const usedIndexes = computed<Set<number>>(() => {
-  const used = new Set<number>()
-  const re = /\[citation:(\d+)]/g
-  const content = displayContent.value || ''
-  let match: RegExpExecArray | null
-  while ((match = re.exec(content)) !== null) {
-    used.add(Number(match[1]))
-  }
-  const valid = new Set((props.msg.references ?? []).map((r) => r.index).filter((n): n is number => n != null))
-  return new Set([...used].filter((n) => valid.has(n)))
-})
 
 /** 展示内容：流式阶段取缓冲，否则取正文 */
 const displayContent = computed<string>(() =>

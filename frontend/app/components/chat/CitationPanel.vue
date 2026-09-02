@@ -1,41 +1,46 @@
 <template>
   <div class="citation-panel">
-    <div class="citation-panel__header">
+    <div class="citation-panel__header" @click="collapsed = !collapsed">
       <a-space size="small">
         <LinkOutlined />
         <span>引用来源</span>
-        <a-tag color="blue">{{ displayReferences.length }}</a-tag>
+        <a-tag color="blue">{{ references.length }}</a-tag>
       </a-space>
+      <span class="citation-panel__toggle">
+        <DownOutlined :rotate="collapsed ? 0 : 180" />
+      </span>
     </div>
-    <div v-if="displayReferences.length === 0" class="citation-panel__empty">本次回答无引用来源</div>
-    <div
-      v-for="ref in displayReferences"
-      :key="ref.index"
-      :id="`cite-${ref.index}`"
-      class="citation-item"
-      :class="{ 'citation-item--active': activeIndex === ref.index }"
-      @click="handleView(ref)"
-    >
-      <a-space class="citation-item__head" :size="6">
-        <a-badge
-          :count="ref.index"
-          :show-zero="false"
-          :color="activeIndex === ref.index ? '#1677ff' : '#86909c'"
-        />
-        <FileTextOutlined style="color: #1677ff" />
-        <span class="citation-item__title">{{ ref.title || ref.filePath }}</span>
-        <a-tooltip :title="ref.filePath">
-          <FolderOpenOutlined style="color: #86909c" />
-        </a-tooltip>
-        <span class="citation-item__open">查看全文</span>
-      </a-space>
-      <div v-if="ref.headings?.length" class="citation-item__headings">
-        <template v-for="(h, hi) in ref.headings" :key="hi">
-          <span v-if="hi > 0" class="heading-sep">›</span>
-          <span class="heading-chip">{{ h }}</span>
-        </template>
+    <div v-if="!collapsed" class="citation-panel__body">
+      <div v-if="references.length === 0" class="citation-panel__empty">本次回答无引用来源</div>
+      <div
+        v-for="ref in references"
+        :key="ref.index"
+        :id="`cite-${ref.index}`"
+        class="citation-item"
+        :class="{ 'citation-item--active': activeIndex === ref.index }"
+        @click="handleView(ref)"
+      >
+        <a-space class="citation-item__head" :size="6">
+          <a-badge
+            :count="ref.index"
+            :show-zero="false"
+            :color="activeIndex === ref.index ? '#1677ff' : '#86909c'"
+          />
+          <FileTextOutlined style="color: #1677ff" />
+          <span class="citation-item__title">{{ ref.title || ref.filePath }}</span>
+          <a-tooltip :title="ref.filePath">
+            <FolderOpenOutlined style="color: #86909c" />
+          </a-tooltip>
+          <span class="citation-item__open">查看全文</span>
+        </a-space>
+        <div v-if="ref.headings?.length" class="citation-item__headings">
+          <template v-for="(h, hi) in ref.headings" :key="hi">
+            <span v-if="hi > 0" class="heading-sep">›</span>
+            <span class="heading-chip">{{ h }}</span>
+          </template>
+        </div>
+        <div class="citation-item__content" v-html="highlightedContent(ref)"></div>
       </div>
-      <div class="citation-item__content" v-html="highlightedContent(ref)"></div>
     </div>
   </div>
 </template>
@@ -43,34 +48,24 @@
 <script setup lang="ts">
 /**
  * 引用来源面板。
- *
- * <p>仅展示回答中「实际引用」的文献（未引用的一律隐藏）；
- * 点击文献项或正文角标可查看全文。</p>
  */
-import { LinkOutlined, FileTextOutlined, FolderOpenOutlined } from '@ant-design/icons-vue'
+import { LinkOutlined, FileTextOutlined, FolderOpenOutlined, DownOutlined } from '@ant-design/icons-vue'
 import type { ReferenceVO } from '@/utils/api-types'
 
 const props = defineProps<{
   /** 引用来源列表 */
   references: ReferenceVO[]
-  /** 回答中实际引用的序号集合（仅显示这些） */
-  usedIndexes?: Set<number>
 }>()
 
 const emit = defineEmits<{
   (e: 'view', ref: ReferenceVO): void
 }>()
 
+/** 是否折叠 */
+const collapsed = ref(true)
+
 /** 当前高亮的引用序号 */
 const activeIndex = ref<number | null>(null)
-
-/** 只显示实际被引用的文献（回答未引用任何文献时显示为空） */
-const displayReferences = computed<ReferenceVO[]>(() => {
-  if (props.usedIndexes) {
-    return props.references.filter((r) => props.usedIndexes?.has(<number>r.index))
-  }
-  return props.references
-})
 
 /** HTML 转义，防止注入 */
 function escapeHtml(s: string): string {
@@ -123,6 +118,16 @@ defineExpose({ highlight })
   color: #4e5969;
   font-size: 13px;
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.citation-panel__toggle {
+  color: #86909c;
+  font-size: 12px;
 }
 
 .citation-panel__empty {

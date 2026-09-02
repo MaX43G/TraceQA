@@ -14,8 +14,8 @@ name: traceqa
 x-logging: &default-logging
   driver: json-file
   options:
-    max-size: "20m"
-    max-file: "5"
+    max-size: "5m"
+    max-file: "3"
 
 services:
   # ===================== 基础设施 =====================
@@ -25,6 +25,7 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
+    mem_limit: 1g
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-traceqa}
@@ -51,6 +52,7 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
+    mem_limit: 512m
     command: [ "redis-server", "--appendonly", "yes", "--save", "60 1", "--appendfsync", "everysec" ]
     volumes:
       - traceqa-redis-data:/data
@@ -69,6 +71,7 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
+    mem_limit: 1g
     environment:
       MODE: standalone
       NACOS_AUTH_ENABLE: "false"
@@ -91,6 +94,7 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
+    mem_limit: 2g
     environment:
       LLM_BINDING: openai
       LLM_BINDING_HOST: ${LIGHTRAG_LLM_BASE_URL:-https://api.siliconflow.cn/v1}
@@ -139,6 +143,7 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
+    mem_limit: 1g
     command: [ "server", "/data", "--console-address", ":9001" ]
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
@@ -165,6 +170,7 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
+    mem_limit: 768m
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: 8080
@@ -193,6 +199,7 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
+    mem_limit: 768m
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: 8081
@@ -228,6 +235,7 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
+    mem_limit: 512m
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: 8083
@@ -260,6 +268,7 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
+    mem_limit: 1g
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: 8084
@@ -302,6 +311,7 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
+    mem_limit: 1g
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: 8085
@@ -344,6 +354,7 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
+    mem_limit: 512m
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: 8086
@@ -422,6 +433,7 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
+    mem_limit: 768m
     entrypoint:
       - /bin/sh
       - -c
@@ -445,6 +457,7 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
+    mem_limit: 768m
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
@@ -476,6 +489,7 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
+    mem_limit: 768m
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - ./docker/loki-config.yaml:/etc/loki/local-config.yaml:ro
@@ -488,6 +502,7 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
+    mem_limit: 768m
     command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
       - ./docker/tempo.yaml:/etc/tempo.yaml:ro
@@ -503,6 +518,7 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
+    mem_limit: 256m
     command: -config.file=/etc/promtail/config.yml
     volumes:
       - ./docker/promtail-config.yaml:/etc/promtail/config.yml:ro
