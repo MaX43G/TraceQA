@@ -412,11 +412,11 @@ services:
     environment:
       TZ: Asia/Shanghai
     volumes:
-      - ./frontend/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend/Caddyfile:/etc/caddy/Caddyfile
       - traceqa-caddy-data:/data
       - traceqa-caddy-config:/config
-      - /root/caddy-certs:/etc/ssl/caddy-certs:ro
-      - /var/www/acme-challenge:/var/www/acme-challenge:ro
+      - /root/caddy-certs:/etc/ssl/caddy-certs
+      - /var/www/acme-challenge:/var/www/acme-challenge
     ports:
       - "80:80"
       - "443:443"
