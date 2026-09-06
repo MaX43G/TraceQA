@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.FileStore;
 import java.nio.file.FileSystems;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -111,19 +112,53 @@ public class SystemResourceService {
     }
 
     private Map<String, Object> memoryInfo() {
-        OperatingSystemMXBean os = osBean();
-        long total = os.getTotalMemorySize();
-        long free = os.getFreeMemorySize();
-        long used = Math.max(total - free, 0);
+        Map<String, Long> mem = hostMeminfo();
+        long total = mem.getOrDefault("MemTotal", 0L);
+        long available = mem.getOrDefault("MemAvailable", -1L);
+        if (available < 0) {
+            available = mem.getOrDefault("MemFree", 0L);
+        }
+        if (total <= 0 || available < 0) {
+            OperatingSystemMXBean os = osBean();
+            total = os.getTotalMemorySize();
+            available = os.getFreeMemorySize();
+        }
+        long used = Math.max(total - available, 0);
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("totalBytes", total);
         m.put("usedBytes", used);
-        m.put("freeBytes", free);
+        m.put("freeBytes", available);
         m.put("usedPercent", total <= 0 ? 0 : round(used * 100.0 / total));
         m.put("totalHuman", humanBytes(total));
         m.put("usedHuman", humanBytes(used));
-        m.put("freeHuman", humanBytes(free));
+        m.put("freeHuman", humanBytes(available));
         return m;
+    }
+
+    /** 读取宿主 /proc/meminfo（内存单位 kB -> 字节）；失败返回空 Map */
+    private Map<String, Long> hostMeminfo() {
+        Map<String, Long> map = new HashMap<>();
+        try {
+            for (String line : java.nio.file.Files.readAllLines(
+                    java.nio.file.Path.of("/proc/meminfo"), StandardCharsets.UTF_8)) {
+                String[] parts = line.split(":");
+                if (parts.length < 2) {
+                    continue;
+                }
+                String key = parts[0].trim();
+                String[] kv = parts[1].trim().split("\\s+");
+                if (kv.length == 0) {
+                    continue;
+                }
+                try {
+                    map.put(key, Long.parseLong(kv[0]) * 1024L);
+                } catch (NumberFormatException ignore) {
+                }
+            }
+        } catch (Exception e) {
+            log.warn("读取 /proc/meminfo 失败：{}", e.getMessage());
+        }
+        return map;
     }
 
     private List<Map<String, Object>> diskInfo() {
@@ -168,7 +203,6 @@ public class SystemResourceService {
 
     private Map<String, Object> hostInfo() {
         Map<String, Object> m = new LinkedHashMap<>();
-        // 优先从 Docker Engine 读取宿主机信息，失败则回退 JVM 属性
         Map<String, Object> docker = dockerInfo();
         if (!docker.isEmpty()) {
             m.putAll(docker);
@@ -177,7 +211,9 @@ public class SystemResourceService {
             m.put("osName", System.getProperty("os.name"));
             m.put("osArch", System.getProperty("os.arch"));
         }
-        m.put("cpuCores", osBean().getAvailableProcessors());
+        if (!m.containsKey("cpuCores")) {
+            m.put("cpuCores", osBean().getAvailableProcessors());
+        }
         m.put("javaVersion", System.getProperty("java.version"));
         m.put("containerHostname", hostnameFromEnv());
         return m;
@@ -191,7 +227,6 @@ public class SystemResourceService {
         if (now < dockerDfExpireAt) {
             return dockerDfCache;
         }
-        // 计算 /system/df（较慢），结果缓存 TTL
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("available", true);
         String df = dockerApi("/system/df", "GET");
@@ -233,8 +268,8 @@ public class SystemResourceService {
             m.put("osArch", root.path("Architecture").asText(""));
             m.put("kernelVersion", root.path("KernelVersion").asText(""));
             m.put("dockerVersion", root.path("ServerVersion").asText(""));
+            m.put("cpuCores", root.path("NCPU").asInt(0));
         } catch (Exception e) {
-            // 忽略，回退 JVM 属性
         }
         return m;
     }
@@ -249,7 +284,6 @@ public class SystemResourceService {
         try {
             reclaimed = objectMapper.readTree(resp).path("SpaceReclaimed").asLong(0);
         } catch (Exception ignore) {
-            // 部分接口可能无 SpaceReclaimed
         }
         step.put("label", label);
         step.put("endpoint", path);

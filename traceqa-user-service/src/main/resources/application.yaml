@@ -43,6 +43,8 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    # 已有表但无历史表时，将其作为基线（跳过已存在的 V1，不重复建表）
+    baseline-on-migrate: true
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE_USER:traceqa_user}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true

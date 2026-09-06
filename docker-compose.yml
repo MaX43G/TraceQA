@@ -94,6 +94,7 @@ services:
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
+    mem_limit: 4g
     environment:
       LLM_BINDING: openai
       LLM_BINDING_HOST: ${LIGHTRAG_LLM_BASE_URL:-https://api.siliconflow.cn/v1}
@@ -211,6 +212,8 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traceqa123}
       DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-}
       DEFAULT_USER_PASSWORD: ${DEFAULT_USER_PASSWORD:-}
+      # 已有表但无 Flyway 历史表时将其作为基线，避免启动失败
+      SPRING_FLYWAY_BASELINEONMIGRATE: "true"
       OTEL_SERVICE_NAME: traceqa-user-service
       OTEL_TRACES_EXPORTER: otlp
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
@@ -281,6 +284,8 @@ services:
       LIGHTRAG_BASE_URL: http://lightrag:9621
       LIGHTRAG_API_KEY: ""
       APP_STORAGE_ROOT: /app/data/files
+      # 已有表但无 Flyway 历史表时将其作为基线，避免启动失败
+      SPRING_FLYWAY_BASELINEONMIGRATE: "true"
       OTEL_SERVICE_NAME: traceqa-kb-service
       OTEL_TRACES_EXPORTER: otlp
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
@@ -334,6 +339,8 @@ services:
       APP_RERANK_BASE_URL: ${RERANK_BASE_URL:-https://api.siliconflow.cn}
       APP_RERANK_API_KEY: ${RERANK_API_KEY:-}
       APP_RERANK_MODEL: ${RERANK_MODEL:-BAAI/bge-reranker-v2-m3}
+      # 已有表但无 Flyway 历史表时将其作为基线，避免启动失败
+      SPRING_FLYWAY_BASELINEONMIGRATE: "true"
       OTEL_SERVICE_NAME: traceqa-qa-service
       OTEL_TRACES_EXPORTER: otlp
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
@@ -376,6 +383,8 @@ services:
       LIGHTRAG_API_KEY: ""
       APP_OBSERVABILITY_SCRAPE_TOKEN: ${OBSERVABILITY_SCRAPE_TOKEN:-traceqa-prometheus-scrape-change-me}
       APP_COOKIE_SECURE: ${APP_COOKIE_SECURE:-false}
+      # 已有表但无 Flyway 历史表时将其作为基线，避免启动失败
+      SPRING_FLYWAY_BASELINEONMIGRATE: "true"
       OBSERVABILITY_GRAFANA_BASE_URL: http://grafana:3000
       OBSERVABILITY_PROMETHEUS_BASE_URL: http://prometheus:9090
       OTEL_SERVICE_NAME: traceqa-admin-service
