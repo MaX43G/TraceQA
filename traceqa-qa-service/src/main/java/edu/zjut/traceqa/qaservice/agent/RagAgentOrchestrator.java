@@ -271,8 +271,7 @@ public class RagAgentOrchestrator {
             finishThinking(thinking, emitter, "结果精排", "排序完成");
         }
 
-        boolean degraded = enhanced == null
-                || (enhanced.getRewritten() == null && enhanced.getHyde() == null);
+        boolean degraded = enhanced.getRewritten() == null && enhanced.getHyde() == null;
         RetrievalResult result = new RetrievalResult(fused, degraded);
         emitRetrievalStats(emitter, graphChunks.size(), vectorChunks.size(), keywordChunks.size(),
                 result.getChunks(), retrieveStart);
