@@ -194,6 +194,8 @@ export function renderMarkdown(content: string, availableIndexes?: Set<number>):
     const rendered = md.render(renderMath(decorateCitations(content, availableIndexes)))
     return DOMPurify.sanitize(rendered, {
         ADD_ATTR: ['style', 'data-idx', 'data-action', 'data-lang', 'data-code', 'type', 'checked', 'disabled'],
-        ADD_TAGS: ['sup', 'input', 'section', 'hr']
+        ADD_TAGS: ['sup', 'input', 'section', 'hr'],
+        // 文档/回答中的媒体引用多为本地无效路径（如 /images/xxx.jpg），渲染会触发 404 请求，直接剔除
+        FORBID_TAGS: ['img', 'video', 'audio', 'iframe', 'embed', 'object', 'source', 'picture']
     })
 }

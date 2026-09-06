@@ -139,7 +139,6 @@
 | DeepSeek-R1-0528 | `deepseek-ai/DeepSeek-R1-0528-Qwen3-8B` |
 | Qwen3-8B         | `Qwen/Qwen3-8B`                         |
 | Qwen3.5-4B       | `Qwen/Qwen3.5-4B`                       |
-| Qwen2.5-7B       | `Qwen/Qwen2.5-7B-Instruct`              |
 
 ## 快速开始（Docker 一键部署）
 

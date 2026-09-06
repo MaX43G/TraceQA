@@ -9,8 +9,28 @@ import {
     me,
     updateNickname as apiUpdateNickname
 } from '@/api/traceqa/renzheng'
-import {TOKEN_KEY} from '@/utils/request'
+import {TOKEN_KEY, ApiError} from '@/utils/request'
 import type {UserInfo} from '@/utils/api-types'
+
+/** 登录最大重试次数与基础退避间隔（服务启动/网关瞬时无实例时按指数退避重试） */
+const LOGIN_RETRY_MAX = 6
+const LOGIN_RETRY_BASE_MS = 1500
+
+/** 登录接口：网关瞬时无实例（503/502）时按指数退避自动重试，覆盖服务启动窗口 */
+async function loginWithRetry(username: string, password: string) {
+    for (let attempt = 0; ; attempt++) {
+        try {
+            return await apiLogin({username, password})
+        } catch (e) {
+            const code = e instanceof ApiError ? e.code : 0
+            if ((code === 503 || code === 502) && attempt < LOGIN_RETRY_MAX) {
+                await new Promise((r) => setTimeout(r, LOGIN_RETRY_BASE_MS * 2 ** attempt))
+                continue
+            }
+            throw e
+        }
+    }
+}
 
 export const useAuthStore = defineStore('auth', {
     state: () => ({
@@ -31,7 +51,7 @@ export const useAuthStore = defineStore('auth', {
     actions: {
         /** 登录 */
         async login(username: string, password: string): Promise<void> {
-            const res = await apiLogin({username, password})
+            const res = await loginWithRetry(username, password)
             const data = res.data
             if (!data) {
                 throw new Error('登录响应异常')
