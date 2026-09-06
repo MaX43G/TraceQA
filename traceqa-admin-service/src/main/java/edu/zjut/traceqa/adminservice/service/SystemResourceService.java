@@ -269,7 +269,7 @@ public class SystemResourceService {
             m.put("kernelVersion", root.path("KernelVersion").asText(""));
             m.put("dockerVersion", root.path("ServerVersion").asText(""));
             m.put("cpuCores", root.path("NCPU").asInt(0));
-        } catch (Exception e) {
+        } catch (Exception _) {
         }
         return m;
     }
