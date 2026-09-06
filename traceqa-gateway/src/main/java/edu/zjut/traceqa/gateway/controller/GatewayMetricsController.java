@@ -1,6 +1,7 @@
 package edu.zjut.traceqa.gateway.controller;
 
 import edu.zjut.traceqa.gateway.metric.GatewayMetrics;
+import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -14,11 +15,8 @@ import java.util.Map;
 @RequestMapping("/internal")
 public class GatewayMetricsController {
 
-    private final GatewayMetrics metrics;
-
-    public GatewayMetricsController(GatewayMetrics metrics) {
-        this.metrics = metrics;
-    }
+    @Resource
+    private GatewayMetrics metrics;
 
     /** 返回网关聚合的请求运行指标 */
     @GetMapping("/metrics")

@@ -3,7 +3,7 @@ package edu.zjut.traceqa.adminservice.config;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import edu.zjut.traceqa.common.model.po.Announcement;
 import edu.zjut.traceqa.adminservice.mapper.AnnouncementMapper;
-import lombok.AllArgsConstructor;
+import jakarta.annotation.Resource;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,12 +16,12 @@ import org.springframework.stereotype.Component;
  * <p>首次启动时预置欢迎公告。</p>
  */
 @Component
-@AllArgsConstructor
 public class DataInitializer implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
 
-    private final AnnouncementMapper announcementMapper;
+    @Resource
+    private AnnouncementMapper announcementMapper;
 
     /**
      * 启动装载默认公告

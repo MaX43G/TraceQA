@@ -5,6 +5,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import edu.zjut.traceqa.common.auth.LoginUser;
 import edu.zjut.traceqa.common.context.AuthHeaders;
 import edu.zjut.traceqa.gateway.metric.GatewayMetrics;
+import jakarta.annotation.Resource;
 import org.jspecify.annotations.NullMarked;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,11 +38,8 @@ public class AuthHeaderGlobalFilter implements GlobalFilter, Ordered {
      */
     private static final String BEARER_PREFIX = "Bearer ";
 
-    private final GatewayMetrics metrics;
-
-    public AuthHeaderGlobalFilter(GatewayMetrics metrics) {
-        this.metrics = metrics;
-    }
+    @Resource
+    private GatewayMetrics metrics;
 
     @Override
     @NullMarked

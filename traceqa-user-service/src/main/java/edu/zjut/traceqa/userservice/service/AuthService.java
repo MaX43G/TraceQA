@@ -16,6 +16,7 @@ import edu.zjut.traceqa.common.model.vo.LoginResponse;
 import edu.zjut.traceqa.common.model.vo.UserInfo;
 import edu.zjut.traceqa.userservice.mapper.RoleMapper;
 import edu.zjut.traceqa.userservice.mapper.UserMapper;
+import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,20 +62,16 @@ public class AuthService {
     private static final Duration LOGIN_LOCK_TTL = Duration.ofMinutes(10);
     private static final Duration LOGIN_FAIL_TTL = Duration.ofMinutes(10);
 
-    private final UserMapper userMapper;
-    private final RoleMapper roleMapper;
-    private final PasswordEncoder passwordEncoder;
-    private final FileClient fileClient;
-    private final StringRedisTemplate stringRedisTemplate;
-
-    public AuthService(UserMapper userMapper, RoleMapper roleMapper, PasswordEncoder passwordEncoder,
-                       FileClient fileClient, StringRedisTemplate stringRedisTemplate) {
-        this.userMapper = userMapper;
-        this.roleMapper = roleMapper;
-        this.passwordEncoder = passwordEncoder;
-        this.fileClient = fileClient;
-        this.stringRedisTemplate = stringRedisTemplate;
-    }
+    @Resource
+    private UserMapper userMapper;
+    @Resource
+    private RoleMapper roleMapper;
+    @Resource
+    private PasswordEncoder passwordEncoder;
+    @Resource
+    private FileClient fileClient;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     /**
      * 用户注册（默认角色 USER；账号需英文数字且唯一，注册后不可修改）。

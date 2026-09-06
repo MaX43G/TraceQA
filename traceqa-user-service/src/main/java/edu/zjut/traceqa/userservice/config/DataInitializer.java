@@ -6,6 +6,7 @@ import edu.zjut.traceqa.common.model.po.User;
 import edu.zjut.traceqa.userservice.mapper.RoleMapper;
 import edu.zjut.traceqa.userservice.mapper.UserMapper;
 import edu.zjut.traceqa.userservice.service.AuthService;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,15 +36,12 @@ public class DataInitializer implements ApplicationRunner {
     @Value("${DEFAULT_USER_PASSWORD:}")
     private String defaultUserPassword;
 
-    private final UserMapper userMapper;
-    private final RoleMapper roleMapper;
-    private final PasswordEncoder passwordEncoder;
-
-    public DataInitializer(UserMapper userMapper, RoleMapper roleMapper, PasswordEncoder passwordEncoder) {
-        this.userMapper = userMapper;
-        this.roleMapper = roleMapper;
-        this.passwordEncoder = passwordEncoder;
-    }
+    @Resource
+    private UserMapper userMapper;
+    @Resource
+    private RoleMapper roleMapper;
+    @Resource
+    private PasswordEncoder passwordEncoder;
 
     /**
      * 启动装载初始化数据

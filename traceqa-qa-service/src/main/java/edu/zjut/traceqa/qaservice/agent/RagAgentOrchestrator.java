@@ -17,6 +17,7 @@ import edu.zjut.traceqa.qaservice.service.ChatService;
 import edu.zjut.traceqa.qaservice.service.LlmService;
 import edu.zjut.traceqa.qaservice.service.RedisCacheService;
 import edu.zjut.traceqa.qaservice.sse.SsePublisher;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -53,13 +54,20 @@ public class RagAgentOrchestrator {
      */
     private static final int KEYWORD_FALLBACK_THRESHOLD = 4;
 
-    private final ChatService chatService;
-    private final IntentAgent intentAgent;
-    private final AnswerAgent answerAgent;
-    private final RetrievalService retrievalService;
-    private final LlmService llmService;
-    private final SsePublisher ssePublisher;
-    private final RedisCacheService redisCacheService;
+    @Resource
+    private ChatService chatService;
+    @Resource
+    private IntentAgent intentAgent;
+    @Resource
+    private AnswerAgent answerAgent;
+    @Resource
+    private RetrievalService retrievalService;
+    @Resource
+    private LlmService llmService;
+    @Resource
+    private SsePublisher ssePublisher;
+    @Resource
+    private RedisCacheService redisCacheService;
 
     /**
      * 并行检索时保护 thinking 节点列表与 SSE 进度推送的锁
@@ -71,18 +79,6 @@ public class RagAgentOrchestrator {
 
     @Value("${spring.ai.openai.api-key:}")
     private String springAiApiKey;
-
-    public RagAgentOrchestrator(ChatService chatService, IntentAgent intentAgent, AnswerAgent answerAgent,
-                                RetrievalService retrievalService, LlmService llmService,
-                                SsePublisher ssePublisher, RedisCacheService redisCacheService) {
-        this.chatService = chatService;
-        this.intentAgent = intentAgent;
-        this.answerAgent = answerAgent;
-        this.retrievalService = retrievalService;
-        this.llmService = llmService;
-        this.ssePublisher = ssePublisher;
-        this.redisCacheService = redisCacheService;
-    }
 
     /**
      * 流式执行完整 Agent 工作流（由 ragExecutor 线程调用）。

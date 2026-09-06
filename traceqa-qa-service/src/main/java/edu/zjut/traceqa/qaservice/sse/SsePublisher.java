@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.qaservice.sse;
 
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -19,11 +20,8 @@ public class SsePublisher {
 
     private static final Logger log = LoggerFactory.getLogger(SsePublisher.class);
 
-    private final ObjectMapper objectMapper;
-
-    public SsePublisher(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
+    @Resource
+    private ObjectMapper objectMapper;
 
     /**
      * 发送指定事件

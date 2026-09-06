@@ -3,6 +3,7 @@ package edu.zjut.traceqa.adminservice.service;
 import edu.zjut.traceqa.common.client.GatewayClient;
 import edu.zjut.traceqa.common.client.KbClient;
 import edu.zjut.traceqa.common.client.QaClient;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,24 +31,20 @@ public class MonitorService {
     /** sa-token 登录 token 的 Redis key 前缀：{tokenName}:login:token: */
     private static final String LOGIN_TOKEN_KEY_SUFFIX = ":login:token:";
 
-    private final StringRedisTemplate stringRedisTemplate;
-    private final GatewayClient gatewayClient;
-    private final KbClient kbClient;
-    private final QaClient qaClient;
-    private final LightRagMonitorService lightRagMonitorService;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+    @Resource
+    private GatewayClient gatewayClient;
+    @Resource
+    private KbClient kbClient;
+    @Resource
+    private QaClient qaClient;
+    @Resource
+    private LightRagMonitorService lightRagMonitorService;
 
     /** sa-token 的 token-name（与 application.yaml 的 sa-token.token-name 一致） */
     @Value("${sa-token.token-name:Authorization}")
     private String tokenName;
-
-    public MonitorService(StringRedisTemplate stringRedisTemplate, GatewayClient gatewayClient,
-                          KbClient kbClient, QaClient qaClient, LightRagMonitorService lightRagMonitorService) {
-        this.stringRedisTemplate = stringRedisTemplate;
-        this.gatewayClient = gatewayClient;
-        this.kbClient = kbClient;
-        this.qaClient = qaClient;
-        this.lightRagMonitorService = lightRagMonitorService;
-    }
 
     /**
      * 监控快照

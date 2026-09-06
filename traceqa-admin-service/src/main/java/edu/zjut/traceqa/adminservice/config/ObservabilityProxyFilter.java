@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.adminservice.config;
 
+import jakarta.annotation.Resource;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -44,17 +45,13 @@ public class ObservabilityProxyFilter extends OncePerRequestFilter {
     private static final Set<String> SKIP_RESPONSE_HEADERS = new HashSet<>(
             Arrays.asList("content-length", "transfer-encoding", "connection", "keep-alive", "set-cookie", "upgrade"));
 
-    private final ObservabilitySessionStore sessionStore;
-    private final AdminProperties properties;
-    private final HttpClient httpClient;
-
-    public ObservabilityProxyFilter(ObservabilitySessionStore sessionStore, AdminProperties properties) {
-        this.sessionStore = sessionStore;
-        this.properties = properties;
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(5))
-                .build();
-    }
+    @Resource
+    private ObservabilitySessionStore sessionStore;
+    @Resource
+    private AdminProperties properties;
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5))
+            .build();
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {

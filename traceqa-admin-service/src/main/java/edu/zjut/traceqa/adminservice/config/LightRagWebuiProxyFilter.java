@@ -1,6 +1,7 @@
 package edu.zjut.traceqa.adminservice.config;
 
 import edu.zjut.traceqa.common.config.LightRagProperties;
+import jakarta.annotation.Resource;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -40,17 +41,13 @@ public class LightRagWebuiProxyFilter extends OncePerRequestFilter {
     private static final Set<String> SKIP_RESPONSE_HEADERS = new HashSet<>(
             Arrays.asList("content-length", "transfer-encoding", "connection", "keep-alive", "set-cookie", "upgrade"));
 
-    private final LightRagWebuiSessionStore sessionStore;
-    private final LightRagProperties properties;
-    private final HttpClient httpClient;
-
-    public LightRagWebuiProxyFilter(LightRagWebuiSessionStore sessionStore, LightRagProperties properties) {
-        this.sessionStore = sessionStore;
-        this.properties = properties;
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(5))
-                .build();
-    }
+    @Resource
+    private LightRagWebuiSessionStore sessionStore;
+    @Resource
+    private LightRagProperties properties;
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5))
+            .build();
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {

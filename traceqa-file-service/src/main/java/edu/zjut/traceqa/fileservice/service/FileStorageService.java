@@ -8,6 +8,8 @@ import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.SetBucketPolicyArgs;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -34,13 +36,10 @@ public class FileStorageService {
             + "{\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Action\":[\"s3:GetObject\"],"
             + "\"Resource\":[\"arn:aws:s3:::%BUCKET%/*\"]}]}";
 
-    private final MinioClient minioClient;
-    private final MinioProperties properties;
-
-    public FileStorageService(MinioClient minioClient, MinioProperties properties) {
-        this.minioClient = minioClient;
-        this.properties = properties;
-    }
+    @Resource
+    private MinioClient minioClient;
+    @Resource
+    private MinioProperties properties;
 
     /**
      * 启动时确保桶存在并配置公共只读策略

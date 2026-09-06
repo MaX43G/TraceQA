@@ -3,6 +3,7 @@ package edu.zjut.traceqa.qaservice.agent;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import edu.zjut.traceqa.common.model.dto.LlmConfig;
 import edu.zjut.traceqa.qaservice.service.LlmService;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -20,13 +21,10 @@ public class AnswerAgent {
 
     private static final Logger log = LoggerFactory.getLogger(AnswerAgent.class);
 
-    private final RagAgents ragAgents;
-    private final LlmService llmService;
-
-    public AnswerAgent(RagAgents ragAgents, LlmService llmService) {
-        this.ragAgents = ragAgents;
-        this.llmService = llmService;
-    }
+    @Resource
+    private RagAgents ragAgents;
+    @Resource
+    private LlmService llmService;
 
     /**
      * 流式生成回答。

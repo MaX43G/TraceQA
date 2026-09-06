@@ -1,5 +1,6 @@
 package edu.zjut.traceqa.common.util;
 
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
@@ -15,11 +16,8 @@ import java.util.List;
 @Component
 public class JsonUtils {
 
-    private final ObjectMapper objectMapper;
-
-    public JsonUtils(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
+    @Resource
+    private ObjectMapper objectMapper;
 
     /**
      * 序列化为 JSON 字符串，失败返回 null

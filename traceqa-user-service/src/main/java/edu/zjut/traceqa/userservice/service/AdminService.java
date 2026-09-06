@@ -14,6 +14,7 @@ import edu.zjut.traceqa.common.model.vo.AdminUserVO;
 import edu.zjut.traceqa.common.model.vo.RoleDTO;
 import edu.zjut.traceqa.userservice.mapper.RoleMapper;
 import edu.zjut.traceqa.userservice.mapper.UserMapper;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -28,13 +29,10 @@ public class AdminService {
 
     private static final Logger log = LoggerFactory.getLogger(AdminService.class);
 
-    private final UserMapper userMapper;
-    private final RoleMapper roleMapper;
-
-    public AdminService(UserMapper userMapper, RoleMapper roleMapper) {
-        this.userMapper = userMapper;
-        this.roleMapper = roleMapper;
-    }
+    @Resource
+    private UserMapper userMapper;
+    @Resource
+    private RoleMapper roleMapper;
 
     /**
      * 分页查询用户列表

@@ -9,6 +9,7 @@ import edu.zjut.traceqa.common.model.po.KnowledgeBase;
 import edu.zjut.traceqa.common.model.vo.KnowledgeBaseDTO;
 import edu.zjut.traceqa.kbservice.mapper.DocumentMapper;
 import edu.zjut.traceqa.kbservice.mapper.KnowledgeBaseMapper;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -26,13 +27,10 @@ public class KnowledgeBaseService {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeBaseService.class);
 
-    private final KnowledgeBaseMapper knowledgeBaseMapper;
-    private final DocumentMapper documentMapper;
-
-    public KnowledgeBaseService(KnowledgeBaseMapper knowledgeBaseMapper, DocumentMapper documentMapper) {
-        this.knowledgeBaseMapper = knowledgeBaseMapper;
-        this.documentMapper = documentMapper;
-    }
+    @Resource
+    private KnowledgeBaseMapper knowledgeBaseMapper;
+    @Resource
+    private DocumentMapper documentMapper;
 
     /**
      * 查询全部知识库

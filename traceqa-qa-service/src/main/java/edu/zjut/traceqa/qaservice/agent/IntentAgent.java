@@ -4,6 +4,7 @@ import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import edu.zjut.traceqa.common.enums.IntentType;
 import edu.zjut.traceqa.common.model.dto.LlmConfig;
 import edu.zjut.traceqa.qaservice.service.LlmService;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -20,13 +21,10 @@ public class IntentAgent {
 
     private static final Logger log = LoggerFactory.getLogger(IntentAgent.class);
 
-    private final RagAgents ragAgents;
-    private final LlmService llmService;
-
-    public IntentAgent(RagAgents ragAgents, LlmService llmService) {
-        this.ragAgents = ragAgents;
-        this.llmService = llmService;
-    }
+    @Resource
+    private RagAgents ragAgents;
+    @Resource
+    private LlmService llmService;
 
     /**
      * 识别用户消息意图（支持多轮历史）。

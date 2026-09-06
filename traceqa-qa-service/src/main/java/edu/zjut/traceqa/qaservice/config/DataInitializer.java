@@ -3,6 +3,7 @@ package edu.zjut.traceqa.qaservice.config;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import edu.zjut.traceqa.common.model.po.SystemPrompt;
 import edu.zjut.traceqa.qaservice.mapper.SystemPromptMapper;
+import jakarta.annotation.Resource;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,11 +22,8 @@ public class DataInitializer implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
 
-    private final SystemPromptMapper systemPromptMapper;
-
-    public DataInitializer(SystemPromptMapper systemPromptMapper) {
-        this.systemPromptMapper = systemPromptMapper;
-    }
+    @Resource
+    private SystemPromptMapper systemPromptMapper;
 
     /**
      * 启动装载系统提示词

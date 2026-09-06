@@ -2,6 +2,7 @@ package edu.zjut.traceqa.qaservice.config;
 
 import edu.zjut.traceqa.qaservice.config.QaProperties.Rerank;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -24,16 +25,13 @@ public class RerankClient {
 
     private static final Logger log = LoggerFactory.getLogger(RerankClient.class);
 
-    private final RestClient.Builder builder;
-    private final ObjectMapper objectMapper;
-    private final QaProperties properties;
+    @Resource
+    private RestClient.Builder builder;
+    @Resource
+    private ObjectMapper objectMapper;
+    @Resource
+    private QaProperties properties;
     private RestClient restClient;
-
-    public RerankClient(RestClient.Builder builder, ObjectMapper objectMapper, QaProperties properties) {
-        this.builder = builder;
-        this.objectMapper = objectMapper;
-        this.properties = properties;
-    }
 
     /**
      * 初始化 RestClient（未配置 baseUrl 则跳过）

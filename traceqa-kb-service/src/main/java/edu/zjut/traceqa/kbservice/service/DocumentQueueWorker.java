@@ -4,6 +4,7 @@ import edu.zjut.traceqa.common.enums.DocumentStatus;
 import edu.zjut.traceqa.common.model.po.Document;
 import edu.zjut.traceqa.kbservice.mapper.DocumentMapper;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.connection.stream.MapRecord;
@@ -38,17 +39,13 @@ public class DocumentQueueWorker {
     private static final String DEAD_KEY = "doc:queue:dead";
     private static final int MAX_RETRY = 3;
 
-    private final StringRedisTemplate stringRedisTemplate;
-    private final DocumentMapper documentMapper;
-    private final DocumentParseWorker parseWorker;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+    @Resource
+    private DocumentMapper documentMapper;
+    @Resource
+    private DocumentParseWorker parseWorker;
     private final AtomicInteger processingCount = new AtomicInteger(0);
-
-    public DocumentQueueWorker(StringRedisTemplate stringRedisTemplate, DocumentMapper documentMapper,
-                               DocumentParseWorker parseWorker) {
-        this.stringRedisTemplate = stringRedisTemplate;
-        this.documentMapper = documentMapper;
-        this.parseWorker = parseWorker;
-    }
 
     /**
      * 文档任务入队（Redis 不可用则降级为直接解析）

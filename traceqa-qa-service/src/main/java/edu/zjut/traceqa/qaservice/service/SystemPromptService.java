@@ -7,8 +7,8 @@ import edu.zjut.traceqa.common.exception.BizException;
 import edu.zjut.traceqa.common.model.po.SystemPrompt;
 import edu.zjut.traceqa.qaservice.config.PromptDefaults;
 import edu.zjut.traceqa.qaservice.mapper.SystemPromptMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jakarta.annotation.Resource;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -22,13 +22,11 @@ import java.util.List;
 @Service
 public class SystemPromptService {
 
-    private static final Logger log = LoggerFactory.getLogger(SystemPromptService.class);
+    @Resource
+    private SystemPromptMapper systemPromptMapper;
 
-    private final SystemPromptMapper systemPromptMapper;
-
-    public SystemPromptService(SystemPromptMapper systemPromptMapper) {
-        this.systemPromptMapper = systemPromptMapper;
-    }
+    @Resource
+    private ApplicationEventPublisher eventPublisher;
 
     /**
      * 查询提示词列表
@@ -78,6 +76,8 @@ public class SystemPromptService {
             throw new BizException(ErrorCode.NOT_FOUND, "提示词不存在");
         }
         systemPromptMapper.updateById(prompt);
+        // 通知缓存了该提示词的组件（如 Answer/Intent Agent）失效缓存，使新提示词立即生效
+        eventPublisher.publishEvent(new SystemPromptChangedEvent(prompt.getScenario()));
         return prompt;
     }
 
@@ -92,6 +92,8 @@ public class SystemPromptService {
                         .set(SystemPrompt::getEnabled, 0));
         prompt.setEnabled(1);
         systemPromptMapper.updateById(prompt);
+        // 停用/启用会改变 getActive 结果，通知缓存失效
+        eventPublisher.publishEvent(new SystemPromptChangedEvent(prompt.getScenario()));
     }
 
     /**

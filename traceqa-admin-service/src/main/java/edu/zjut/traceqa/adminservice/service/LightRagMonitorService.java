@@ -1,6 +1,7 @@
 package edu.zjut.traceqa.adminservice.service;
 
 import edu.zjut.traceqa.common.config.LightRagClient;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -22,13 +23,10 @@ public class LightRagMonitorService {
     private static final long CACHE_TTL_MS = 8000L;
     private static final int POPULAR_LABELS_LIMIT = 50;
 
-    private final LightRagClient lightRagClient;
+    @Resource
+    private LightRagClient lightRagClient;
     private volatile Map<String, Object> cached;
     private volatile long cacheExpireAt;
-
-    public LightRagMonitorService(LightRagClient lightRagClient) {
-        this.lightRagClient = lightRagClient;
-    }
 
     /**
      * 只读信息面板快照（8 秒缓存）

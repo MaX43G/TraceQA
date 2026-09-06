@@ -3,6 +3,7 @@ package edu.zjut.traceqa.qaservice.service;
 import edu.zjut.traceqa.common.model.dto.LlmConfig;
 import edu.zjut.traceqa.common.model.po.SystemPrompt;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -20,19 +21,15 @@ public class LlmService {
 
     private static final Logger log = LoggerFactory.getLogger(LlmService.class);
 
-    private final ChatClient.Builder chatClientBuilder;
-    private final SystemPromptService systemPromptService;
-    private final CircuitBreakerService circuitBreakerService;
-    private final OpenAiCompatClient openAiCompatClient;
+    @Resource
+    private ChatClient.Builder chatClientBuilder;
+    @Resource
+    private SystemPromptService systemPromptService;
+    @Resource
+    private CircuitBreakerService circuitBreakerService;
+    @Resource
+    private OpenAiCompatClient openAiCompatClient;
     private ChatClient chatClient;
-
-    public LlmService(ChatClient.Builder chatClientBuilder, SystemPromptService systemPromptService,
-                      CircuitBreakerService circuitBreakerService, OpenAiCompatClient openAiCompatClient) {
-        this.chatClientBuilder = chatClientBuilder;
-        this.systemPromptService = systemPromptService;
-        this.circuitBreakerService = circuitBreakerService;
-        this.openAiCompatClient = openAiCompatClient;
-    }
 
     /**
      * 构建默认 ChatClient

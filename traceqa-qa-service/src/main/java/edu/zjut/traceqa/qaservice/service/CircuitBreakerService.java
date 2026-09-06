@@ -2,6 +2,8 @@ package edu.zjut.traceqa.qaservice.service;
 
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -20,14 +22,16 @@ public class CircuitBreakerService {
 
     private static final Logger log = LoggerFactory.getLogger(CircuitBreakerService.class);
 
-    private final CircuitBreaker breaker;
+    @Resource
+    private CircuitBreakerRegistry registry;
+
+    private CircuitBreaker breaker;
 
     /**
      * 从 Resilience4j 注册表获取名为 {@code llm} 的熔断器实例。
-     *
-     * @param registry Resilience4j 熔断器注册表（由 spring-boot3 自动装配）
      */
-    public CircuitBreakerService(CircuitBreakerRegistry registry) {
+    @PostConstruct
+    public void init() {
         this.breaker = registry.circuitBreaker("llm");
     }
 

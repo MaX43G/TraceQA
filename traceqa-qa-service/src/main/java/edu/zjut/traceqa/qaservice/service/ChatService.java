@@ -14,6 +14,7 @@ import edu.zjut.traceqa.common.model.vo.ThinkingNodeVO;
 import edu.zjut.traceqa.common.util.JsonUtils;
 import edu.zjut.traceqa.qaservice.mapper.ChatMessageMapper;
 import edu.zjut.traceqa.qaservice.mapper.ChatSessionMapper;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -33,15 +34,12 @@ public class ChatService {
     private static final Logger log = LoggerFactory.getLogger(ChatService.class);
     private static final int TITLE_MAX_LENGTH = 20;
 
-    private final ChatSessionMapper sessionMapper;
-    private final ChatMessageMapper messageMapper;
-    private final JsonUtils jsonUtils;
-
-    public ChatService(ChatSessionMapper sessionMapper, ChatMessageMapper messageMapper, JsonUtils jsonUtils) {
-        this.sessionMapper = sessionMapper;
-        this.messageMapper = messageMapper;
-        this.jsonUtils = jsonUtils;
-    }
+    @Resource
+    private ChatSessionMapper sessionMapper;
+    @Resource
+    private ChatMessageMapper messageMapper;
+    @Resource
+    private JsonUtils jsonUtils;
 
     /**
      * 创建会话

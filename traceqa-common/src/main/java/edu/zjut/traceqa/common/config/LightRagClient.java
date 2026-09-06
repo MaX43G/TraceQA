@@ -3,6 +3,7 @@ package edu.zjut.traceqa.common.config;
 import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.exception.BizException;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -40,15 +41,12 @@ public class LightRagClient {
 
     private static final Logger log = LoggerFactory.getLogger(LightRagClient.class);
 
-    private final LightRagProperties properties;
-    private final ObjectMapper objectMapper;
+    @Resource
+    private LightRagProperties properties;
+    @Resource
+    private ObjectMapper objectMapper;
     private RestClient restClient;
     private WebClient webClient;
-
-    public LightRagClient(LightRagProperties properties, ObjectMapper objectMapper) {
-        this.properties = properties;
-        this.objectMapper = objectMapper;
-    }
 
     /**
      * 初始化 RestClient 与 WebClient

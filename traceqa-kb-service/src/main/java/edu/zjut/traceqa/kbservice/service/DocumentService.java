@@ -14,6 +14,7 @@ import edu.zjut.traceqa.common.model.vo.DocumentUploadVO;
 import edu.zjut.traceqa.common.model.vo.DocumentVO;
 import edu.zjut.traceqa.kbservice.config.StorageProperties;
 import edu.zjut.traceqa.kbservice.mapper.DocumentMapper;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -49,23 +50,18 @@ public class DocumentService {
      */
     private static final Set<String> ALLOWED_TYPES = Set.of("md", "txt");
 
-    private final DocumentMapper documentMapper;
-    private final StorageProperties properties;
-    private final DocumentProgressStore progressStore;
-    private final DocumentQueueWorker documentQueueWorker;
-    private final DocumentParseWorker parseWorker;
-    private final KnowledgeBaseService knowledgeBaseService;
-
-    public DocumentService(DocumentMapper documentMapper, StorageProperties properties,
-                           DocumentProgressStore progressStore, DocumentQueueWorker documentQueueWorker,
-                           DocumentParseWorker parseWorker, KnowledgeBaseService knowledgeBaseService) {
-        this.documentMapper = documentMapper;
-        this.properties = properties;
-        this.progressStore = progressStore;
-        this.documentQueueWorker = documentQueueWorker;
-        this.parseWorker = parseWorker;
-        this.knowledgeBaseService = knowledgeBaseService;
-    }
+    @Resource
+    private DocumentMapper documentMapper;
+    @Resource
+    private StorageProperties properties;
+    @Resource
+    private DocumentProgressStore progressStore;
+    @Resource
+    private DocumentQueueWorker documentQueueWorker;
+    @Resource
+    private DocumentParseWorker parseWorker;
+    @Resource
+    private KnowledgeBaseService knowledgeBaseService;
 
     /**
      * 单文档上传

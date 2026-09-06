@@ -6,6 +6,7 @@ import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.exception.BizException;
 import edu.zjut.traceqa.common.model.po.Announcement;
 import edu.zjut.traceqa.adminservice.mapper.AnnouncementMapper;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -18,11 +19,8 @@ import java.util.Map;
 @Service
 public class AnnouncementService {
 
-    private final AnnouncementMapper announcementMapper;
-
-    public AnnouncementService(AnnouncementMapper announcementMapper) {
-        this.announcementMapper = announcementMapper;
-    }
+    @Resource
+    private AnnouncementMapper announcementMapper;
 
     /**
      * 公开获取所有启用的公告（按更新时间倒序，最多 20 条）

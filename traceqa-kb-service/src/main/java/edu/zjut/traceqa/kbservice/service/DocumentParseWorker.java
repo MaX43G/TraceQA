@@ -6,6 +6,7 @@ import edu.zjut.traceqa.common.exception.BizException;
 import edu.zjut.traceqa.common.model.po.Document;
 import edu.zjut.traceqa.common.model.vo.DocumentVO;
 import edu.zjut.traceqa.kbservice.mapper.DocumentMapper;
+import jakarta.annotation.Resource;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.apache.pdfbox.Loader;
@@ -60,16 +61,12 @@ public class DocumentParseWorker {
      */
     private static final long PART_INTERVAL_MS = 1000L;
 
-    private final DocumentMapper documentMapper;
-    private final LightRagClient lightRagClient;
-    private final DocumentProgressStore progressStore;
-
-    public DocumentParseWorker(DocumentMapper documentMapper, LightRagClient lightRagClient,
-                               DocumentProgressStore progressStore) {
-        this.documentMapper = documentMapper;
-        this.lightRagClient = lightRagClient;
-        this.progressStore = progressStore;
-    }
+    @Resource
+    private DocumentMapper documentMapper;
+    @Resource
+    private LightRagClient lightRagClient;
+    @Resource
+    private DocumentProgressStore progressStore;
 
     @Data
     @AllArgsConstructor

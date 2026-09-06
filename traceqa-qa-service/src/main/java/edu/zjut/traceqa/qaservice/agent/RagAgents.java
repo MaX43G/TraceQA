@@ -2,10 +2,13 @@ package edu.zjut.traceqa.qaservice.agent;
 
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import edu.zjut.traceqa.common.model.po.SystemPrompt;
+import edu.zjut.traceqa.qaservice.service.SystemPromptChangedEvent;
 import edu.zjut.traceqa.qaservice.service.SystemPromptService;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /**
@@ -20,16 +23,13 @@ public class RagAgents {
 
     private static final Logger log = LoggerFactory.getLogger(RagAgents.class);
 
-    private final ChatModel chatModel;
-    private final SystemPromptService systemPromptService;
+    @Resource
+    private ChatModel chatModel;
+    @Resource
+    private SystemPromptService systemPromptService;
 
     private volatile ReactAgent intentAgent;
     private volatile ReactAgent answerAgent;
-
-    public RagAgents(ChatModel chatModel, SystemPromptService systemPromptService) {
-        this.chatModel = chatModel;
-        this.systemPromptService = systemPromptService;
-    }
 
     /**
      * 获取意图识别 Agent（懒加载缓存）
@@ -81,5 +81,26 @@ public class RagAgents {
             return prompt.getContent();
         }
         return defaultPrompt;
+    }
+
+    /**
+     * 系统提示词变更后失效缓存，使新提示词在下次问答立即生效（无需重启）。
+     * 仅失效对应场景的 Agent；无关场景事件忽略。
+     */
+    @EventListener
+    public void onPromptChanged(SystemPromptChangedEvent event) {
+        String scenario = event.scenario();
+        boolean affected = false;
+        if ("summary".equals(scenario) && answerAgent != null) {
+            answerAgent = null;
+            affected = true;
+        }
+        if ("intent".equals(scenario) && intentAgent != null) {
+            intentAgent = null;
+            affected = true;
+        }
+        if (affected) {
+            log.info("系统提示词已变更（{}），失效对应 Agent 缓存，下次问答将重新构建", scenario);
+        }
     }
 }

@@ -2,6 +2,7 @@ package edu.zjut.traceqa.qaservice.service;
 
 import edu.zjut.traceqa.common.model.dto.LlmConfig;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -24,12 +25,9 @@ public class OpenAiCompatClient {
 
     private static final Logger log = LoggerFactory.getLogger(OpenAiCompatClient.class);
 
-    private final ObjectMapper objectMapper;
+    @Resource
+    private ObjectMapper objectMapper;
     private WebClient webClient;
-
-    public OpenAiCompatClient(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
 
     /**
      * 初始化 WebClient
