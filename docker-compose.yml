@@ -326,6 +326,14 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-THUDM/GLM-4-9B-0414}
+      # 检索加速开关：默认关闭「二次检索补全 / 精排」以提速，需要时置 true 打开
+      APP_RETRIEVAL_ENABLE_REREAD: ${RETRIEVAL_ENABLE_REREAD:-true}
+      APP_RETRIEVAL_ENABLE_RERANK: ${RETRIEVAL_ENABLE_RERANK:-true}
+      # 外部语义重排
+      APP_RERANK_ENABLED: ${RERANK_ENABLED:-true}
+      APP_RERANK_BASE_URL: ${RERANK_BASE_URL:-https://api.siliconflow.cn}
+      APP_RERANK_API_KEY: ${RERANK_API_KEY:-}
+      APP_RERANK_MODEL: ${RERANK_MODEL:-BAAI/bge-reranker-v2-m3}
       OTEL_SERVICE_NAME: traceqa-qa-service
       OTEL_TRACES_EXPORTER: otlp
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318

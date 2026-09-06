@@ -7,7 +7,8 @@ spring:
     name: traceqa-qa-service
   main:
     web-application-type: servlet
-    virtual-threads:
+  threads:
+    virtual:
       enabled: true
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
@@ -26,6 +27,10 @@ spring:
     multipart:
       max-file-size: 50MB
       max-request-size: 55MB
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
   sql:
     init:
       mode: never

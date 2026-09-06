@@ -249,14 +249,31 @@ public class RagAgentOrchestrator {
                 ? List.of()
                 : runKeyword(emitter, thinking, content, config, cancelled);
 
-        ThinkingNodeVO fuseNode = startThinking(thinking, "融合与补全", "fusion-agent",
-                "正在融合三路结果并二次检索补全、精排");
+        // 1) 结果融合
+        ThinkingNodeVO fuseNode = startThinking(thinking, "结果融合", "fusion-agent", "正在融合三路检索结果");
         ssePublisher.send(emitter, "thinking", fuseNode);
-        RetrievalResult result = retrievalService.fuseAndSupplement(content, graphChunks, vectorChunks,
-                keywordChunks, enhanced, config);
-        String fuseDetail = String.format("融合后共 %d 条%s", result.getChunks().size(),
-                result.isDegraded() ? "（查询增强已降级）" : "");
-        finishThinking(thinking, emitter, "融合与补全", fuseDetail);
+        List<RetrievedChunk> fused = retrievalService.fuse(List.of(graphChunks, vectorChunks, keywordChunks));
+        finishThinking(thinking, emitter, "结果融合", "融合后共 " + fused.size() + " 条");
+
+        // 2) 二次检索补全（可选，默认关闭）
+        if (retrievalService.isRereadEnabled()) {
+            ThinkingNodeVO supNode = startThinking(thinking, "二次检索补全", "reread-agent", "正在基于关键要素二次检索补全");
+            ssePublisher.send(emitter, "thinking", supNode);
+            fused = retrievalService.supplement(fused);
+            finishThinking(thinking, emitter, "二次检索补全", "补全后共 " + fused.size() + " 条");
+        }
+
+        // 3) 结果精排（可选，默认关闭）
+        if (retrievalService.isRerankEnabled()) {
+            ThinkingNodeVO rkNode = startThinking(thinking, "结果精排", "rerank-agent", "正在语义重排检索结果");
+            ssePublisher.send(emitter, "thinking", rkNode);
+            fused = retrievalService.rerank(content, fused);
+            finishThinking(thinking, emitter, "结果精排", "排序完成");
+        }
+
+        boolean degraded = enhanced == null
+                || (enhanced.getRewritten() == null && enhanced.getHyde() == null);
+        RetrievalResult result = new RetrievalResult(fused, degraded);
         emitRetrievalStats(emitter, graphChunks.size(), vectorChunks.size(), keywordChunks.size(),
                 result.getChunks(), retrieveStart);
         return result;

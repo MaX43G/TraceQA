@@ -11,7 +11,7 @@
 
     <!-- 状态图流转：横向流程图 -->
     <div class="flow">
-      <template v-for="(stage, i) in FLOW_STAGES" :key="stage">
+      <template v-for="(stage, i) in displayedStages" :key="stage">
         <div class="flow-node" :class="nodeClass(stage)" :title="titleOf(stage)">
           <div class="flow-node__dot">
             <LoadingOutlined v-if="isStatus(stage, 'running')" spin />
@@ -22,7 +22,7 @@
           <div class="flow-node__label">{{ stage }}</div>
           <div v-if="detailOf(stage)" class="flow-node__detail">{{ detailOf(stage) }}</div>
         </div>
-        <div v-if="i < FLOW_STAGES.length - 1" class="flow-arrow">→</div>
+        <div v-if="i < displayedStages.length - 1" class="flow-arrow">→</div>
       </template>
     </div>
   </div>
@@ -58,10 +58,20 @@ const FLOW_STAGES = [
   '图谱检索',
   '向量检索',
   '关键词检索',
-  '融合与补全',
+  '结果融合',
+  '二次检索补全',
+  '结果精排',
   '总结生成',
   '直接应答'
 ]
+
+/** 可选阶段：未启用（后端未下发对应节点）时不展示，避免流程图出现永不执行的步骤 */
+const OPTIONAL_STAGES = new Set(['二次检索补全', '结果精排'])
+
+/** 实际展示的阶段列表 */
+const displayedStages = computed<string[]>(() =>
+    FLOW_STAGES.filter((s) => !OPTIONAL_STAGES.has(s) || nodeOf(s) !== undefined)
+)
 
 /** 是否存在运行中的节点 */
 const anyRunning = computed<boolean>(() => props.nodes.some((n) => n.status === 'running'))

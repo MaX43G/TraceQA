@@ -4,11 +4,12 @@ import cn.hutool.crypto.SecureUtil;
 import edu.zjut.traceqa.common.config.LightRagClient;
 import edu.zjut.traceqa.common.model.dto.EnhancedQuery;
 import edu.zjut.traceqa.common.model.dto.LlmConfig;
-import edu.zjut.traceqa.common.model.dto.RetrievalResult;
 import edu.zjut.traceqa.common.model.dto.RetrievedChunk;
+import edu.zjut.traceqa.qaservice.config.QaProperties;
 import edu.zjut.traceqa.qaservice.config.RerankClient;
 import edu.zjut.traceqa.qaservice.service.LlmService;
 import edu.zjut.traceqa.qaservice.service.RedisCacheService;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -16,11 +17,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -37,18 +40,20 @@ public class RetrievalService {
     private static final double RRF_K = 60.0;
     private static final int MAX_PER_PATH = 12;
 
-    private final LightRagClient lightRagClient;
-    private final LlmService llmService;
-    private final RedisCacheService redisCacheService;
-    private final RerankClient rerankClient;
+    @Resource
+    private LightRagClient lightRagClient;
 
-    public RetrievalService(LightRagClient lightRagClient, LlmService llmService,
-                            RedisCacheService redisCacheService, RerankClient rerankClient) {
-        this.lightRagClient = lightRagClient;
-        this.llmService = llmService;
-        this.redisCacheService = redisCacheService;
-        this.rerankClient = rerankClient;
-    }
+    @Resource
+    private LlmService llmService;
+
+    @Resource
+    private RedisCacheService redisCacheService;
+
+    @Resource
+    private RerankClient rerankClient;
+
+    @Resource
+    private QaProperties qaProperties;
 
     /**
      * 查询类型
@@ -174,17 +179,17 @@ public class RetrievalService {
     }
 
     /**
-     * 融合 + ReRead + 精排
+     * 是否启用「二次检索补全」（由 app.retrieval.enable-reread 控制）
      */
-    public RetrievalResult fuseAndSupplement(String question, List<RetrievedChunk> graphChunks,
-                                             List<RetrievedChunk> vectorChunks, List<RetrievedChunk> keywordChunks,
-                                             EnhancedQuery enhanced, LlmConfig config) {
-        List<RetrievedChunk> fused = fuse(List.of(graphChunks, vectorChunks, keywordChunks));
-        fused = reread(fused, config);
-        fused = rerankWithModel(question, fused, config);
-        boolean degraded = enhanced == null
-                || (enhanced.getRewritten() == null && enhanced.getHyde() == null);
-        return new RetrievalResult(fused, degraded);
+    public boolean isRereadEnabled() {
+        return qaProperties.getRetrieval().isEnableReread();
+    }
+
+    /**
+     * 是否启用「结果精排」（由 app.retrieval.enable-rerank 控制）
+     */
+    public boolean isRerankEnabled() {
+        return qaProperties.getRetrieval().isEnableRerank();
     }
 
     /**
@@ -192,6 +197,59 @@ public class RetrievalService {
      */
     public final List<RetrievedChunk> fuse(List<List<RetrievedChunk>> sources) {
         return mergeChunks(sources);
+    }
+
+    /**
+     * 二次检索补全（ReRead）。仅在 {@link #isRereadEnabled()} 时执行；否则原样返回。
+     *
+     * <p>效率优化：不再额外调用 LLM 提取术语，改为从已融合片段中启发式提取补充关键词，
+     * 并以更轻量的关键字检索（而非重型 hybrid 查询）补齐信息，显著缩短该步耗时。</p>
+     */
+    public List<RetrievedChunk> supplement(List<RetrievedChunk> fused) {
+        if (!isRereadEnabled() || fused.isEmpty()) {
+            return fused;
+        }
+        String summary = fused.stream().map(RetrievedChunk::getContent)
+                .collect(Collectors.joining("\n"));
+        List<String> terms = extractTermsHeuristic(summary);
+        if (terms.isEmpty()) {
+            return fused;
+        }
+        String termQuery = String.join(" ", terms);
+        try {
+            List<RetrievedChunk> extra = parseReferences(
+                    lightRagClient.queryStream(termQuery, "naive", terms, null), "reread");
+            return mergeChunks(List.of(fused, extra));
+        } catch (Exception e) {
+            return fused;
+        }
+    }
+
+    /**
+     * 结果精排（仅外部语义重排）。仅在 {@link #isRerankEnabled()} 时执行；否则原样返回。
+     * 未配置/失败时不回退 LLM 精排，避免额外 LLM 调用拖慢响应。
+     */
+    public List<RetrievedChunk> rerank(String question, List<RetrievedChunk> chunks) {
+        if (!isRerankEnabled() || chunks.size() <= 3) {
+            return chunks;
+        }
+        List<String> docs = chunks.stream().map(RetrievedChunk::getContent).toList();
+        List<Integer> order = rerankClient.rerank(question, docs);
+        if (order == null) {
+            return chunks;
+        }
+        List<RetrievedChunk> reranked = new ArrayList<>();
+        for (int idx : order) {
+            if (idx >= 0 && idx < chunks.size() && !reranked.contains(chunks.get(idx))) {
+                reranked.add(chunks.get(idx));
+            }
+        }
+        for (RetrievedChunk chunk : chunks) {
+            if (!reranked.contains(chunk)) {
+                reranked.add(chunk);
+            }
+        }
+        return reranked;
     }
 
     /**
@@ -315,71 +373,22 @@ public class RetrievalService {
         return String.join("+", parts);
     }
 
-    private List<RetrievedChunk> reread(List<RetrievedChunk> fused, LlmConfig config) {
-        if (fused.isEmpty()) {
-            return fused;
+    private List<String> extractTermsHeuristic(String text) {
+        if (text == null || text.isBlank()) {
+            return List.of();
         }
-        String summary = fused.stream().map(RetrievedChunk::getContent)
-                .collect(Collectors.joining("\n"));
-        String raw = llmService.call("reread", summary, config);
-        List<String> terms = extractTerms(raw);
-        if (terms.isEmpty()) {
-            return fused;
-        }
-        String termQuery = String.join(" ", terms);
-        try {
-            Map<String, Object> data = lightRagClient.query(termQuery, "hybrid", true);
-            List<RetrievedChunk> extra = parseReferences(extractReferences(data), "reread");
-            return mergeChunks(List.of(fused, extra));
-        } catch (Exception e) {
-            return fused;
-        }
-    }
-
-    private List<RetrievedChunk> rerankWithModel(String question, List<RetrievedChunk> chunks, LlmConfig config) {
-        if (chunks.size() <= 3) {
-            return chunks;
-        }
-        List<Integer> order;
-        List<String> docs = chunks.stream().map(RetrievedChunk::getContent).toList();
-        order = rerankClient.rerank(question, docs);
-        if (order == null) {
-            order = llmRerank(question, chunks, config);
-        }
-        if (order == null) {
-            return chunks;
-        }
-        List<RetrievedChunk> reranked = new ArrayList<>();
-        for (int idx : order) {
-            if (idx >= 0 && idx < chunks.size() && !reranked.contains(chunks.get(idx))) {
-                reranked.add(chunks.get(idx));
+        Set<String> terms = new LinkedHashSet<>();
+        Matcher m = Pattern.compile("[\\u4e00-\\u9fa5A-Za-z0-9][\\u4e00-\\u9fa5A-Za-z0-9\\-]*").matcher(text);
+        while (m.find()) {
+            String t = m.group();
+            if (t.length() >= 2 && t.length() <= 12) {
+                terms.add(t);
+            }
+            if (terms.size() >= 6) {
+                break;
             }
         }
-        for (RetrievedChunk chunk : chunks) {
-            if (!reranked.contains(chunk)) {
-                reranked.add(chunk);
-            }
-        }
-        return reranked;
-    }
-
-    private List<Integer> llmRerank(String question, List<RetrievedChunk> chunks, LlmConfig config) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < chunks.size(); i++) {
-            sb.append("[").append(i).append("] ").append(chunks.get(i).getContent()).append("\n");
-        }
-        String raw = llmService.call("rerank", "问题：" + question + "\n片段：\n" + sb, config);
-        if (raw == null) {
-            return null;
-        }
-        List<Integer> order = new ArrayList<>();
-        for (String token : raw.split("[,\\s]+")) {
-            try {
-                order.add(Integer.parseInt(token.trim()));
-            } catch (NumberFormatException ignored) {
-            }
-        }
-        return order.isEmpty() ? null : order;
+        return new ArrayList<>(terms);
     }
 
     private List<String> decomposeSubqueries(String question) {
@@ -426,17 +435,6 @@ public class RetrievalService {
             }
         }
         return keywords;
-    }
-
-    private List<String> extractTerms(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return List.of();
-        }
-        return Arrays.stream(raw.split("[、，,；;\\n]"))
-                .map(String::trim)
-                .filter(t -> !t.isEmpty())
-                .limit(6)
-                .toList();
     }
 
     private boolean ruleComplex(String question) {
