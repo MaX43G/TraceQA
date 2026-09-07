@@ -166,6 +166,9 @@ declare namespace API {
         model?: string;
         baseUrl?: string;
         apiKey?: string;
+        enableVector?: boolean;
+        enableGraph?: boolean;
+        enableKeyword?: boolean;
     };
 
     type delete1Params = {

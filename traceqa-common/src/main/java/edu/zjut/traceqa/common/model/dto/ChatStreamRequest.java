@@ -56,6 +56,21 @@ public class ChatStreamRequest {
     private String apiKey;
 
     /**
+     * 是否启用向量检索（默认 true）
+     */
+    private Boolean enableVector;
+
+    /**
+     * 是否启用图谱检索（默认 true）
+     */
+    private Boolean enableGraph;
+
+    /**
+     * 是否启用关键词检索（默认 true）
+     */
+    private Boolean enableKeyword;
+
+    /**
      * 是否使用服务端配置模型
      */
     public boolean hasServerModel() {
@@ -67,5 +82,26 @@ public class ChatStreamRequest {
      */
     public boolean hasCustomModel() {
         return model != null && !model.isBlank();
+    }
+
+    /**
+     * 向量检索是否开启（null 视为 true）
+     */
+    public boolean isVectorEnabled() {
+        return enableVector == null || enableVector;
+    }
+
+    /**
+     * 图谱检索是否开启（null 视为 true）
+     */
+    public boolean isGraphEnabled() {
+        return enableGraph == null || enableGraph;
+    }
+
+    /**
+     * 关键词检索是否开启（null 视为 true）
+     */
+    public boolean isKeywordEnabled() {
+        return enableKeyword == null || enableKeyword;
     }
 }

@@ -4,7 +4,6 @@
       <a-space size="small">
         <PieChartOutlined />
         <span>检索分析</span>
-        <a-tag color="purple">{{ stats.elapsedMs ?? 0 }} ms</a-tag>
       </a-space>
     </div>
 

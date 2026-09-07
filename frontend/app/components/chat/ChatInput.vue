@@ -7,6 +7,32 @@
         :disabled="disabled"
         @keydown="handleKeydown"
     />
+    <div class="chat-input__toggles">
+      <a-tooltip title="向量语义检索">
+        <a-switch
+            v-model:checked="toggles.vector"
+            size="small"
+            checked-children="向量"
+            un-checked-children="向量"
+        />
+      </a-tooltip>
+      <a-tooltip title="知识图谱检索">
+        <a-switch
+            v-model:checked="toggles.graph"
+            size="small"
+            checked-children="图谱"
+            un-checked-children="图谱"
+        />
+      </a-tooltip>
+      <a-tooltip title="关键词检索">
+        <a-switch
+            v-model:checked="toggles.keyword"
+            size="small"
+            checked-children="关键词"
+            un-checked-children="关键词"
+        />
+      </a-tooltip>
+    </div>
     <div class="chat-input__footer">
       <span class="chat-input__tip">{{ generating ? 'AI 正在回答，请稍候…' : 'Enter 发送，Shift + Enter 换行' }}</span>
       <a-space>
@@ -35,7 +61,7 @@
 
 <script setup lang="ts">
 /**
- * 聊天输入组件：Enter 快捷发送 + 语音输入。
+ * 聊天输入组件：Enter 快捷发送 + 语音输入 + 检索开关。
  * 语音输入采用浏览器原生 Web Speech API（SpeechRecognition），前端实时识别并填入输入框，
  * 完全免费、无需后端参与；Chrome/Edge 支持，其它浏览器自动隐藏。
  */
@@ -50,12 +76,42 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'send', content: string): void
+  (e: 'send', content: string, toggles: { vector: boolean; graph: boolean; keyword: boolean }): void
 }>()
 
 const text = ref('')
 const resetKey = ref(0)
 const listening = ref(false)
+
+// 检索开关状态（从 localStorage 读取，默认全开）
+const STORAGE_KEY = 'traceqa-retrieval-toggles'
+const toggles = reactive({
+  vector: true,
+  graph: true,
+  keyword: true
+})
+
+// 初始化：从 localStorage 恢复
+if (typeof window !== 'undefined') {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      if (typeof parsed.vector === 'boolean') toggles.vector = parsed.vector
+      if (typeof parsed.graph === 'boolean') toggles.graph = parsed.graph
+      if (typeof parsed.keyword === 'boolean') toggles.keyword = parsed.keyword
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// 持久化到 localStorage
+watch(toggles, (val) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(val))
+  }
+}, {deep: true})
 
 // 浏览器原生语音识别（免费、前端实时；Chrome/Edge 支持）
 const SpeechRecognition =
@@ -164,7 +220,7 @@ function submit(): void {
   }
   text.value = ''
   resetKey.value++
-  emit('send', content)
+  emit('send', content, {...toggles})
 }
 
 function clear(): void {
@@ -184,6 +240,18 @@ defineExpose({clear})
   background: #fff;
   padding: 12px 16px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.chat-input__toggles {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 0 2px;
+}
+
+.chat-input__toggles :deep(.ant-switch) {
+  font-size: 11px;
 }
 
 .chat-input__footer {

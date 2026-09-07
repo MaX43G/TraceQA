@@ -50,6 +50,10 @@ export async function streamChat(
         model?: string
         baseUrl?: string
         apiKey?: string
+        /** 检索开关（用户可控） */
+        enableVector?: boolean
+        enableGraph?: boolean
+        enableKeyword?: boolean
     },
     handlers: ChatStreamHandlers,
     signal?: AbortSignal
