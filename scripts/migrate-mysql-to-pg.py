@@ -55,6 +55,80 @@ TABLE_ORDER = {
     "traceqa_admin": ["t_announcement"],
 }
 
+# PostgreSQL 建表 DDL（如果目标表不存在则自动创建）
+CREATE_TABLE_DDL = {
+    "t_role": """
+        CREATE TABLE IF NOT EXISTS t_role (
+            id BIGINT PRIMARY KEY, code VARCHAR(32) NOT NULL, name VARCHAR(64) NOT NULL,
+            permissions VARCHAR(1024) DEFAULT '', description VARCHAR(255) DEFAULT '',
+            create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            deleted SMALLINT DEFAULT 0
+        )
+    """,
+    "t_user": """
+        CREATE TABLE IF NOT EXISTS t_user (
+            id BIGINT PRIMARY KEY, username VARCHAR(64) NOT NULL, password VARCHAR(128) NOT NULL,
+            nickname VARCHAR(64) DEFAULT '', role_code VARCHAR(32) DEFAULT 'USER',
+            status SMALLINT DEFAULT 1, avatar VARCHAR(512) DEFAULT '',
+            create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            deleted SMALLINT DEFAULT 0
+        )
+    """,
+    "t_knowledge_base": """
+        CREATE TABLE IF NOT EXISTS t_knowledge_base (
+            id BIGINT PRIMARY KEY, name VARCHAR(128) NOT NULL, description VARCHAR(512) DEFAULT '',
+            course VARCHAR(128) DEFAULT '', status SMALLINT DEFAULT 1,
+            create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            deleted SMALLINT DEFAULT 0
+        )
+    """,
+    "t_document": """
+        CREATE TABLE IF NOT EXISTS t_document (
+            id BIGINT PRIMARY KEY, knowledge_base_id BIGINT NOT NULL, original_name VARCHAR(255) NOT NULL,
+            stored_path VARCHAR(512) DEFAULT '', file_type VARCHAR(16) DEFAULT '', file_size BIGINT DEFAULT 0,
+            status VARCHAR(16) DEFAULT 'PENDING', track_id VARCHAR(128) DEFAULT '',
+            content_hash VARCHAR(64) DEFAULT '', part_total INT DEFAULT 1, part_done INT DEFAULT 0,
+            chunk_count INT DEFAULT 0, entity_count INT DEFAULT 0, relation_count INT DEFAULT 0,
+            error_msg VARCHAR(512) DEFAULT '',
+            create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            deleted SMALLINT DEFAULT 0
+        )
+    """,
+    "t_chat_session": """
+        CREATE TABLE IF NOT EXISTS t_chat_session (
+            id BIGINT PRIMARY KEY, user_id BIGINT NOT NULL, title VARCHAR(128) DEFAULT '新对话',
+            knowledge_base_id BIGINT DEFAULT NULL, pinned SMALLINT DEFAULT 0, status SMALLINT DEFAULT 1,
+            create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            deleted SMALLINT DEFAULT 0
+        )
+    """,
+    "t_chat_message": """
+        CREATE TABLE IF NOT EXISTS t_chat_message (
+            id BIGINT PRIMARY KEY, session_id BIGINT NOT NULL, role VARCHAR(16) NOT NULL,
+            content TEXT, thinking_trace TEXT, "references" TEXT,
+            latency_ms BIGINT DEFAULT 0, status SMALLINT DEFAULT 1,
+            create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            deleted SMALLINT DEFAULT 0
+        )
+    """,
+    "t_system_prompt": """
+        CREATE TABLE IF NOT EXISTS t_system_prompt (
+            id BIGINT PRIMARY KEY, scenario VARCHAR(64) NOT NULL, name VARCHAR(128) DEFAULT '',
+            content TEXT, enabled SMALLINT DEFAULT 1, remark VARCHAR(255) DEFAULT '',
+            create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            deleted SMALLINT DEFAULT 0
+        )
+    """,
+    "t_announcement": """
+        CREATE TABLE IF NOT EXISTS t_announcement (
+            id BIGINT PRIMARY KEY, title VARCHAR(128) DEFAULT '', content TEXT,
+            enabled SMALLINT DEFAULT 1,
+            create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            deleted SMALLINT DEFAULT 0
+        )
+    """,
+}
+
 # 保留字（PostgreSQL 关键字，需要双引号包裹）
 PG_RESERVED_WORDS = {"references"}
 
@@ -83,6 +157,11 @@ def migrate_table(mysql_conn, pg_conn, table_name):
     mysql_cur = mysql_conn.cursor()
     pg_cur = pg_conn.cursor()
 
+    # 0. 如果目标表不存在，先建表
+    if table_name in CREATE_TABLE_DDL:
+        pg_cur.execute(CREATE_TABLE_DDL[table_name])
+        pg_conn.commit()
+
     # 1. 获取 MySQL 表数据
     mysql_cur.execute(f"SELECT * FROM `{table_name}`")
     rows = mysql_cur.fetchall()
@@ -106,7 +185,11 @@ def migrate_table(mysql_conn, pg_conn, table_name):
         converted_rows.append(tuple(converted))
 
     # 4. 清空目标表（如果已有数据）
-    pg_cur.execute(f"TRUNCATE TABLE {quote_column(table_name)} CASCADE")
+    try:
+        pg_cur.execute(f"TRUNCATE TABLE {quote_column(table_name)} CASCADE")
+    except Exception:
+        pg_conn.rollback()
+        # 表可能刚建好，跳过 TRUNCATE
 
     # 5. 批量插入 PostgreSQL
     insert_sql = f"""
