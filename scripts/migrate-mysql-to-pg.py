@@ -213,7 +213,7 @@ def verify_migration(mysql_conn, pg_conn, table_name):
     mysql_count = mysql_cur.fetchone()["cnt"]
 
     pg_cur.execute(f"SELECT COUNT(*) AS cnt FROM {quote_column(table_name)}")
-    pg_count = pg_cur.fetchone()["cnt"]
+    pg_count = pg_cur.fetchone()[0]
 
     match = "✓" if mysql_count == pg_count else "✗ 不一致!"
     print(f"  {table_name}: MySQL={mysql_count}, PG={pg_count} {match}")
