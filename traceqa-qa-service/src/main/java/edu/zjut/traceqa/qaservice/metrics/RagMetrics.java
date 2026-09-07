@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * RAG 链路专用 Micrometer 指标采集器。
@@ -21,6 +22,9 @@ import java.util.concurrent.TimeUnit;
  *   <li>{@code rag.retrieval.hits} — 检索命中数分布（按 path 标签：graph/vector/keyword）</li>
  *   <li>{@code rag.intent.distribution} — 意图分类计数（按 intent 标签）</li>
  *   <li>{@code rag.answer.degraded} — 降级回答计数</li>
+ *   <li>{@code rag.cache.hit} — 缓存命中计数</li>
+ *   <li>{@code rag.llm.call} — LLM 调用计数（按 model+status 标签）</li>
+ *   <li>{@code rag.concurrent.queries} — 当前并发查询数</li>
  * </ul>
  */
 @Component
@@ -32,12 +36,22 @@ public class RagMetrics {
     private final ConcurrentHashMap<String, Timer> stageTimers = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Timer> intentTimers = new ConcurrentHashMap<>();
     private Counter degradedCounter;
+    private Counter cacheHitCounter;
+    private Counter cacheMissCounter;
+    private final AtomicInteger concurrentQueries = new AtomicInteger();
 
     @PostConstruct
     void init() {
         degradedCounter = Counter.builder("rag.answer.degraded")
                 .description("Number of degraded (non-AI) answers")
                 .register(meterRegistry);
+        cacheHitCounter = Counter.builder("rag.cache.hit")
+                .description("Number of intent cache hits")
+                .register(meterRegistry);
+        cacheMissCounter = Counter.builder("rag.cache.miss")
+                .description("Number of intent cache misses")
+                .register(meterRegistry);
+        meterRegistry.gauge("rag.concurrent.queries", concurrentQueries, AtomicInteger::get);
     }
 
     /** 记录完整 RAG 问答耗时 */
@@ -85,5 +99,35 @@ public class RagMetrics {
     /** 记录降级回答 */
     public void recordDegraded() {
         degradedCounter.increment();
+    }
+
+    /** 记录缓存命中 */
+    public void recordCacheHit() {
+        cacheHitCounter.increment();
+    }
+
+    /** 记录缓存未命中 */
+    public void recordCacheMiss() {
+        cacheMissCounter.increment();
+    }
+
+    /** 记录 LLM 调用 */
+    public void recordLlmCall(String model, boolean success) {
+        Counter.builder("rag.llm.call")
+                .description("LLM API call count")
+                .tag("model", model)
+                .tag("status", success ? "success" : "failure")
+                .register(meterRegistry)
+                .increment();
+    }
+
+    /** 进入查询（增加并发计数） */
+    public void queryStart() {
+        concurrentQueries.incrementAndGet();
+    }
+
+    /** 查询结束（减少并发计数） */
+    public void queryEnd() {
+        concurrentQueries.decrementAndGet();
     }
 }

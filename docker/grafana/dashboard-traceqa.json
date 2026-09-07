@@ -64,8 +64,8 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(http_server_requests_seconds_count[1m])) by (uri)",
-          "legendFormat": "{{uri}}"
+          "expr": "sum(rate(http_server_requests_seconds_count[1m])) by (http_route)",
+          "legendFormat": "{{http_route}}"
         }
       ]
     },
@@ -104,8 +104,8 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket[1m])) by (le, uri)) * 1000",
-          "legendFormat": "p95 {{uri}}"
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket[1m])) by (le, http_route)) * 1000",
+          "legendFormat": "p95 {{http_route}}"
         }
       ]
     },
@@ -135,7 +135,16 @@
           "expr": "jvm_threads_peak_threads",
           "legendFormat": "peak"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "tooltip": {
+              "suffix": "注：使用虚拟线程时，live 数可能较高"
+            }
+          }
+        }
+      }
     },
     {
       "title": "GC 暂停速率 (ms/s)",
@@ -152,8 +161,8 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(jvm_gc_pause_seconds_sum[1m])) by (cause) * 1000",
-          "legendFormat": "{{cause}}"
+          "expr": "sum(rate(jvm_gc_pause_seconds_sum[1m])) by (action) * 1000",
+          "legendFormat": "{{action}}"
         }
       ]
     },
@@ -173,19 +182,19 @@
       "targets": [
         {
           "expr": "hikaricp_connections_active",
-          "legendFormat": "active"
+          "legendFormat": "active {{application}}"
         },
         {
           "expr": "hikaricp_connections_idle",
-          "legendFormat": "idle"
+          "legendFormat": "idle {{application}}"
         },
         {
           "expr": "hikaricp_connections_max",
-          "legendFormat": "max"
+          "legendFormat": "max {{application}}"
         },
         {
           "expr": "hikaricp_connections_pending",
-          "legendFormat": "pending"
+          "legendFormat": "pending {{application}}"
         }
       ]
     },
@@ -204,8 +213,8 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(http_server_requests_seconds_count[1m])) by (status)",
-          "legendFormat": "{{status}}"
+          "expr": "sum(rate(http_server_requests_seconds_count[1m])) by (http_status)",
+          "legendFormat": "{{http_status}}"
         }
       ]
     },
@@ -346,7 +355,7 @@
       ]
     },
     {
-      "title": "线程池 (Executor)",
+      "title": "虚拟线程 (Virtual Threads)",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -360,22 +369,19 @@
       },
       "targets": [
         {
-          "expr": "executor_pool_size_threads",
-          "legendFormat": "pool size"
+          "expr": "jvm_threads_live_threads",
+          "legendFormat": "total live"
         },
         {
-          "expr": "executor_active_threads",
-          "legendFormat": "active"
+          "expr": "jvm_threads_daemon_threads",
+          "legendFormat": "daemon"
         },
         {
-          "expr": "executor_queued_tasks",
-          "legendFormat": "queued"
-        },
-        {
-          "expr": "executor_pool_max_threads",
-          "legendFormat": "max"
+          "expr": "jvm_threads_peak_threads",
+          "legendFormat": "peak"
         }
-      ]
+      ],
+      "description": "虚拟线程模式下，传统线程池指标不适用，此面板展示线程总数"
     },
     {
       "title": "HTTP 出站请求速率 (rps)",
@@ -392,13 +398,13 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(http_client_requests_seconds_count[1m])) by (uri)",
-          "legendFormat": "{{uri}}"
+          "expr": "sum(rate(http_client_requests_seconds_count[1m])) by (http_route)",
+          "legendFormat": "{{http_route}}"
         }
       ]
     },
     {
-      "title": "Redis (Lettuce) 请求速率 (rps)",
+      "title": "Redis (Lettuce) 请求延迟 (ms)",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -412,8 +418,12 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(lettuce_seconds_count[1m]))",
-          "legendFormat": "redis/s"
+          "expr": "histogram_quantile(0.95, sum(rate(lettuce_command_latency_seconds_bucket[1m])) by (le)) * 1000",
+          "legendFormat": "p95 latency"
+        },
+        {
+          "expr": "rate(lettuce_command_latency_seconds_count[1m])",
+          "legendFormat": "commands/s"
         }
       ]
     },
@@ -486,7 +496,7 @@
       ]
     },
     {
-      "title": "Tomcat 会话",
+      "title": "SSE 连接活跃数",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -500,14 +510,11 @@
       },
       "targets": [
         {
-          "expr": "tomcat_sessions_active_current_sessions",
-          "legendFormat": "active"
-        },
-        {
-          "expr": "rate(tomcat_sessions_created_sessions_total[1m])",
-          "legendFormat": "created/s"
+          "expr": "sse_connections_active",
+          "legendFormat": "active connections"
         }
-      ]
+      ],
+      "description": "当前活跃的 SSE 流式连接数"
     },
     {
       "title": "进程运行时长 (s)",
@@ -550,6 +557,6 @@
   "timezone": "browser",
   "title": "TraceQA 运行大盘",
   "uid": "traceqa",
-  "version": 3,
+  "version": 4,
   "weekStart": ""
 }

@@ -91,6 +91,7 @@ public class RagAgentOrchestrator {
      * @param cancelled 取消标志：用户中断/连接断开时置位，生成过程随即停止
      */
     public void streamChat(Long userId, ChatStreamRequest request, SseEmitter emitter, AtomicBoolean cancelled) {
+        ragMetrics.queryStart();
         List<ThinkingNodeVO> thinking = new ArrayList<>();
         long start = System.currentTimeMillis();
         LlmConfig modelConfig = toLlmConfig(request);
@@ -131,6 +132,8 @@ public class RagAgentOrchestrator {
             ssePublisher.completeWithError(emitter, Map.of(
                     "code", ErrorCode.LLM_UNAVAILABLE.getCode(),
                     "msg", "AI 服务暂时不可用，请稍后再试"));
+        } finally {
+            ragMetrics.queryEnd();
         }
     }
 
@@ -175,10 +178,12 @@ public class RagAgentOrchestrator {
         IntentType intent;
         if (cached.isPresent()) {
             intent = cached.get();
+            ragMetrics.recordCacheHit();
             node.setData(Map.of("intentLabel", intent.getLabel(), "cached", true));
             finishThinking(thinking, emitter, "意图识别", "识别结果：" + intent.getLabel() + "（缓存命中）");
         } else {
             intent = intentAgent.identify(content, history, config);
+            ragMetrics.recordCacheMiss();
             redisCacheService.put(cacheKey, intent, Duration.ofMinutes(30));
             ragMetrics.recordIntent(intent.name());
             node.setData(Map.of("intentLabel", intent.getLabel(), "cached", false));

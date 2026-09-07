@@ -537,6 +537,7 @@ services:
       - ./docker/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
       - ./docker/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
       - ./docker/grafana/dashboard-traceqa.json:/var/lib/grafana/dashboards/traceqa.json:ro
+      - ./docker/grafana/dashboard-rag.json:/var/lib/grafana/dashboards/traceqa-rag.json:ro
       - traceqa-grafana-data:/var/lib/grafana
     ports:
       - "6128:3000"

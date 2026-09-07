@@ -1,0 +1,357 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "RAG 问答总耗时 P50/P95/P99 (ms)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(rag_query_latency_seconds_bucket[1m])) by (le)) * 1000",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(rag_query_latency_seconds_bucket[1m])) by (le)) * 1000",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(rag_query_latency_seconds_bucket[1m])) by (le)) * 1000",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      }
+    },
+    {
+      "title": "RAG 问答速率 (qps)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(rag_query_latency_seconds_count[1m]))",
+          "legendFormat": "total qps"
+        },
+        {
+          "expr": "sum(rate(rag_query_latency_seconds_count[1m])) by (intent)",
+          "legendFormat": "{{intent}}"
+        }
+      ]
+    },
+    {
+      "title": "意图分类分布",
+      "type": "piechart",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(rag_intent_distribution_total[5m])) by (intent)",
+          "legendFormat": "{{intent}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "title": "降级回答数",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(rag_answer_degraded_total[5m]))",
+          "legendFormat": "degraded"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "缓存命中/未命中",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(rag_cache_hit_total[5m]))",
+          "legendFormat": "hit"
+        },
+        {
+          "expr": "sum(increase(rag_cache_miss_total[5m]))",
+          "legendFormat": "miss"
+        }
+      ]
+    },
+    {
+      "title": "当前并发查询数",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "rag_concurrent_queries",
+          "legendFormat": "concurrent"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "各阶段耗时 P95 (ms)",
+      "type": "barchart",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 0,
+        "y": 12
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(rag_stage_latency_seconds_bucket[1m])) by (le, stage)) * 1000",
+          "legendFormat": "{{stage}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      },
+      "options": {
+        "orientation": "horizontal"
+      }
+    },
+    {
+      "title": "检索命中数分布",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(rag_retrieval_hits_seconds_count[1m])) by (path)",
+          "legendFormat": "{{path}} hits/s"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(rag_retrieval_hits_seconds_bucket[1m])) by (le, path))",
+          "legendFormat": "p95 {{path}}"
+        }
+      ]
+    },
+    {
+      "title": "SSE 消息发送速率",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "targets": [
+        {
+          "expr": "rate(sse_messages_sent_total[1m])",
+          "legendFormat": "sent/s"
+        },
+        {
+          "expr": "rate(sse_messages_failed_total[1m])",
+          "legendFormat": "failed/s"
+        },
+        {
+          "expr": "sse_connections_active",
+          "legendFormat": "active connections"
+        }
+      ]
+    },
+    {
+      "title": "SSE 发送延迟 P95 (ms)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(sse_send_latency_seconds_bucket[1m])) by (le)) * 1000",
+          "legendFormat": "p95 send latency"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(sse_send_latency_seconds_bucket[1m])) by (le)) * 1000",
+          "legendFormat": "p99 send latency"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      }
+    },
+    {
+      "title": "网关请求延迟 P95 (ms)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PROM"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(gateway_request_latency_seconds_bucket[1m])) by (le)) * 1000",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(gateway_request_latency_seconds_bucket[1m])) by (le)) * 1000",
+          "legendFormat": "p99"
+        },
+        {
+          "expr": "rate(gateway_requests_slow_total[1m])",
+          "legendFormat": "slow req/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      }
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": [
+    "traceqa",
+    "rag"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "TraceQA RAG 链路大盘",
+  "uid": "traceqa-rag",
+  "version": 1,
+  "weekStart": ""
+}
