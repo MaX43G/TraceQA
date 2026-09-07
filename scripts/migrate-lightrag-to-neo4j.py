@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 """
-TraceQA LightRAG 数据迁移脚本：SQLite → Neo4j + PostgreSQL
-============================================================
-功能：
-  1. 读取 LightRAG 嵌入式 SQLite 数据（图谱/文档/分块）
-  2. 将实体-关系图谱导入 Neo4j
-  3. 将文档分块与向量导入 PostgreSQL (pgvector)
-  4. 清理旧的嵌入式存储
+TraceQA LightRAG 数据迁移脚本：JSON/GraphML → Neo4j + PostgreSQL
+=================================================================
+LightRAG 新版本使用 JSON KV 存储 + GraphML 图谱格式。
+
+数据文件：
+  - graph_chunk_entity_relation.graphml  → 图谱（实体/关系/分块）→ Neo4j
+  - kv_store_full_docs.json              → 完整文档 → PostgreSQL
+  - kv_store_text_chunks.json            → 文本分块 → PostgreSQL
+  - kv_store_full_entities.json          → 实体 → PostgreSQL
+  - kv_store_full_relations.json         → 关系 → PostgreSQL
+  - vdb_chunks.json                      → 向量分块 → PostgreSQL
+  - vdb_entities.json                    → 向量实体 → PostgreSQL
+  - vdb_relationships.json               → 向量关系 → PostgreSQL
 
 使用：
-  pip install neo4j psycopg2-binary
-
-  # 先拷出 LightRAG 数据卷
-  docker cp traceqa-lightrag:/app/data/rag_storage ./lightrag-backup
-
-  # 运行迁移
+  pip install neo4j psycopg2-binary lxml
   python scripts/migrate-lightrag-to-neo4j.py
 
 环境变量：
@@ -24,8 +25,6 @@ TraceQA LightRAG 数据迁移脚本：SQLite → Neo4j + PostgreSQL
 import os
 import sys
 import json
-import sqlite3
-import struct
 import time
 from pathlib import Path
 
@@ -37,9 +36,15 @@ except ImportError:
 
 try:
     import psycopg2
-    from psycopg2.extras import execute_values
+    from psycopg2.extras import execute_values, Json
 except ImportError:
     print("请安装 psycopg2: pip install psycopg2-binary")
+    sys.exit(1)
+
+try:
+    from lxml import etree
+except ImportError:
+    print("请安装 lxml: pip install lxml")
     sys.exit(1)
 
 
@@ -56,111 +61,79 @@ PG_CONFIG = {
     "dbname": os.getenv("PG_DATABASE_LIGHTRAG", "traceqa_lightrag"),
 }
 
-# LightRAG 数据目录
+# LightRAG 数据目录（在容器内 /app/data/rag_storage）
 RAG_STORAGE_DIR = os.getenv(
     "RAG_STORAGE_DIR",
-    os.path.expanduser("~/.traceqa/lightrag-backup/rag_storage")
+    "/app/data/rag_storage"
 )
 
 
-def find_sqlite_files(base_dir):
-    """自动发现 LightRAG 的 SQLite 文件"""
-    base = Path(base_dir)
-    files = {}
-    for f in base.glob("*.db"):
-        name = f.stem.lower()
-        if "full_doc" in name:
-            files["full_docs"] = str(f)
-        elif "doc_chunk" in name or "chunk" in name:
-            files["doc_chunks"] = str(f)
-        elif "graph" in name and "chunk" not in name:
-            files["graph"] = str(f)
-    # 也检查不带 .db 后缀的文件
-    for f in base.glob("*"):
-        if f.is_file() and f.suffix == "":
-            try:
-                conn = sqlite3.connect(str(f))
-                cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
-                tables = [row[0] for row in cursor.fetchall()]
-                conn.close()
-                if any("doc" in t.lower() for t in tables):
-                    files.setdefault("unknown", str(f))
-            except:
-                pass
-    return files
+def load_json(path):
+    """加载 JSON KV 存储文件"""
+    p = Path(path)
+    if not p.exists():
+        return {}
+    with open(p, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
-def read_full_docs(db_path):
-    """读取完整文档"""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.execute("SELECT doc_id, content, metadata FROM full_docs")
-    docs = []
-    for row in cursor.fetchall():
-        doc_id, content, metadata = row
-        meta = json.loads(metadata) if metadata else {}
-        docs.append({
-            "id": doc_id,
-            "content": content,
-            "metadata": meta,
-        })
-    conn.close()
-    return docs
+def parse_graphml(graphml_path):
+    """解析 GraphML 文件，提取节点和边"""
+    tree = etree.parse(graphml_path)
+    root = tree.getroot()
 
+    ns = {"g": "http://graphml.graphdrawing.org/xmlns"}
 
-def read_doc_chunks(db_path):
-    """读取文档分块"""
-    conn = sqlite3.connect(db_path)
-    # 探查表结构
-    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
-    tables = [row[0] for row in cursor.fetchall()]
+    # 提取节点
+    nodes = {}
+    for node in root.findall(".//g:node", ns):
+        node_id = node.get("id")
+        data = {}
+        for data_elem in node.findall("g:data", ns):
+            key = data_elem.get("key")
+            data[key] = data_elem.text
+        nodes[node_id] = data
 
-    chunks = []
-    for table in tables:
-        try:
-            cursor = conn.execute(f"PRAGMA table_info({table})")
-            cols = [row[1] for row in cursor.fetchall()]
-            if any("chunk" in c.lower() for c in cols) or any("content" in c.lower() for c in cols):
-                cursor = conn.execute(f"SELECT * FROM {table}")
-                for row in cursor.fetchall():
-                    row_dict = dict(zip([d[1] for d in conn.execute(f"PRAGMA table_info({table})").fetchall()], row))
-                    chunks.append(row_dict)
-        except:
-            continue
-    conn.close()
-    return chunks
-
-
-def read_graph(db_path):
-    """读取图谱数据（节点和边）"""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
-    tables = [row[0] for row in cursor.fetchall()]
-
-    nodes = []
+    # 提取边
     edges = []
-    for table in tables:
-        try:
-            cursor = conn.execute(f"PRAGMA table_info({table})")
-            cols = [row[1] for row in cursor.fetchall()]
-            cursor = conn.execute(f"SELECT * FROM {table}")
-            rows = [dict(zip([d[1] for d in conn.execute(f"PRAGMA table_info({table})").fetchall()], row))
-                    for row in cursor.fetchall()]
+    for edge in root.findall(".//g:edge", ns):
+        source = edge.get("source")
+        target = edge.get("target")
+        data = {}
+        for data_elem in edge.findall("g:data", ns):
+            key = data_elem.get("key")
+            data[key] = data_elem.text
+        edges.append({"source": source, "target": target, **data})
 
-            for row in rows:
-                # 尝试识别节点表和边表
-                if any(k in str(row.keys()).lower() for k in ["source", "target", "from", "to"]):
-                    edges.append(row)
-                else:
-                    nodes.append(row)
-        except:
-            continue
-    conn.close()
     return nodes, edges
 
 
-def migrate_to_neo4j(nodes, edges):
-    """导入图谱到 Neo4j"""
-    print(f"\n导入 Neo4j：{len(nodes)} 节点, {len(edges)} 边")
+def migrate_to_neo4j(rag_dir):
+    """迁移图谱到 Neo4j"""
+    graphml_path = Path(rag_dir) / "graph_chunk_entity_relation.graphml"
+    if not graphml_path.exists():
+        print(f"\n⚠️  GraphML 文件不存在: {graphml_path}")
+        return 0, 0
+
+    print(f"\n解析 GraphML: {graphml_path}")
+    nodes, edges = parse_graphml(graphml_path)
+    print(f"  节点: {len(nodes)}, 边: {len(edges)}")
+
+    # 分类节点
+    entity_nodes = {}
+    chunk_nodes = {}
+    for nid, data in nodes.items():
+        node_type = data.get("node_type", data.get("type", "")).lower()
+        label = data.get("label", "")
+        if "entity" in node_type or "entity" in label.lower():
+            entity_nodes[nid] = data
+        elif "chunk" in node_type or "chunk" in label.lower():
+            chunk_nodes[nid] = data
+        else:
+            # 默认归为实体
+            entity_nodes[nid] = data
+
+    print(f"  实体节点: {len(entity_nodes)}, 分块节点: {len(chunk_nodes)}")
 
     driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
@@ -168,63 +141,116 @@ def migrate_to_neo4j(nodes, edges):
         # 清空旧数据
         session.run("MATCH (n) DETACH DELETE n")
 
-        # 导入节点
-        for i, node in enumerate(nodes):
-            labels = node.get("type", node.get("label", "Entity"))
-            name = node.get("name", node.get("id", f"node_{i}"))
-            props = {k: v for k, v in node.items() if k not in ("type", "label", "name", "id")}
-            props["name"] = str(name)
+        # 创建约束
+        session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (e:Entity) REQUIRE e.name IS UNIQUE")
+        session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (c:Chunk) REQUIRE c.id IS UNIQUE")
 
-            cypher = f"CREATE (n:{labels} {{name: $name}})"
-            session.run(cypher, name=str(name))
+        # 导入实体节点
+        count = 0
+        for nid, data in entity_nodes.items():
+            name = data.get("name", data.get("entity_name", nid))
+            entity_type = data.get("entity_type", data.get("type", "Entity"))
+            description = data.get("description", "")
+            source_id = data.get("source_id", "")
 
-            # 设置属性
-            for k, v in props.items():
-                if v is not None:
-                    try:
-                        session.run(
-                            f"MATCH (n {{{{name: $name}}}}) SET n.{k} = $value",
-                            name=str(name), value=str(v)
-                        )
-                    except:
-                        pass
+            session.run(
+                "MERGE (e:Entity {name: $name}) "
+                "SET e.type = $type, e.description = $desc, e.source_id = $source_id",
+                name=str(name), type=str(entity_type),
+                desc=str(description), source_id=str(source_id)
+            )
+            count += 1
+            if count % 200 == 0:
+                print(f"    实体: {count}/{len(entity_nodes)}")
 
-            if (i + 1) % 100 == 0:
-                print(f"  节点: {i + 1}/{len(nodes)}")
+        print(f"    实体: {count} 完成")
 
-        # 导入边
-        for i, edge in enumerate(edges):
-            src = edge.get("source", edge.get("from", edge.get("src", "")))
-            tgt = edge.get("target", edge.get("to", edge.get("tgt", "")))
-            rel_type = edge.get("type", edge.get("relation", "RELATES"))
-            props = {k: v for k, v in edge.items()
-                     if k not in ("source", "target", "from", "to", "src", "tgt", "type", "relation")}
+        # 导入分块节点
+        count = 0
+        for nid, data in chunk_nodes.items():
+            chunk_id = data.get("chunk_id", nid)
+            content = data.get("content", data.get("text", ""))
+            source = data.get("source", data.get("file_path", ""))
 
-            if src and tgt:
+            session.run(
+                "MERGE (c:Chunk {id: $id}) "
+                "SET c.content = $content, c.source = $source",
+                id=str(chunk_id), content=str(content)[:10000], source=str(source)
+            )
+            count += 1
+            if count % 200 == 0:
+                print(f"    分块: {count}/{len(chunk_nodes)}")
+
+        print(f"    分块: {count} 完成")
+
+        # 导入边（关系）
+        count = 0
+        for edge in edges:
+            src = edge.get("source", "")
+            tgt = edge.get("target", "")
+            rel_type = edge.get("relationship", edge.get("relation", edge.get("type", "RELATES")))
+            # 清理关系类型名（Neo4j 不允许特殊字符）
+            rel_type = "".join(c if c.isalnum() or c == "_" else "_" for c in str(rel_type)).upper()
+            if not rel_type:
+                rel_type = "RELATES"
+
+            weight = edge.get("weight", "1")
+            description = edge.get("description", "")
+
+            try:
+                session.run(
+                    f"MATCH (a {{name: $src}}), (b {{name: $tgt}}) "
+                    f"CREATE (a)-[:{rel_type} {{weight: $weight, description: $desc}}]->(b)",
+                    src=str(src), tgt=str(tgt),
+                    weight=str(weight), desc=str(description)
+                )
+                count += 1
+            except Exception:
+                # 可能是 Chunk→Entity 的边，尝试用 id 匹配
                 try:
                     session.run(
-                        f"MATCH (a {{name: $src}}), (b {{name: $tgt}}) "
-                        f"CREATE (a)-[:{rel_type}]->(b)",
+                        f"MATCH (a {{id: $src}}), (b {{name: $tgt}}) "
+                        f"CREATE (a)-[:CONTAINS]->(b)",
                         src=str(src), tgt=str(tgt)
                     )
-                except:
+                    count += 1
+                except Exception:
                     pass
 
-            if (i + 1) % 100 == 0:
-                print(f"  边: {i + 1}/{len(edges)}")
+            if count % 200 == 0 and count > 0:
+                print(f"    边: {count}/{len(edges)}")
+
+        print(f"    边: {count} 完成")
+
+        # 统计
+        result = session.run("MATCH (n) RETURN labels(n)[0] AS label, count(*) AS cnt")
+        for record in result:
+            print(f"  Neo4j 统计: {record['label']} = {record['cnt']}")
 
     driver.close()
-    print("  Neo4j 导入完成")
+    return len(entity_nodes) + len(chunk_nodes), count
 
 
-def migrate_to_pgvector(docs, chunks):
-    """导入文档和分块到 PostgreSQL (pgvector)"""
-    print(f"\n导入 PostgreSQL：{len(docs)} 文档, {len(chunks)} 分块")
+def migrate_to_pgvector(rag_dir):
+    """迁移文档和分块到 PostgreSQL"""
+    rag_dir = Path(rag_dir)
+
+    # 读取 JSON KV 存储
+    full_docs = load_json(rag_dir / "kv_store_full_docs.json")
+    text_chunks = load_json(rag_dir / "kv_store_text_chunks.json")
+    full_entities = load_json(rag_dir / "kv_store_full_entities.json")
+    full_relations = load_json(rag_dir / "kv_store_full_relations.json")
+
+    print(f"\n读取 JSON KV 存储:")
+    print(f"  完整文档: {len(full_docs)} 篇")
+    print(f"  文本分块: {len(text_chunks)} 个")
+    print(f"  实体: {len(full_entities)} 个")
+    print(f"  关系: {len(full_relations)} 条")
 
     conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
 
-    # 创建表（如果不存在）
+    # 创建表
     cur.execute("""
         CREATE TABLE IF NOT EXISTS lightrag_documents (
             id TEXT PRIMARY KEY,
@@ -236,128 +262,172 @@ def migrate_to_pgvector(docs, chunks):
     cur.execute("""
         CREATE TABLE IF NOT EXISTS lightrag_chunks (
             id TEXT PRIMARY KEY,
-            doc_id TEXT,
             content TEXT,
-            chunk_index INT DEFAULT 0,
             metadata JSONB,
             create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS lightrag_entities (
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL,
-            type TEXT DEFAULT 'Entity',
-            content TEXT,
+            name TEXT PRIMARY KEY,
+            entity_type TEXT DEFAULT 'Entity',
+            description TEXT,
+            source_id TEXT,
             metadata JSONB,
             create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS lightrag_relations (
-            id SERIAL PRIMARY KEY,
             source_name TEXT,
             target_name TEXT,
             relation_type TEXT DEFAULT 'RELATES',
-            content TEXT,
+            weight FLOAT DEFAULT 1.0,
+            description TEXT,
             metadata JSONB,
-            create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (source_name, target_name, relation_type)
         )
     """)
     conn.commit()
 
     # 导入文档
-    for doc in docs:
+    count = 0
+    for doc_id, doc_data in full_docs.items():
+        if isinstance(doc_data, dict):
+            content = doc_data.get("content", doc_data.get("data", ""))
+            metadata = {k: v for k, v in doc_data.items() if k not in ("content", "data")}
+        else:
+            content = str(doc_data)
+            metadata = {}
+
         cur.execute(
             "INSERT INTO lightrag_documents (id, content, metadata) VALUES (%s, %s, %s) "
             "ON CONFLICT (id) DO UPDATE SET content = EXCLUDED.content",
-            (doc["id"], doc["content"], json.dumps(doc.get("metadata", {})))
+            (str(doc_id), content, Json(metadata))
         )
+        count += 1
     conn.commit()
-    print(f"  文档: {len(docs)} 行")
+    print(f"  文档: {count} 行")
 
     # 导入分块
-    for i, chunk in enumerate(chunks):
-        chunk_id = chunk.get("chunk_id", chunk.get("id", f"chunk_{i}"))
-        doc_id = chunk.get("doc_id", "")
-        content = chunk.get("content", chunk.get("text", ""))
-        chunk_idx = chunk.get("chunk_index", i)
-        metadata = {k: v for k, v in chunk.items()
-                    if k not in ("chunk_id", "id", "doc_id", "content", "text", "chunk_index")}
+    count = 0
+    for chunk_id, chunk_data in text_chunks.items():
+        if isinstance(chunk_data, dict):
+            content = chunk_data.get("content", chunk_data.get("data", ""))
+            metadata = {k: v for k, v in chunk_data.items() if k not in ("content", "data")}
+        else:
+            content = str(chunk_data)
+            metadata = {}
 
         cur.execute(
-            "INSERT INTO lightrag_chunks (id, doc_id, content, chunk_index, metadata) "
-            "VALUES (%s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING",
-            (str(chunk_id), str(doc_id), content, chunk_idx, json.dumps(metadata))
+            "INSERT INTO lightrag_chunks (id, content, metadata) VALUES (%s, %s, %s) "
+            "ON CONFLICT (id) DO NOTHING",
+            (str(chunk_id), content, Json(metadata))
         )
+        count += 1
     conn.commit()
-    print(f"  分块: {len(chunks)} 行")
+    print(f"  分块: {count} 行")
+
+    # 导入实体
+    count = 0
+    for entity_name, entity_data in full_entities.items():
+        if isinstance(entity_data, dict):
+            entity_type = entity_data.get("entity_type", entity_data.get("type", "Entity"))
+            description = entity_data.get("description", "")
+            source_id = entity_data.get("source_id", "")
+            metadata = {k: v for k, v in entity_data.items()
+                        if k not in ("entity_type", "type", "description", "source_id", "name")}
+        else:
+            entity_type = "Entity"
+            description = str(entity_data)
+            source_id = ""
+            metadata = {}
+
+        cur.execute(
+            "INSERT INTO lightrag_entities (name, entity_type, description, source_id, metadata) "
+            "VALUES (%s, %s, %s, %s, %s) ON CONFLICT (name) DO UPDATE SET description = EXCLUDED.description",
+            (str(entity_name), str(entity_type), description, str(source_id), Json(metadata))
+        )
+        count += 1
+    conn.commit()
+    print(f"  实体: {count} 行")
+
+    # 导入关系
+    count = 0
+    for rel_id, rel_data in full_relations.items():
+        if isinstance(rel_data, dict):
+            src = rel_data.get("source", rel_data.get("source_name", ""))
+            tgt = rel_data.get("target", rel_data.get("target_name", ""))
+            rel_type = rel_data.get("relationship", rel_data.get("relation_type", "RELATES"))
+            weight = float(rel_data.get("weight", 1))
+            description = rel_data.get("description", "")
+            metadata = {k: v for k, v in rel_data.items()
+                        if k not in ("source", "target", "source_name", "target_name",
+                                     "relationship", "relation_type", "weight", "description")}
+        else:
+            src = str(rel_id)
+            tgt = ""
+            rel_type = "RELATES"
+            weight = 1.0
+            description = str(rel_data)
+            metadata = {}
+
+        if src and tgt:
+            cur.execute(
+                "INSERT INTO lightrag_relations "
+                "(source_name, target_name, relation_type, weight, description, metadata) "
+                "VALUES (%s, %s, %s, %s, %s, %s) "
+                "ON CONFLICT (source_name, target_name, relation_type) DO NOTHING",
+                (str(src), str(tgt), str(rel_type), weight, description, Json(metadata))
+            )
+            count += 1
+    conn.commit()
+    print(f"  关系: {count} 行")
 
     cur.close()
     conn.close()
-    print("  PostgreSQL 导入完成")
+    return len(full_docs), len(text_chunks), len(full_entities), len(full_relations)
 
 
 def main():
     print("=" * 60)
-    print("TraceQA LightRAG 数据迁移")
+    print("TraceQA LightRAG 数据迁移（JSON/GraphML → Neo4j + PG）")
     print(f"数据源：{RAG_STORAGE_DIR}")
     print("=" * 60)
 
     if not Path(RAG_STORAGE_DIR).exists():
         print(f"\n✗ 数据目录不存在: {RAG_STORAGE_DIR}")
-        print("请先拷出 LightRAG 数据卷：")
+        print("请先从容器内拷出数据：")
         print("  docker cp traceqa-lightrag:/app/data/rag_storage ./lightrag-backup")
-        print(f"  然后设置 RAG_STORAGE_DIR 环境变量指向 ./lightrag-backup/rag_storage")
+        print("  然后设置 RAG_STORAGE_DIR 环境变量")
         sys.exit(1)
 
-    # 发现文件
-    files = find_sqlite_files(RAG_STORAGE_DIR)
-    print(f"\n发现文件: {files}")
+    # 检查关键文件
+    required = ["graph_chunk_entity_relation.graphml", "kv_store_full_docs.json"]
+    for f in required:
+        if not (Path(RAG_STORAGE_DIR) / f).exists():
+            print(f"\n⚠️  关键文件缺失: {f}")
 
     start = time.time()
 
-    # 读取数据
-    docs = []
-    chunks = []
-    nodes = []
-    edges = []
-
-    if "full_docs" in files:
-        docs = read_full_docs(files["full_docs"])
-        print(f"完整文档: {len(docs)} 篇")
-
-    if "doc_chunks" in files:
-        chunks = read_doc_chunks(files["doc_chunks"])
-        print(f"文档分块: {len(chunks)} 个")
-
-    if "graph" in files:
-        nodes, edges = read_graph(files["graph"])
-        print(f"图谱节点: {len(nodes)} 个, 边: {len(edges)} 条")
-
-    if not docs and not chunks and not nodes:
-        print("\n⚠️  未发现有效数据。请确认 LightRAG 数据目录结构。")
-        print("   LightRAG 的 SQLite 文件通常命名为：")
-        print("   - full_docs.db / nano-vectordb/*.db")
-        print("   - graph_*.db")
-        sys.exit(1)
-
     # 迁移到 Neo4j
-    if nodes or edges:
-        try:
-            migrate_to_neo4j(nodes, edges)
-        except Exception as e:
-            print(f"\n✗ Neo4j 迁移失败: {e}")
-            print("  请确认 Neo4j 已启动且连接信息正确。")
+    try:
+        node_count, edge_count = migrate_to_neo4j(RAG_STORAGE_DIR)
+        print(f"\n✓ Neo4j 迁移完成：{node_count} 节点, {edge_count} 边")
+    except Exception as e:
+        print(f"\n✗ Neo4j 迁移失败: {e}")
+        import traceback
+        traceback.print_exc()
 
     # 迁移到 PostgreSQL
-    if docs or chunks:
-        try:
-            migrate_to_pgvector(docs, chunks)
-        except Exception as e:
-            print(f"\n✗ PostgreSQL 迁移失败: {e}")
-            print("  请确认 PostgreSQL 已启动且 traceqa_lightrag 库已创建。")
-            print("  可手动创建：docker exec traceqa-postgresql psql -U traceqa -c 'CREATE DATABASE traceqa_lightrag;'")
+    try:
+        docs, chunks, entities, relations = migrate_to_pgvector(RAG_STORAGE_DIR)
+        print(f"\n✓ PostgreSQL 迁移完成：{docs} 文档, {chunks} 分块, {entities} 实体, {relations} 关系")
+    except Exception as e:
+        print(f"\n✗ PostgreSQL 迁移失败: {e}")
+        import traceback
+        traceback.print_exc()
 
     elapsed = time.time() - start
     print(f"\n{'=' * 60}")
