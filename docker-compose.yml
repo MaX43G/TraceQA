@@ -1,6 +1,6 @@
 ﻿# ============================================================
 # 溯知 / TraceQA 微服务一键部署编排
-# 服务：mysql + redis + nacos + lightrag + minio
+# 服务：postgresql + neo4j + redis + nacos + lightrag + minio
 #      + gateway + user/file/kb/qa/admin 微服务 + frontend + caddy + prometheus + grafana
 #
 # 对外仅开放端口：80 / 443 / 6115（Caddy/前端 HTTPS）、6116（MinIO 头像直链）
@@ -19,32 +19,60 @@ x-logging: &default-logging
 
 services:
   # ===================== 基础设施 =====================
-  mysql:
-    image: mysql:8.4.11
-    container_name: traceqa-mysql
+  postgresql:
+    image: postgres:18.6
+    container_name: traceqa-postgresql
     labels: { logging: promtail }
     logging: *default-logging
     restart: unless-stopped
     mem_limit: 1g
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-traceqa}
-      MYSQL_USER: ${MYSQL_USER:-traceqa}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traceqa123}
+      POSTGRES_PASSWORD: ${PG_ROOT_PASSWORD:-root123456}
+      PGDATA: /var/lib/postgresql/data/pgdata
       TZ: Asia/Shanghai
     command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - max_connections=200
+      - -c
+      - timezone=Asia/Shanghai
     volumes:
       - ./db:/docker-entrypoint-initdb.d:ro
-      - traceqa-mysql-data:/var/lib/mysql
+      - traceqa-pg-data:/var/lib/postgresql/data
     ports:
-      - "6118:3306"
+      - "6118:5432"
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root123456}" ]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 10
+
+  neo4j:
+    image: neo4j:5.26.30-community
+    container_name: traceqa-neo4j
+    labels: { logging: promtail }
+    logging: *default-logging
+    restart: unless-stopped
+    mem_limit: 2g
+    environment:
+      NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/traceqa-neo4j-2026}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 1g
+      NEO4J_server_memory_pagecache_size: 512m
+      TZ: Asia/Shanghai
+    volumes:
+      - traceqa-neo4j-data:/data
+    ports:
+      - "6133:7474"   # HTTP（Neo4j Browser）
+      - "6134:7687"   # Bolt
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 30s
 
   redis:
     image: redis:8.8.2
@@ -125,10 +153,27 @@ services:
       WHITELIST_PATHS: /health
       TOKEN_SECRET: ${LIGHTRAG_TOKEN_SECRET:-}
       TOKEN_EXPIRE_HOURS: ${LIGHTRAG_TOKEN_EXPIRE_HOURS:-48}
+      # ---- 图谱存储：Neo4j ----
+      LIGHTRAG_STORAGE_GRAPH: Neo4jStorage
+      LIGHTRAG_STORAGE_GRAPH_URL: bolt://neo4j:7687
+      LIGHTRAG_STORAGE_GRAPH_USER: neo4j
+      LIGHTRAG_STORAGE_GRAPH_PASSWORD: ${NEO4J_AUTH:-neo4j/traceqa-neo4j-2026}
+      # ---- 向量存储：PostgreSQL (pgvector) ----
+      LIGHTRAG_STORAGE_VECTOR: PGVectorStorage
+      LIGHTRAG_STORAGE_VECTOR_HOST: postgresql
+      LIGHTRAG_STORAGE_VECTOR_PORT: 5432
+      LIGHTRAG_STORAGE_VECTOR_USER: ${PG_USER:-traceqa}
+      LIGHTRAG_STORAGE_VECTOR_PASSWORD: ${PG_PASSWORD:-traceqa123}
+      LIGHTRAG_STORAGE_VECTOR_DATABASE: traceqa_lightrag
     volumes:
       - traceqa-lightrag-data:/app/data
     ports:
       - "6119:9621"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
     healthcheck:
       test: [ "CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:9621/health', timeout=5)" ]
       interval: 15s
@@ -204,11 +249,11 @@ services:
       SERVER_PORT: 8081
       NACOS_SERVER_ADDR: nacos:8848
       REDIS_HOST: redis
-      MYSQL_HOST: mysql
-      MYSQL_PORT: 3306
-      MYSQL_DATABASE_USER: traceqa_user
-      MYSQL_USER: ${MYSQL_USER:-traceqa}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traceqa123}
+      PG_HOST: postgresql
+      PG_PORT: 5432
+      PG_DATABASE_USER: traceqa_user
+      PG_USER: ${PG_USER:-traceqa}
+      PG_PASSWORD: ${PG_PASSWORD:-traceqa123}
       DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-}
       DEFAULT_USER_PASSWORD: ${DEFAULT_USER_PASSWORD:-}
       # 已有表但无 Flyway 历史表时将其作为基线，避免启动失败
@@ -222,7 +267,7 @@ services:
     ports:
       - "6122:8081"
     depends_on:
-      mysql:
+      postgresql:
         condition: service_healthy
       nacos:
         condition: service_healthy
@@ -275,11 +320,11 @@ services:
       SERVER_PORT: 8084
       NACOS_SERVER_ADDR: nacos:8848
       REDIS_HOST: redis
-      MYSQL_HOST: mysql
-      MYSQL_PORT: 3306
-      MYSQL_DATABASE_KB: traceqa_kb
-      MYSQL_USER: ${MYSQL_USER:-traceqa}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traceqa123}
+      PG_HOST: postgresql
+      PG_PORT: 5432
+      PG_DATABASE_KB: traceqa_kb
+      PG_USER: ${PG_USER:-traceqa}
+      PG_PASSWORD: ${PG_PASSWORD:-traceqa123}
       LIGHTRAG_BASE_URL: http://lightrag:9621
       LIGHTRAG_API_KEY: ""
       APP_STORAGE_ROOT: /app/data/files
@@ -296,7 +341,7 @@ services:
     ports:
       - "6124:8084"
     depends_on:
-      mysql:
+      postgresql:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -320,11 +365,11 @@ services:
       SERVER_PORT: 8085
       NACOS_SERVER_ADDR: nacos:8848
       REDIS_HOST: redis
-      MYSQL_HOST: mysql
-      MYSQL_PORT: 3306
-      MYSQL_DATABASE_QA: traceqa_qa
-      MYSQL_USER: ${MYSQL_USER:-traceqa}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traceqa123}
+      PG_HOST: postgresql
+      PG_PORT: 5432
+      PG_DATABASE_QA: traceqa_qa
+      PG_USER: ${PG_USER:-traceqa}
+      PG_PASSWORD: ${PG_PASSWORD:-traceqa123}
       LIGHTRAG_BASE_URL: http://lightrag:9621
       LIGHTRAG_API_KEY: ""
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.siliconflow.cn}
@@ -349,7 +394,7 @@ services:
     ports:
       - "6125:8085"
     depends_on:
-      mysql:
+      postgresql:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -373,11 +418,11 @@ services:
       SERVER_PORT: 8086
       NACOS_SERVER_ADDR: nacos:8848
       REDIS_HOST: redis
-      MYSQL_HOST: mysql
-      MYSQL_PORT: 3306
-      MYSQL_DATABASE_ADMIN: traceqa_admin
-      MYSQL_USER: ${MYSQL_USER:-traceqa}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traceqa123}
+      PG_HOST: postgresql
+      PG_PORT: 5432
+      PG_DATABASE_ADMIN: traceqa_admin
+      PG_USER: ${PG_USER:-traceqa}
+      PG_PASSWORD: ${PG_PASSWORD:-traceqa123}
       LIGHTRAG_BASE_URL: http://lightrag:9621
       LIGHTRAG_API_KEY: ""
       APP_OBSERVABILITY_SCRAPE_TOKEN: ${OBSERVABILITY_SCRAPE_TOKEN:-traceqa-prometheus-scrape-change-me}
@@ -397,7 +442,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
-      mysql:
+      postgresql:
         condition: service_healthy
       nacos:
         condition: service_healthy
@@ -545,7 +590,8 @@ services:
       - "6132:3100"
 
 volumes:
-  traceqa-mysql-data:
+  traceqa-pg-data:
+  traceqa-neo4j-data:
   traceqa-redis-data:
   traceqa-lightrag-data:
   traceqa-minio-data:

@@ -38,9 +38,9 @@ public class ChatMessage extends BaseEntity {
     private String thinkingTrace;
 
     /**
-     * 引用来源 JSON 数组（references 为 MySQL 保留字需反引号包裹）
+     * 引用来源 JSON 数组（references 为 PostgreSQL 保留字需双引号包裹）
      */
-    @TableField("`references`")
+    @TableField("\"references\"")
     private String references;
 
     /**

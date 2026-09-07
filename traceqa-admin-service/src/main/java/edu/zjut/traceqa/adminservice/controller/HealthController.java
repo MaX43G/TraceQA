@@ -20,7 +20,7 @@ import java.util.Objects;
  * 健康检查接口。
  *
  * <p>供 docker-compose 健康检查与运维探测使用，无需鉴权。
- * 聚合返回 Redis、MySQL、LightRAG 与文档解析队列状态。</p>
+ * 聚合返回 Redis、PostgreSQL、LightRAG 与文档解析队列状态。</p>
  */
 @Tag(name = "健康检查", description = "系统健康检查（公开）")
 @RestController
@@ -46,7 +46,7 @@ public class HealthController {
         data.put("status", "UP");
         data.put("service", "traceqa");
         data.put("redis", redisStatus());
-        data.put("mysql", mysqlStatus());
+        data.put("postgresql", postgresqlStatus());
         data.put("lightrag", lightRagClient.ping() ? "UP" : "DOWN");
         data.put("queue", queueStats());
         return ApiResponse.ok(data);
@@ -61,7 +61,7 @@ public class HealthController {
         }
     }
 
-    private String mysqlStatus() {
+    private String postgresqlStatus() {
         try {
             announcementMapper.selectCount(null);
             return "UP";

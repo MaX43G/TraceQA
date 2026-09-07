@@ -232,8 +232,8 @@
             </dependency>
             <dependency>
                 <groupId>org.flywaydb</groupId>
-                <artifactId>flyway-mysql</artifactId>
-                <version>11.8.0</version>
+                <artifactId>flyway-database-postgresql</artifactId>
+                <version>13.5.0</version>
             </dependency>
             <!-- Resilience4j 熔断 -->
             <dependency>

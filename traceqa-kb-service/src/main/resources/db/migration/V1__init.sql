@@ -7,10 +7,10 @@ CREATE TABLE IF NOT EXISTS t_knowledge_base
     name        VARCHAR(128) NOT NULL,
     description VARCHAR(512) DEFAULT '',
     course      VARCHAR(128) DEFAULT '',
-    status      TINYINT      DEFAULT 1,
-    create_time DATETIME     DEFAULT CURRENT_TIMESTAMP,
-    update_time DATETIME     DEFAULT CURRENT_TIMESTAMP,
-    deleted     TINYINT      DEFAULT 0
+    status      SMALLINT     DEFAULT 1,
+    create_time TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    deleted     SMALLINT     DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS t_document
@@ -30,9 +30,9 @@ CREATE TABLE IF NOT EXISTS t_document
     entity_count      INT          DEFAULT 0,
     relation_count    INT          DEFAULT 0,
     error_msg         VARCHAR(512) DEFAULT '',
-    create_time       DATETIME     DEFAULT CURRENT_TIMESTAMP,
-    update_time       DATETIME     DEFAULT CURRENT_TIMESTAMP,
-    deleted           TINYINT      DEFAULT 0
+    create_time       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    update_time       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    deleted           SMALLINT     DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_doc_kb ON t_document (knowledge_base_id);

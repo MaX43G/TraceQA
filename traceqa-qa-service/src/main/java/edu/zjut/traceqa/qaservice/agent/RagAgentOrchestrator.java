@@ -28,6 +28,7 @@ import reactor.core.publisher.Flux;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -114,6 +115,24 @@ public class RagAgentOrchestrator {
                 answer = generateAnswer(emitter, thinking, request.getContent(), history, result, modelConfig, cancelled);
             }
 
+            // 系统参数节点
+            long totalMs = System.currentTimeMillis() - start;
+            String modelUsed = modelConfig != null && modelConfig.getModel() != null
+                    ? modelConfig.getModel() : "未指定";
+            String strategy = isDirectAnswer(intent) ? "直接应答" : "检索增强生成（RAG）";
+            ThinkingNodeVO paramsNode = startThinking(thinking, "系统参数", "system-agent", "查询链路参数汇总");
+            ssePublisher.send(emitter, "thinking", paramsNode);
+            paramsNode.setData(Map.of(
+                    "model", modelUsed,
+                    "strategy", strategy,
+                    "intent", intent.name(),
+                    "totalLatencyMs", totalMs,
+                    "retrievalConfig", Map.of(
+                            "enableReread", retrievalService.isRereadEnabled(),
+                            "enableRerank", retrievalService.isRerankEnabled(),
+                            "knowledgeBaseId", request.getKnowledgeBaseId())));
+            finishThinking(thinking, emitter, "系统参数", "模型：" + modelUsed + " | 策略：" + strategy + " | 总耗时：" + totalMs + "ms");
+
             persistAndFinish(session, thinking, references, answer, start, emitter);
             ssePublisher.complete(emitter);
         } catch (Exception e) {
@@ -166,10 +185,12 @@ public class RagAgentOrchestrator {
         IntentType intent;
         if (cached.isPresent()) {
             intent = cached.get();
+            node.setData(Map.of("intent", intent.name(), "intentLabel", intent.getLabel(), "cached", true));
             finishThinking(thinking, emitter, "意图识别", "识别结果：" + intent.getLabel() + "（缓存命中）");
         } else {
             intent = intentAgent.identify(content, history, config);
             redisCacheService.put(cacheKey, intent, Duration.ofMinutes(30));
+            node.setData(Map.of("intent", intent.name(), "intentLabel", intent.getLabel(), "cached", false));
             finishThinking(thinking, emitter, "意图识别", "识别结果：" + intent.getLabel());
         }
         return intent;
@@ -191,6 +212,7 @@ public class RagAgentOrchestrator {
             case SIMPLE -> "简单问题 → 仅向量检索";
             case COMPLEX -> "复杂问题 → 聚合链路（图谱 + 向量 + 关键词）";
         };
+        routerNode.setData(Map.of("strategy", type.name(), "pathLabel", pathLabel));
         finishThinking(thinking, emitter, "检索策略调度", pathLabel);
 
         if (type == RetrievalService.QueryType.DEFINITION) {
@@ -225,6 +247,10 @@ public class RagAgentOrchestrator {
                 && !enhanced.getSubqueries().isEmpty()) {
             enhanceDetail += String.format("（分解 %d 个子问题）", enhanced.getSubqueries().size());
         }
+        enhanceNode.setData(Map.of(
+                "rewritten", enhanced.getRewritten(),
+                "hyde", enhanced.getHyde(),
+                "subqueries", enhanced.getSubqueries() == null ? List.of() : enhanced.getSubqueries()));
         finishThinking(thinking, emitter, "查询重写与 HyDE", enhanceDetail);
 
         CompletableFuture<List<RetrievedChunk>> graphFuture = CompletableFuture.supplyAsync(() -> {
@@ -232,6 +258,7 @@ public class RagAgentOrchestrator {
             ssePublisher.send(emitter, "thinking", gNode);
             List<RetrievedChunk> chunks = retrievalService.queryGraph(content,
                     progress -> pushProgress(emitter, gNode, cancelled, progress));
+            gNode.setData(Map.of("hits", chunks.size(), "sources", filePaths(chunks)));
             finishThinking(thinking, emitter, "图谱检索", "图谱命中 " + chunks.size() + " 条");
             return chunks;
         });
@@ -249,6 +276,15 @@ public class RagAgentOrchestrator {
         ThinkingNodeVO fuseNode = startThinking(thinking, "结果融合", "fusion-agent", "正在融合三路检索结果");
         ssePublisher.send(emitter, "thinking", fuseNode);
         List<RetrievedChunk> fused = retrievalService.fuse(List.of(graphChunks, vectorChunks, keywordChunks));
+        fuseNode.setData(Map.of(
+                "graphCount", graphChunks.size(),
+                "vectorCount", vectorChunks.size(),
+                "keywordCount", keywordChunks.size(),
+                "fusedCount", fused.size(),
+                "graphSources", filePaths(graphChunks),
+                "vectorSources", filePaths(vectorChunks),
+                "keywordSources", filePaths(keywordChunks),
+                "fusedSources", filePaths(fused)));
         finishThinking(thinking, emitter, "结果融合", "融合后共 " + fused.size() + " 条");
 
         // 2) 二次检索补全（可选，默认关闭）
@@ -305,6 +341,7 @@ public class RagAgentOrchestrator {
         ssePublisher.send(emitter, "thinking", vectorNode);
         List<RetrievedChunk> chunks = retrievalService.queryVector(content, enhanced,
                 progress -> pushProgress(emitter, vectorNode, cancelled, progress));
+        vectorNode.setData(Map.of("hits", chunks.size(), "sources", filePaths(chunks)));
         finishThinking(thinking, emitter, "向量检索", "向量命中 " + chunks.size() + " 条");
         return chunks;
     }
@@ -318,6 +355,7 @@ public class RagAgentOrchestrator {
         ssePublisher.send(emitter, "thinking", kwNode);
         List<RetrievedChunk> chunks = retrievalService.queryKeyword(content, config,
                 progress -> pushProgress(emitter, kwNode, cancelled, progress));
+        kwNode.setData(Map.of("hits", chunks.size(), "sources", filePaths(chunks)));
         finishThinking(thinking, emitter, "关键词检索", "关键词命中 " + chunks.size() + " 条");
         return chunks;
     }
@@ -365,7 +403,9 @@ public class RagAgentOrchestrator {
             answer = degradedAnswer(result);
             ssePublisher.send(emitter, "delta", Map.of("content", answer));
         }
-        finishThinking(thinking, emitter, "总结生成", "回答生成完毕");
+        String modelName = config != null && config.getModel() != null ? config.getModel() : "平台默认";
+        node.setData(Map.of("model", modelName, "promptLength", prompt.length()));
+        finishThinking(thinking, emitter, "总结生成", "回答生成完毕（模型：" + modelName + "）");
         return answer;
     }
 
@@ -520,6 +560,23 @@ public class RagAgentOrchestrator {
     }
 
     /**
+     * 提取片段列表中不重复的文件路径（最多 max 条）
+     */
+    private List<String> filePaths(List<RetrievedChunk> chunks) {
+        if (chunks == null || chunks.isEmpty()) {
+            return List.of();
+        }
+        LinkedHashSet<String> seen = new LinkedHashSet<>();
+        for (RetrievedChunk c : chunks) {
+            if (c.getFilePath() != null && !c.getFilePath().isBlank()) {
+                seen.add(extractFilename(c.getFilePath()));
+                if (seen.size() >= 20) break;
+            }
+        }
+        return List.copyOf(seen);
+    }
+
+    /**
      * 判断是否为无需检索的直接应答意图
      */
     private boolean isDirectAnswer(IntentType intent) {
@@ -532,6 +589,7 @@ public class RagAgentOrchestrator {
     private ThinkingNodeVO startThinking(List<ThinkingNodeVO> thinking, String stage,
                                          String agent, String message) {
         ThinkingNodeVO node = new ThinkingNodeVO(stage, agent, "running", message, null);
+        node.setStartMillis(System.currentTimeMillis());
         synchronized (thinkingLock) {
             thinking.add(node);
         }
@@ -546,10 +604,10 @@ public class RagAgentOrchestrator {
             for (int i = thinking.size() - 1; i >= 0; i--) {
                 ThinkingNodeVO node = thinking.get(i);
                 if (node.getStage().equals(stage) && "running".equals(node.getStatus())) {
-                    ThinkingNodeVO done = new ThinkingNodeVO(node.getStage(), node.getAgent(),
-                            "done", node.getMessage(), detail);
-                    thinking.set(i, done);
-                    ssePublisher.send(emitter, "thinking", done);
+                    node.setStatus("done");
+                    node.setDetail(detail);
+                    node.setCostMs(System.currentTimeMillis() - node.getStartMillis());
+                    ssePublisher.send(emitter, "thinking", node);
                     return;
                 }
             }
@@ -564,8 +622,9 @@ public class RagAgentOrchestrator {
             for (int i = thinking.size() - 1; i >= 0; i--) {
                 ThinkingNodeVO node = thinking.get(i);
                 if ("running".equals(node.getStatus())) {
-                    thinking.set(i, new ThinkingNodeVO(node.getStage(), node.getAgent(), "failed",
-                            node.getMessage(), "执行失败，已降级"));
+                    node.setStatus("failed");
+                    node.setDetail("执行失败，已降级");
+                    node.setCostMs(System.currentTimeMillis() - node.getStartMillis());
                     break;
                 }
             }

@@ -40,10 +40,10 @@ spring:
     # 已有表但无历史表时，将其作为基线（跳过已存在的 V1，不重复建表）
     baseline-on-migrate: true
   datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE_KB:traceqa_kb}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: ${MYSQL_USER:root}
-    password: ${MYSQL_PASSWORD:123456}
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${PG_HOST:localhost}:${PG_PORT:5432}/${PG_DATABASE_KB:traceqa_kb}?currentSchema=public
+    username: ${PG_USER:traceqa}
+    password: ${PG_PASSWORD:traceqa123}
 
 # MyBatis-Plus
 mybatis-plus:
