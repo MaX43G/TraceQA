@@ -250,10 +250,6 @@ defineExpose({clear})
   padding: 0 2px;
 }
 
-.chat-input__toggles :deep(.ant-switch) {
-  font-size: 11px;
-}
-
 .chat-input__footer {
   display: flex;
   align-items: center;

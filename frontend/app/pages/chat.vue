@@ -331,13 +331,13 @@ async function handleSend(content: string, toggles?: { vector: boolean; graph: b
             }
           }
         },
-        onDone: () => {
+        onDone: async () => {
           streamMsg.streaming = false
           streamMsg.content = streamMsg.buffer
           // 回答已完成即解除输入锁定（onEnd 可能因 SSE 连接未及时关闭而不触发）
           chat.generating = false
-          // 猜你想问：AI 解读当前问答，推荐可能追问的问题（异步获取，失败静默）
-          loadFollowup(content, streamMsg)
+          // 猜你想问：AI 解读当前问答，推荐可能追问的问题
+          await loadFollowup(content, streamMsg)
         },
         onError: (err) => {
           streamMsg.streaming = false
@@ -349,9 +349,18 @@ async function handleSend(content: string, toggles?: { vector: boolean; graph: b
         onEnd: async () => {
           chat.generating = false
           inputRef.value?.clear()
+          // 保留 followup
+          const followup = streamMsg.followup
           await chat.loadSessions()
           if (chat.currentSessionId) {
             await chat.openSession(chat.currentSessionId)
+          }
+          // 将 followup 恢复到最后一条助手消息
+          if (followup?.length) {
+            const lastAssistant = [...chat.messages].reverse().find(m => m.role === 'ASSISTANT')
+            if (lastAssistant) {
+              (lastAssistant as any).followup = followup
+            }
           }
         }
       }

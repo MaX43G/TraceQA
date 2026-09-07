@@ -262,11 +262,11 @@ public class RagAgentOrchestrator {
                     finishThinking(thinking, emitter, "图谱检索", "图谱命中 " + chunks.size() + " 条");
                     return chunks;
                 })
-                : CompletableFuture.completedFuture(List.<RetrievedChunk>of());
+                : CompletableFuture.completedFuture(List.of());
         CompletableFuture<List<RetrievedChunk>> vectorFuture = request.isVectorEnabled()
                 ? CompletableFuture.supplyAsync(
                         () -> runVector(emitter, thinking, content, enhanced, cancelled))
-                : CompletableFuture.completedFuture(List.<RetrievedChunk>of());
+                : CompletableFuture.completedFuture(List.of());
         List<RetrievedChunk> graphChunks = graphFuture.join();
         List<RetrievedChunk> vectorChunks = vectorFuture.join();
 
