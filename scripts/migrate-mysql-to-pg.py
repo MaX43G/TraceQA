@@ -170,15 +170,16 @@ def migrate_table(mysql_conn, pg_conn, table_name):
         print(f"  {table_name}: 0 行（跳过）")
         return 0
 
-    # 2. 获取列名
-    columns = [desc[0] for desc in mysql_cur.description]
+    # 2. 获取列名（DictCursor 返回字典，取 key 顺序）
+    columns = list(rows[0].keys()) if rows else []
     pg_columns = [quote_column(c) for c in columns]
 
-    # 3. 转换数据类型
+    # 3. 转换数据类型（取字典的 values，保持列顺序）
     converted_rows = []
     for row in rows:
         converted = []
-        for val in row:
+        for col in columns:
+            val = row[col]
             if isinstance(val, bytes):
                 val = val.decode("utf-8", errors="replace")
             converted.append(val)
