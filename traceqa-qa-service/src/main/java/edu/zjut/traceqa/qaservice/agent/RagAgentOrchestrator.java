@@ -122,21 +122,25 @@ public class RagAgentOrchestrator {
                     ? modelConfig.getModel() : "未指定";
             String strategy = isDirectAnswer(intent) ? "直接应答" : "检索增强生成（RAG）";
             ThinkingNodeVO paramsNode = startThinking(thinking, "系统参数", "system-agent", "查询链路参数汇总");
-            paramsNode.setData(Map.of(
-                    "model", modelUsed,
-                    "strategy", strategy,
-                    "intent", intent.name(),
-                    "totalLatencyMs", totalMs,
-                    "retrievalConfig", Map.of(
-                            "enableReread", retrievalService.isRereadEnabled(),
-                            "enableRerank", retrievalService.isRerankEnabled(),
-                            "knowledgeBaseId", request.getKnowledgeBaseId())));
+            Map<String, Object> paramsData = new LinkedHashMap<>();
+            paramsData.put("model", modelUsed);
+            paramsData.put("strategy", strategy);
+            paramsData.put("intent", intent.name());
+            paramsData.put("totalLatencyMs", totalMs);
+            Map<String, Object> retrievalCfg = new LinkedHashMap<>();
+            retrievalCfg.put("enableReread", retrievalService.isRereadEnabled());
+            retrievalCfg.put("enableRerank", retrievalService.isRerankEnabled());
+            if (request.getKnowledgeBaseId() != null) {
+                retrievalCfg.put("knowledgeBaseId", request.getKnowledgeBaseId());
+            }
+            paramsData.put("retrievalConfig", retrievalCfg);
+            paramsNode.setData(paramsData);
             finishThinking(thinking, emitter, "系统参数", "模型：" + modelUsed + " | 策略：" + strategy + " | 总耗时：" + totalMs + "ms");
 
             persistAndFinish(session, thinking, references, answer, start, emitter);
             ssePublisher.complete(emitter);
         } catch (Exception e) {
-            log.error("Agent 编排异常，整体降级：{}", e.getMessage());
+            log.error("Agent 编排异常，整体降级：{}", e.getMessage(), e);
             markThinkingFailed(thinking);
             ssePublisher.completeWithError(emitter, Map.of(
                     "code", ErrorCode.LLM_UNAVAILABLE.getCode(),
@@ -248,8 +252,8 @@ public class RagAgentOrchestrator {
             enhanceDetail += String.format("（分解 %d 个子问题）", enhanced.getSubqueries().size());
         }
         enhanceNode.setData(Map.of(
-                "rewritten", enhanced.getRewritten(),
-                "hyde", enhanced.getHyde(),
+                "rewritten", enhanced.getRewritten() == null ? "" : enhanced.getRewritten(),
+                "hyde", enhanced.getHyde() == null ? "" : enhanced.getHyde(),
                 "subqueries", enhanced.getSubqueries() == null ? List.of() : enhanced.getSubqueries()));
         finishThinking(thinking, emitter, "查询重写与 HyDE", enhanceDetail);
 
