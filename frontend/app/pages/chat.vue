@@ -262,6 +262,7 @@ async function handleSend(content: string): Promise<void> {
     createTime: new Date().toISOString(),
     streaming: true,
     buffer: '',
+    reasoningBuffer: '',
     stats: undefined as RetrievalStats | undefined
   }) as StreamMessage
   chat.messages.push(streamMsg)
@@ -283,6 +284,9 @@ async function handleSend(content: string): Promise<void> {
         },
         onDelta: (chunk) => {
           streamMsg.buffer += chunk
+        },
+        onReasoning: (chunk) => {
+          streamMsg.reasoningBuffer += chunk
         },
         onReferences: (references) => {
           streamMsg.references = references

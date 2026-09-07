@@ -20,6 +20,8 @@ export interface StreamMessage extends ChatMessageVO {
     streaming: boolean
     /** 内容增量缓冲 */
     buffer: string
+    /** 推理过程增量缓冲（DeepSeek R1 等推理模型的思考链） */
+    reasoningBuffer: string
     /** 检索分析数据（SSE stats 事件） */
     stats?: {
         graphHits?: number;

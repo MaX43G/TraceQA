@@ -18,6 +18,18 @@
       <template v-else>
         <ThinkingTracePanel v-if="hasThinking" :nodes="msg.thinkingTrace ?? []"/>
         <RetrievalStatsPanel v-if="msg.stats" :stats="msg.stats"/>
+        <div v-if="reasoningContent" class="chat-msg__reasoning">
+          <a-collapse ghost>
+            <a-collapse-panel key="reasoning" :show-arrow="true">
+              <template #header>
+                <span class="chat-msg__reasoning-label">
+                  <ThunderboltOutlined /> 推理过程（{{ reasoningContent.length }} 字）
+                </span>
+              </template>
+              <div class="chat-msg__reasoning-content">{{ reasoningContent }}</div>
+            </a-collapse-panel>
+          </a-collapse>
+        </div>
         <div class="chat-msg__ai-bubble">
           <MarkdownViewer :content="displayContent" :typing="props.streaming" @cite-click="handleCite"/>
           <div v-if="props.streaming" class="chat-msg__streaming">正在生成…</div>
@@ -79,7 +91,7 @@
  * <p>用户消息右侧气泡；AI 消息包含「思考折叠面板 + Markdown 打字机 +
  * 引用溯源角标 + 复制/删除操作」。</p>
  */
-import {CopyOutlined, DeleteOutlined, SoundOutlined} from '@ant-design/icons-vue'
+import {CopyOutlined, DeleteOutlined, SoundOutlined, ThunderboltOutlined} from '@ant-design/icons-vue'
 import {message} from 'ant-design-vue'
 import MarkdownViewer from './MarkdownViewer.vue'
 import ThinkingTracePanel from './ThinkingTracePanel.vue'
@@ -94,6 +106,7 @@ const props = defineProps<{
   msg: ChatMessageVO & {
     streaming?: boolean
     buffer?: string
+    reasoningBuffer?: string
     stats?: RetrievalStats
     followup?: string[]
   }
@@ -121,6 +134,11 @@ const avatarStyle = computed<Record<string, string>>(() =>
 
 /** 是否存在思考链路 */
 const hasThinking = computed<boolean>(() => (props.msg.thinkingTrace?.length ?? 0) > 0)
+
+/** 推理过程内容（流式阶段取 reasoningBuffer，持久化后为空——DeepSeek R1 推理 token 不入库） */
+const reasoningContent = computed<string>(() =>
+    props.streaming ? props.msg.reasoningBuffer ?? '' : ''
+)
 
 /** 是否存在引用来源 */
 const hasReferences = computed<boolean>(() => (props.msg.references?.length ?? 0) > 0)
@@ -289,6 +307,32 @@ function toggleSpeak(): void {
   padding: 12px 16px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
   border: 1px solid #f0f0f0;
+}
+
+.chat-msg__reasoning {
+  margin-bottom: 6px;
+  border: 1px solid #e6f7ff;
+  border-radius: 8px;
+  background: #f6ffed;
+}
+
+.chat-msg__reasoning-label {
+  font-size: 12px;
+  color: #52c41a;
+  font-weight: 500;
+}
+
+.chat-msg__reasoning-content {
+  font-size: 12px;
+  color: #4e5969;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 4px 8px;
+  background: #f9fdf6;
+  border-radius: 4px;
 }
 
 .chat-msg__streaming {

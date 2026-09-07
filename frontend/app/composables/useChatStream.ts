@@ -14,6 +14,8 @@ export interface ChatStreamHandlers {
     onThinking?: (node: ThinkingNodeVO) => void
     /** 内容增量 */
     onDelta?: (content: string) => void
+    /** 推理过程增量（DeepSeek R1 等推理模型的思考链） */
+    onReasoning?: (content: string) => void
     /** 引用来源 */
     onReferences?: (references: ReferenceVO[]) => void
     /** 检索分析（三路命中数 / 来源文档分布 / 耗时） */
@@ -150,6 +152,13 @@ function dispatchBlock(block: string, handlers: ChatStreamHandlers): void {
             const p = payload as { content?: string }
             if (p && p.content) {
                 handlers.onDelta?.(p.content)
+            }
+            break
+        }
+        case 'reasoning': {
+            const p = payload as { content?: string }
+            if (p && p.content) {
+                handlers.onReasoning?.(p.content)
             }
             break
         }

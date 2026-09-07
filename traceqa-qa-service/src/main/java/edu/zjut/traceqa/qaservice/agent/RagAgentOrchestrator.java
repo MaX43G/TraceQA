@@ -15,6 +15,7 @@ import edu.zjut.traceqa.common.model.vo.ThinkingNodeVO;
 import edu.zjut.traceqa.qaservice.retrieval.RetrievalService;
 import edu.zjut.traceqa.qaservice.service.ChatService;
 import edu.zjut.traceqa.qaservice.service.LlmService;
+import edu.zjut.traceqa.qaservice.service.OpenAiCompatClient;
 import edu.zjut.traceqa.qaservice.service.RedisCacheService;
 import edu.zjut.traceqa.qaservice.sse.SsePublisher;
 import jakarta.annotation.Resource;
@@ -121,7 +122,6 @@ public class RagAgentOrchestrator {
                     ? modelConfig.getModel() : "未指定";
             String strategy = isDirectAnswer(intent) ? "直接应答" : "检索增强生成（RAG）";
             ThinkingNodeVO paramsNode = startThinking(thinking, "系统参数", "system-agent", "查询链路参数汇总");
-            ssePublisher.send(emitter, "thinking", paramsNode);
             paramsNode.setData(Map.of(
                     "model", modelUsed,
                     "strategy", strategy,
@@ -416,7 +416,7 @@ public class RagAgentOrchestrator {
                                  LlmConfig config, AtomicBoolean cancelled) {
         ThinkingNodeVO node = startThinking(thinking, "直接应答", "answer-agent", "无需检索，直接应答");
         ssePublisher.send(emitter, "thinking", node);
-        String answer = consume(emitter, llmService.callStream("chat", content, config), cancelled);
+        String answer = consumeWithReasoning(emitter, llmService.callStreamWithReasoning("chat", content, config), cancelled);
         if (answer.isBlank()) {
             answer = "您好！我是「溯知」，可以为你解答《数据挖掘》课程相关问题，"
                     + "也可以询问平台的使用方式。请描述你的问题。";
@@ -428,9 +428,9 @@ public class RagAgentOrchestrator {
 
     private String streamAnswer(SseEmitter emitter, String prompt, LlmConfig config, AtomicBoolean cancelled) {
         StringBuilder acc = new StringBuilder();
-        acc.append(consume(emitter, answerAgent.streamAnswer(prompt, config), cancelled));
+        acc.append(consumeWithReasoning(emitter, llmService.callStreamWithReasoning("summary", prompt, config), cancelled));
         if (acc.isEmpty()) {
-            acc.append(consume(emitter, llmService.callStream("summary", prompt, config), cancelled));
+            acc.append(consume(emitter, answerAgent.streamAnswer(prompt, config), cancelled));
         }
         return acc.toString();
     }
@@ -443,6 +443,24 @@ public class RagAgentOrchestrator {
         flux.takeWhile(_ -> !cancelled.get()).toIterable().forEach(chunk -> {
             acc.append(chunk);
             ssePublisher.send(emitter, "delta", Map.of("content", chunk));
+        });
+        return acc.toString();
+    }
+
+    /**
+     * 消费含推理过程的内容块流：content → delta 事件，reasoning_content → reasoning 事件
+     */
+    private String consumeWithReasoning(SseEmitter emitter, Flux<OpenAiCompatClient.DeltaChunk> flux,
+                                        AtomicBoolean cancelled) {
+        StringBuilder acc = new StringBuilder();
+        flux.takeWhile(_ -> !cancelled.get()).toIterable().forEach(chunk -> {
+            if (!chunk.reasoningContent().isEmpty()) {
+                ssePublisher.send(emitter, "reasoning", Map.of("content", chunk.reasoningContent()));
+            }
+            if (!chunk.content().isEmpty()) {
+                acc.append(chunk.content());
+                ssePublisher.send(emitter, "delta", Map.of("content", chunk.content()));
+            }
         });
         return acc.toString();
     }
@@ -461,13 +479,31 @@ public class RagAgentOrchestrator {
                     "title", session.getTitle()));
             return;
         }
-        ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer,
-                thinking, references, latency);
-        ssePublisher.send(emitter, "done", Map.of(
-                "sessionId", session.getId(),
-                "messageId", assistant.getId(),
-                "title", session.getTitle()));
-        log.info("问答完成：session={}, latency={}ms", session.getId(), latency);
+        try {
+            ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer,
+                    thinking, references, latency);
+            ssePublisher.send(emitter, "done", Map.of(
+                    "sessionId", session.getId(),
+                    "messageId", assistant.getId(),
+                    "title", session.getTitle()));
+            log.info("问答完成：session={}, latency={}ms", session.getId(), latency);
+        } catch (Exception e) {
+            log.warn("持久化消息失败（thinking trace 序列化异常？），降级保存：{}", e.getMessage());
+            try {
+                ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer,
+                        List.of(), references, latency);
+                ssePublisher.send(emitter, "done", Map.of(
+                        "sessionId", session.getId(),
+                        "messageId", assistant.getId(),
+                        "title", session.getTitle()));
+                log.info("问答完成（降级保存，thinking trace 已丢弃）：session={}", session.getId());
+            } catch (Exception ex) {
+                log.error("降级保存也失败：{}", ex.getMessage());
+                ssePublisher.send(emitter, "done", Map.of(
+                        "sessionId", session.getId(),
+                        "title", session.getTitle()));
+            }
+        }
     }
 
     /**

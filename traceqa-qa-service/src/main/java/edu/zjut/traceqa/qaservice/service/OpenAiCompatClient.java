@@ -90,6 +90,30 @@ public class OpenAiCompatClient {
         return Map.of("model", config.getModel(), "messages", messages, "stream", stream);
     }
 
+    /**
+     * 流式调用（含推理过程），返回内容增量 + 推理增量
+     */
+    public Flux<DeltaChunk> streamWithReasoning(LlmConfig config, String systemPrompt, String userContent) {
+        try {
+            return webClient.post()
+                    .uri(resolveUri(config) + "/chat/completions")
+                    .header("Authorization", "Bearer " + config.getApiKey())
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "text/event-stream")
+                    .bodyValue(buildRequest(config, systemPrompt, userContent, true))
+                    .retrieve()
+                    .bodyToFlux(String.class)
+                    .concatMap(chunk -> Flux.fromIterable(parseSseWithReasoning(chunk)))
+                    .onErrorResume(e -> {
+                        log.debug("OpenAI 兼容流式调用失败：{}", e.getMessage());
+                        return Flux.empty();
+                    });
+        } catch (Exception e) {
+            log.debug("OpenAI 兼容流式调用异常：{}", e.getMessage());
+            return Flux.empty();
+        }
+    }
+
     private List<String> parseSse(String line) {
         if (line == null || line.isBlank()) {
             return List.of();
@@ -104,7 +128,7 @@ public class OpenAiCompatClient {
                 continue;
             }
             try {
-                String content = extractDelta(data);
+                String content = extractContentDelta(data);
                 if (content != null && !content.isEmpty()) {
                     result.add(content);
                 }
@@ -114,7 +138,31 @@ public class OpenAiCompatClient {
         return result;
     }
 
-    private String extractDelta(String json) {
+    private List<DeltaChunk> parseSseWithReasoning(String line) {
+        if (line == null || line.isBlank()) {
+            return List.of();
+        }
+        List<DeltaChunk> result = new ArrayList<>();
+        for (String part : line.split("\n")) {
+            String data = part.trim();
+            if (data.startsWith("data:")) {
+                data = data.substring(5).trim();
+            }
+            if (data.isEmpty() || "[DONE]".equals(data)) {
+                continue;
+            }
+            try {
+                DeltaChunk chunk = extractDeltaChunk(data);
+                if (chunk != null && (!chunk.content().isEmpty() || !chunk.reasoningContent().isEmpty())) {
+                    result.add(chunk);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return result;
+    }
+
+    private String extractContentDelta(String json) {
         try {
             var node = objectMapper.readTree(json);
             var choice = node.path("choices").path(0);
@@ -122,6 +170,25 @@ public class OpenAiCompatClient {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private DeltaChunk extractDeltaChunk(String json) {
+        try {
+            var node = objectMapper.readTree(json);
+            var choice = node.path("choices").path(0);
+            var delta = choice.path("delta");
+            String content = delta.path("content").asString("");
+            String reasoning = delta.path("reasoning_content").asString("");
+            return new DeltaChunk(content, reasoning);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 流式增量块（含 content + reasoning_content）
+     */
+    public record DeltaChunk(String content, String reasoningContent) {
     }
 
     private String extractContent(String body) {

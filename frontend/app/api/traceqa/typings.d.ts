@@ -369,6 +369,8 @@ declare namespace API {
         status?: string;
         message?: string;
         detail?: string;
+        costMs?: number;
+        data?: Record<string, unknown>;
     };
 
     type togglePinParams = {

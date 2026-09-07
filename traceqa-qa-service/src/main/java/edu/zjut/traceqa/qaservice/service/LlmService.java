@@ -68,6 +68,40 @@ public class LlmService {
     }
 
     /**
+     * 流式调用（含推理过程）。
+     *
+     * @param scenario    提示词场景
+     * @param userContent 用户内容
+     * @param config      自定义 LLM 配置（可为空）
+     * @return 内容增量流（content + reasoning_content）
+     */
+    public Flux<OpenAiCompatClient.DeltaChunk> callStreamWithReasoning(String scenario, String userContent, LlmConfig config) {
+        if (!circuitBreakerService.allowRequest()) {
+            log.debug("LLM 熔断打开，拒绝流式请求");
+            return Flux.empty();
+        }
+        try {
+            String systemPrompt = resolveSystemPrompt(scenario);
+            if (config != null && config.isValid()) {
+                return openAiCompatClient.streamWithReasoning(config, systemPrompt, userContent)
+                        .doOnError(_ -> circuitBreakerService.recordFailure())
+                        .doOnComplete(circuitBreakerService::recordSuccess)
+                        .onErrorResume(_ -> Flux.empty());
+            }
+            // 默认模型不支持 reasoning_content，用普通流式包装
+            return buildPrompt(systemPrompt).user(userContent).stream().content()
+                    .filter(c -> !c.isEmpty())
+                    .map(c -> new OpenAiCompatClient.DeltaChunk(c, ""))
+                    .doOnError(_ -> circuitBreakerService.recordFailure())
+                    .doOnComplete(circuitBreakerService::recordSuccess)
+                    .onErrorResume(_ -> Flux.empty());
+        } catch (Exception e) {
+            log.debug("LLM 流式调用异常：{}", e.getMessage());
+            return Flux.empty();
+        }
+    }
+
+    /**
      * 流式调用。
      *
      * @param scenario    提示词场景
