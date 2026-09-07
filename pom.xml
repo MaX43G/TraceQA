@@ -224,6 +224,14 @@
                 <artifactId>logstash-logback-encoder</artifactId>
                 <version>8.0</version>
             </dependency>
+            <!-- OpenTelemetry BOM（分布式追踪 + 指标导出） -->
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-bom</artifactId>
+                <version>1.48.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <!-- Flyway 数据库迁移 -->
             <dependency>
                 <groupId>org.flywaydb</groupId>

@@ -178,10 +178,9 @@ function formatKey(key: string): string {
   const map: Record<string, string> = {
     model: '模型',
     strategy: '策略',
-    intent: '意图',
     intentLabel: '意图',
     cached: '缓存命中',
-    totalLatencyMs: '总耗时',
+    totalLatencyMs: '总耗时(ms)',
     retrievalConfig: '检索配置',
     enableReread: '启用二次检索',
     enableRerank: '启用精排',

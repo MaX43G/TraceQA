@@ -9,6 +9,7 @@ import edu.zjut.traceqa.common.model.vo.ChatMessageVO;
 import edu.zjut.traceqa.common.model.vo.SessionVO;
 import edu.zjut.traceqa.common.util.JsonUtils;
 import edu.zjut.traceqa.qaservice.agent.RagAgentOrchestrator;
+import edu.zjut.traceqa.qaservice.sse.SsePublisher;
 import edu.zjut.traceqa.qaservice.service.ChatService;
 import edu.zjut.traceqa.qaservice.service.LlmService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -53,6 +54,8 @@ public class ChatController {
     private LlmService llmService;
     @Resource
     private JsonUtils jsonUtils;
+    @Resource
+    private SsePublisher ssePublisher;
 
     /**
      * 流式对话（SSE：thinking/delta/references/done/error 事件）
@@ -62,6 +65,7 @@ public class ChatController {
     public SseEmitter stream(@Valid @RequestBody ChatStreamRequest request) {
         Long userId = UserContext.getUserId();
         SseEmitter emitter = new SseEmitter(0L);
+        ssePublisher.trackConnection(emitter);
         AtomicBoolean cancelled = new AtomicBoolean(false);
         emitter.onCompletion(() -> {
             cancelled.set(true);

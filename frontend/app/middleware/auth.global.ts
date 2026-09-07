@@ -40,6 +40,12 @@ export default defineNuxtRouteMiddleware(async (to) => {
         return navigateTo('/login')
     }
 
+    // fetchMe 未抛异常但 userInfo 为空（token 过期/后端无法解析用户），视为未登录
+    if (!auth.userInfo) {
+        auth.logout()
+        return navigateTo('/login')
+    }
+
     // 管理后台：非管理员跳回首页
     if (to.path.startsWith('/admin') && !auth.isAdmin) {
         return navigateTo('/')

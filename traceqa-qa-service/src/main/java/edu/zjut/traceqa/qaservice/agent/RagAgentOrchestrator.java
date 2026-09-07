@@ -18,6 +18,7 @@ import edu.zjut.traceqa.qaservice.service.LlmService;
 import edu.zjut.traceqa.qaservice.service.OpenAiCompatClient;
 import edu.zjut.traceqa.qaservice.service.RedisCacheService;
 import edu.zjut.traceqa.qaservice.sse.SsePublisher;
+import edu.zjut.traceqa.qaservice.metrics.RagMetrics;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,6 +71,8 @@ public class RagAgentOrchestrator {
     private SsePublisher ssePublisher;
     @Resource
     private RedisCacheService redisCacheService;
+    @Resource
+    private RagMetrics ragMetrics;
 
     /**
      * 并行检索时保护 thinking 节点列表与 SSE 进度推送的锁
@@ -115,20 +118,6 @@ public class RagAgentOrchestrator {
                 references = emitReferences(emitter, result, highlight);
                 answer = generateAnswer(emitter, thinking, request.getContent(), history, result, modelConfig, cancelled);
             }
-
-            // 系统参数节点
-            long totalMs = System.currentTimeMillis() - start;
-            String modelUsed = modelConfig != null && modelConfig.getModel() != null
-                    ? modelConfig.getModel() : "未指定";
-            String strategy = isDirectAnswer(intent) ? "直接应答" : "检索增强生成（RAG）";
-            ThinkingNodeVO paramsNode = startThinking(thinking, "系统参数", "system-agent", "查询链路参数汇总");
-            Map<String, Object> paramsData = new LinkedHashMap<>();
-            paramsData.put("model", modelUsed);
-            paramsData.put("strategy", strategy);
-            paramsData.put("intent", intent.getLabel());
-            paramsData.put("totalLatencyMs", totalMs);
-            paramsNode.setData(paramsData);
-            finishThinking(thinking, emitter, "系统参数", "模型：" + modelUsed + " | 策略：" + strategy + " | 总耗时：" + totalMs + "ms");
 
             persistAndFinish(session, thinking, references, answer, start, emitter);
             ssePublisher.complete(emitter);
@@ -186,12 +175,13 @@ public class RagAgentOrchestrator {
         IntentType intent;
         if (cached.isPresent()) {
             intent = cached.get();
-            node.setData(Map.of("intent", intent.name(), "intentLabel", intent.getLabel(), "cached", true));
+            node.setData(Map.of("intentLabel", intent.getLabel(), "cached", true));
             finishThinking(thinking, emitter, "意图识别", "识别结果：" + intent.getLabel() + "（缓存命中）");
         } else {
             intent = intentAgent.identify(content, history, config);
             redisCacheService.put(cacheKey, intent, Duration.ofMinutes(30));
-            node.setData(Map.of("intent", intent.name(), "intentLabel", intent.getLabel(), "cached", false));
+            ragMetrics.recordIntent(intent.name());
+            node.setData(Map.of("intentLabel", intent.getLabel(), "cached", false));
             finishThinking(thinking, emitter, "意图识别", "识别结果：" + intent.getLabel());
         }
         return intent;
@@ -327,6 +317,9 @@ public class RagAgentOrchestrator {
         stats.put("fusedCount", fused.size());
         stats.put("elapsedMs", System.currentTimeMillis() - startMs);
         stats.put("sourceDocs", sourceDocs);
+        ragMetrics.recordRetrievalHits("graph", graphHits);
+        ragMetrics.recordRetrievalHits("vector", vectorHits);
+        ragMetrics.recordRetrievalHits("keyword", keywordHits);
         ssePublisher.send(emitter, "stats", stats);
     }
 
@@ -399,6 +392,7 @@ public class RagAgentOrchestrator {
         String answer = streamAnswer(emitter, prompt, config, cancelled);
         if (answer.isBlank()) {
             answer = degradedAnswer(result);
+            ragMetrics.recordDegraded();
             ssePublisher.send(emitter, "delta", Map.of("content", answer));
         }
         String modelName = config != null && config.getModel() != null ? config.getModel() : "平台默认";
@@ -471,6 +465,7 @@ public class RagAgentOrchestrator {
                                   long start, SseEmitter emitter) {
         long latency = System.currentTimeMillis() - start;
         if (answer == null || answer.isBlank()) {
+            ragMetrics.recordQueryLatency(latency, "unknown");
             log.info("回答为空（可能被中断），不保存 AI 消息：session={}", session.getId());
             ssePublisher.send(emitter, "done", Map.of(
                     "sessionId", session.getId(),
@@ -484,6 +479,7 @@ public class RagAgentOrchestrator {
                     "sessionId", session.getId(),
                     "messageId", assistant.getId(),
                     "title", session.getTitle()));
+            ragMetrics.recordQueryLatency(latency, "success");
             log.info("问答完成：session={}, latency={}ms", session.getId(), latency);
         } catch (Exception e) {
             log.warn("持久化消息失败（thinking trace 序列化异常？），降级保存：{}", e.getMessage());

@@ -100,6 +100,7 @@ import {ExportOutlined, MenuOutlined, MenuFoldOutlined, MenuUnfoldOutlined} from
 import {message, Modal} from 'ant-design-vue'
 import {useChatStore} from '@/stores/chat'
 import {useModelStore} from '@/stores/model'
+import {useAuthStore} from '@/stores/auth'
 import {streamChat, type RetrievalStats} from '@/composables/useChatStream'
 import {getAuthHeaders} from '@/utils/request'
 import SessionList from '@/components/chat/SessionList.vue'
@@ -137,7 +138,26 @@ function isStreamingMsg(msg: ChatMessageVO | StreamMessage): boolean {
 }
 
 onMounted(async () => {
-  // 认证由全局路由守卫（middleware/auth.global.ts）保证
+  // 认证守卫：客户端二次校验 token 有效性（防止 middleware 未拦截的场景）
+  const auth = useAuthStore()
+  auth.initToken()
+  if (!auth.isLoggedIn) {
+    navigateTo('/login')
+    return
+  }
+  try {
+    await auth.fetchMe()
+  } catch {
+    auth.logout()
+    navigateTo('/login')
+    return
+  }
+  if (!auth.userInfo) {
+    auth.logout()
+    navigateTo('/login')
+    return
+  }
+
   modelStore.initFromStorage()
   await Promise.all([chat.loadSessions(), modelStore.loadServerModels()])
 })

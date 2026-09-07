@@ -1,5 +1,11 @@
 package edu.zjut.traceqa.gateway.metric;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -12,14 +18,21 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * 网关请求指标采集器。
+ * 网关请求指标采集器（Micrometer 增强版）。
  *
- * <p>作为系统统一入口，网关在此采集全部 HTTP 请求的运行指标（总请求数、延迟分位、
- * 状态/方法分布、Top 接口、慢请求、接口错误、最近异常日志），供管理服务聚合展示。
- * 指标为内存态，网关重启后清零。</p>
+ * <p>同时保留内存态快照（供管理服务 API 查询）和 Micrometer 指标（供 Prometheus/Grafana 可观测性）。</p>
+ *
+ * <p>Prometheus 指标：</p>
+ * <ul>
+ *   <li>{@code gateway.requests.total} — 按 method+status 标签的请求计数</li>
+ *   <li>{@code gateway.request.latency} — 按 path 标签的请求延迟 Timer</li>
+ *   <li>{@code gateway.requests.slow} — 慢请求计数（>2s）</li>
+ *   <li>{@code gateway.requests.error} — 错误请求计数（>=400）</li>
+ * </ul>
  */
 @Component
 public class GatewayMetrics {
@@ -29,6 +42,13 @@ public class GatewayMetrics {
     private static final int SLOW_REQUEST_MAX = 20;
     private static final int LATENCY_SAMPLES_MAX = 1000;
     private static final int RECENT_ERRORS_MAX = 50;
+
+    @Resource
+    private MeterRegistry meterRegistry;
+
+    private Timer requestTimer;
+    private Counter slowRequestCounter;
+    private DistributionSummary latencySummary;
 
     private final AtomicLong totalRequests = new AtomicLong();
     private final AtomicLong totalLatencyMs = new AtomicLong();
@@ -42,6 +62,22 @@ public class GatewayMetrics {
     private final ConcurrentLinkedQueue<Map<String, Object>> slowRequests = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<String> recentErrors = new ConcurrentLinkedQueue<>();
 
+    @PostConstruct
+    void init() {
+        requestTimer = Timer.builder("gateway.request.latency")
+                .description("Gateway request latency")
+                .publishPercentiles(0.5, 0.95, 0.99)
+                .register(meterRegistry);
+        slowRequestCounter = Counter.builder("gateway.requests.slow")
+                .description("Requests exceeding slow threshold (>2s)")
+                .register(meterRegistry);
+        latencySummary = DistributionSummary.builder("gateway.latency.distribution")
+                .description("Request latency distribution in ms")
+                .baseUnit("ms")
+                .publishPercentiles(0.5, 0.95, 0.99)
+                .register(meterRegistry);
+    }
+
     /**
      * 记录一次请求的指标。
      *
@@ -54,18 +90,39 @@ public class GatewayMetrics {
         totalRequests.incrementAndGet();
         totalLatencyMs.addAndGet(costMs);
 
-        statusCounts.computeIfAbsent((status / 100) + "xx", k -> new AtomicLong()).incrementAndGet();
-        methodCounts.computeIfAbsent(method, k -> new AtomicLong()).incrementAndGet();
-        pathCounts.computeIfAbsent(path, k -> new AtomicLong()).incrementAndGet();
+        String statusGroup = (status / 100) + "xx";
+        statusCounts.computeIfAbsent(statusGroup, _ -> new AtomicLong()).incrementAndGet();
+        methodCounts.computeIfAbsent(method, _ -> new AtomicLong()).incrementAndGet();
+        pathCounts.computeIfAbsent(path, _ -> new AtomicLong()).incrementAndGet();
         if (status >= 400) {
-            pathErrorCounts.computeIfAbsent(path, k -> new AtomicLong()).incrementAndGet();
+            pathErrorCounts.computeIfAbsent(path, _ -> new AtomicLong()).incrementAndGet();
         }
+
+        // Micrometer 记录
+        requestTimer.record(costMs, TimeUnit.MILLISECONDS);
+        latencySummary.record(costMs);
+
+        if (status >= 400) {
+            Counter.builder("gateway.requests.error")
+                    .description("Requests with status >= 400")
+                    .tag("status", statusGroup)
+                    .register(meterRegistry)
+                    .increment();
+        }
+
+        Counter.builder("gateway.requests.total")
+                .description("Total gateway requests")
+                .tag("method", method)
+                .tag("status", statusGroup)
+                .register(meterRegistry)
+                .increment();
 
         latencySamples.offer(costMs);
         while (latencySamples.size() > LATENCY_SAMPLES_MAX) {
             latencySamples.poll();
         }
         if (costMs >= SLOW_REQUEST_THRESHOLD_MS) {
+            slowRequestCounter.increment();
             Map<String, Object> slow = new LinkedHashMap<>();
             slow.put("path", path);
             slow.put("method", method);
@@ -124,7 +181,7 @@ public class GatewayMetrics {
             return 0;
         }
         int idx = (int) Math.ceil(p / 100.0 * sorted.size()) - 1;
-        idx = Math.max(0, Math.min(sorted.size() - 1, idx));
+        idx = Math.clamp(idx, 0, sorted.size() - 1);
         return sorted.get(idx);
     }
 

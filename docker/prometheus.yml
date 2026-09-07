@@ -14,3 +14,43 @@ scrape_configs:
       - targets: [ 'admin-service:8086' ]
         labels:
           app: traceqa-admin-service
+
+  # 网关服务
+  - job_name: traceqa-gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: [ 'gateway:8080' ]
+        labels:
+          app: traceqa-gateway
+
+  # 用户服务
+  - job_name: traceqa-user
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: [ 'user-service:8081' ]
+        labels:
+          app: traceqa-user-service
+
+  # 文件服务
+  - job_name: traceqa-file
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: [ 'file-service:8083' ]
+        labels:
+          app: traceqa-file-service
+
+  # 知识库服务
+  - job_name: traceqa-kb
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: [ 'kb-service:8084' ]
+        labels:
+          app: traceqa-kb-service
+
+  # 问答服务
+  - job_name: traceqa-qa
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: [ 'qa-service:8085' ]
+        labels:
+          app: traceqa-qa-service

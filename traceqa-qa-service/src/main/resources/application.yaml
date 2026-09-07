@@ -106,6 +106,20 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+# 可观测性（Actuator / Prometheus / OpenTelemetry）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
 logging:
   level:
     edu.zjut.traceqa: info
