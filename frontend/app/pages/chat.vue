@@ -18,7 +18,7 @@
         placement="left"
         :width="280"
         :closable="false"
-        body-style="padding:0"
+        :body-style="{ padding: '0' }"
     >
       <SessionList
           :sessions="chat.sessions"
@@ -293,6 +293,18 @@ async function handleSend(content: string): Promise<void> {
         },
         onStats: (stats) => {
           streamMsg.stats = stats
+          const fuseNode = streamMsg.thinkingTrace?.find(n => n.stage === '结果融合')
+          if (fuseNode) {
+            const fused = stats.sourceDocs ? Object.keys(stats.sourceDocs) : []
+            fuseNode.data = {
+              ...fuseNode.data,
+              graphCount: stats.graphHits ?? 0,
+              vectorCount: stats.vectorHits ?? 0,
+              keywordCount: stats.keywordHits ?? 0,
+              fusedCount: stats.fusedCount ?? 0,
+              fusedSources: fused
+            }
+          }
         },
         onDone: () => {
           streamMsg.streaming = false
@@ -321,13 +333,19 @@ async function handleSend(content: string): Promise<void> {
   )
 }
 
-/** 合并思考节点（按 stage 更新状态） */
+/** 合并思考节点（按 stage 更新状态；已有节点时合并 data 避免丢失） */
 function mergeThinkingNode(streamMsg: StreamMessage, node: ThinkingNodeVO): void {
   const nodes = streamMsg.thinkingTrace ?? []
   const idx = nodes.findIndex((n) => n.stage === node.stage)
   if (idx === -1) {
     nodes.push(node)
   } else {
+    // 合并 data：保留已有字段，新字段覆盖（如 stats 补充图谱/向量/关键词命中数）
+    if (node.data && nodes[idx]?.data) {
+      node.data = {...nodes[idx].data, ...node.data}
+    } else if (!node.data && nodes[idx]?.data) {
+      node.data = nodes[idx].data
+    }
     nodes[idx] = node
   }
   streamMsg.thinkingTrace = [...nodes]

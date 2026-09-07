@@ -2,8 +2,8 @@
   <div class="thinking-panel">
     <div class="thinking-panel__header">
       <a-space size="small">
-        <SyncOutlined v-if="anyRunning" spin style="color: #1677ff" />
-        <BulbOutlined v-else style="color: #faad14" />
+        <SyncOutlined v-if="anyRunning" spin style="color: #1677ff"/>
+        <BulbOutlined v-else style="color: #faad14"/>
         <span>Agent 工作流</span>
         <a-tag color="blue">{{ nodes.length }} 个节点</a-tag>
         <a-tag v-if="totalCostMs > 0" color="green">{{ totalCostMs }}ms</a-tag>
@@ -15,10 +15,10 @@
       <template v-for="(stage, i) in displayedStages" :key="stage">
         <div class="flow-node" :class="nodeClass(stage)" :title="titleOf(stage)">
           <div class="flow-node__dot">
-            <LoadingOutlined v-if="isStatus(stage, 'running')" spin />
-            <CheckCircleFilled v-else-if="isStatus(stage, 'done')" />
-            <CloseCircleFilled v-else-if="isStatus(stage, 'failed')" />
-            <EllipsisOutlined v-else />
+            <LoadingOutlined v-if="isStatus(stage, 'running')" spin/>
+            <CheckCircleFilled v-else-if="isStatus(stage, 'done')"/>
+            <CloseCircleFilled v-else-if="isStatus(stage, 'failed')"/>
+            <EllipsisOutlined v-else/>
           </div>
           <div class="flow-node__label">{{ stage }}</div>
           <div v-if="nodeOf(stage)?.costMs != null && isStatus(stage, 'done')" class="flow-node__cost">
@@ -33,8 +33,11 @@
     <!-- 节点详细数据（展开/折叠） -->
     <div v-if="hasAnyData" class="data-section">
       <a-button type="link" size="small" @click="showData = !showData">
-        <template #icon><DownOutlined v-if="!showData" /><UpOutlined v-else /></template>
-        {{ showData ? '收起详情' : '查看各步骤详情' }}
+        <template #icon>
+          <DownOutlined v-if="!showData"/>
+          <UpOutlined v-else/>
+        </template>
+        {{ showData ? '收起详情' : '查看工作流详情' }}
       </a-button>
       <div v-if="showData" class="data-list">
         <div v-for="node in nodesWithData" :key="node.stage" class="data-item">
@@ -74,7 +77,7 @@ import {
   DownOutlined,
   UpOutlined
 } from '@ant-design/icons-vue'
-import type { ThinkingNodeVO } from '@/utils/api-types'
+import type {ThinkingNodeVO} from '@/utils/api-types'
 
 const props = defineProps<{
   /** 思考节点列表 */
@@ -109,9 +112,9 @@ const displayedStages = computed<string[]>(() =>
 /** 是否存在运行中的节点 */
 const anyRunning = computed<boolean>(() => props.nodes.some((n) => n.status === 'running'))
 
-/** 所有节点总耗时 */
+/** 所有节点总耗时*/
 const totalCostMs = computed<number>(() =>
-    props.nodes.reduce((sum, n) => sum + (n.costMs ?? 0), 0)
+    props.nodes.reduce((sum, n) => sum + Number(n.costMs ?? 0), 0)
 )
 
 /** 是否有节点携带 data 字段 */
@@ -176,7 +179,7 @@ function formatKey(key: string): string {
     model: '模型',
     strategy: '策略',
     intent: '意图',
-    intentLabel: '意图标签',
+    intentLabel: '意图',
     cached: '缓存命中',
     totalLatencyMs: '总耗时',
     retrievalConfig: '检索配置',
@@ -202,7 +205,7 @@ function formatKey(key: string): string {
   return map[key] || key
 }
 
-/** 格式化 data value 为可读文本 */
+/** 格式化 data value 为可读文本（完整展示，不截断） */
 function formatValue(value: unknown): string {
   if (value == null) return '-'
   if (typeof value === 'boolean') return value ? '是' : '否'
@@ -210,13 +213,12 @@ function formatValue(value: unknown): string {
   if (Array.isArray(value)) {
     if (value.length === 0) return '（空）'
     if (typeof value[0] === 'string') {
-      return value.length <= 3 ? value.join('、') : value.slice(0, 3).join('、') + ` 等${value.length}项`
+      return value.join('、')
     }
     return `${value.length} 项`
   }
-  if (typeof value === 'object') return JSON.stringify(value)
-  const s = String(value)
-  return s.length > 60 ? s.substring(0, 60) + '…' : s
+  if (typeof value === 'object') return JSON.stringify(value, null, 2)
+  return String(value)
 }
 </script>
 
@@ -371,6 +373,9 @@ function formatValue(value: unknown): string {
 .data-kv__value {
   color: #1d2129;
   word-break: break-all;
+  white-space: pre-wrap;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 @keyframes flow-pulse {

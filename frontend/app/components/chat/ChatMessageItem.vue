@@ -17,7 +17,7 @@
       </template>
       <template v-else>
         <ThinkingTracePanel v-if="hasThinking" :nodes="msg.thinkingTrace ?? []"/>
-        <RetrievalStatsPanel v-if="msg.stats" :stats="msg.stats"/>
+        <RetrievalStatsPanel v-if="resolvedStats" :stats="resolvedStats"/>
         <div v-if="reasoningContent" class="chat-msg__reasoning">
           <a-collapse ghost>
             <a-collapse-panel key="reasoning" :show-arrow="true">
@@ -139,6 +139,30 @@ const hasThinking = computed<boolean>(() => (props.msg.thinkingTrace?.length ?? 
 const reasoningContent = computed<string>(() =>
     props.streaming ? props.msg.reasoningBuffer ?? '' : ''
 )
+
+const resolvedStats = computed<RetrievalStats | undefined>(() => {
+  if (props.msg.stats) return props.msg.stats
+  const trace = props.msg.thinkingTrace ?? []
+  if (trace.length === 0) return undefined
+  const fuseNode = trace.find(n => n.stage === '结果融合')
+  if (!fuseNode?.data) return undefined
+  const d = fuseNode.data as Record<string, unknown>
+  const graphHits = Number(d.graphCount ?? 0)
+  const vectorHits = Number(d.vectorCount ?? 0)
+  const keywordHits = Number(d.keywordCount ?? 0)
+  const fusedCount = Number(d.fusedCount ?? 0)
+  if (graphHits + vectorHits + keywordHits === 0) return undefined
+  const sysNode = trace.find(n => n.stage === '系统参数')
+  const elapsedMs = sysNode?.data ? Number((sysNode.data as Record<string, unknown>).totalLatencyMs ?? 0) : 0
+  const sourceDocs: Record<string, number> = {}
+  const fusedSources = d.fusedSources
+  if (Array.isArray(fusedSources)) {
+    for (const name of fusedSources) {
+      sourceDocs[String(name)] = 1
+    }
+  }
+  return { graphHits, vectorHits, keywordHits, fusedCount, elapsedMs, sourceDocs }
+})
 
 /** 是否存在引用来源 */
 const hasReferences = computed<boolean>(() => (props.msg.references?.length ?? 0) > 0)

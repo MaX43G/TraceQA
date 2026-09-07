@@ -125,22 +125,19 @@ public class RagAgentOrchestrator {
             Map<String, Object> paramsData = new LinkedHashMap<>();
             paramsData.put("model", modelUsed);
             paramsData.put("strategy", strategy);
-            paramsData.put("intent", intent.name());
+            paramsData.put("intent", intent.getLabel());
             paramsData.put("totalLatencyMs", totalMs);
-            Map<String, Object> retrievalCfg = new LinkedHashMap<>();
-            retrievalCfg.put("enableReread", retrievalService.isRereadEnabled());
-            retrievalCfg.put("enableRerank", retrievalService.isRerankEnabled());
-            if (request.getKnowledgeBaseId() != null) {
-                retrievalCfg.put("knowledgeBaseId", request.getKnowledgeBaseId());
-            }
-            paramsData.put("retrievalConfig", retrievalCfg);
             paramsNode.setData(paramsData);
             finishThinking(thinking, emitter, "系统参数", "模型：" + modelUsed + " | 策略：" + strategy + " | 总耗时：" + totalMs + "ms");
 
             persistAndFinish(session, thinking, references, answer, start, emitter);
             ssePublisher.complete(emitter);
         } catch (Exception e) {
-            log.error("Agent 编排异常，整体降级：{}", e.getMessage(), e);
+            String trace = java.util.Arrays.stream(e.getStackTrace())
+                    .limit(5)
+                    .map(StackTraceElement::toString)
+                    .collect(java.util.stream.Collectors.joining("\n  "));
+            log.error("Agent 编排异常 [{}]: {}\n  {}", e.getClass().getSimpleName(), e.getMessage(), trace);
             markThinkingFailed(thinking);
             ssePublisher.completeWithError(emitter, Map.of(
                     "code", ErrorCode.LLM_UNAVAILABLE.getCode(),
@@ -271,10 +268,7 @@ public class RagAgentOrchestrator {
         List<RetrievedChunk> graphChunks = graphFuture.join();
         List<RetrievedChunk> vectorChunks = vectorFuture.join();
 
-        int baseCount = retrievalService.fuse(List.of(graphChunks, vectorChunks)).size();
-        List<RetrievedChunk> keywordChunks = baseCount >= KEYWORD_FALLBACK_THRESHOLD
-                ? List.of()
-                : runKeyword(emitter, thinking, content, config, cancelled);
+        List<RetrievedChunk> keywordChunks = runKeyword(emitter, thinking, content, config, cancelled);
 
         // 1) 结果融合
         ThinkingNodeVO fuseNode = startThinking(thinking, "结果融合", "fusion-agent", "正在融合三路检索结果");
