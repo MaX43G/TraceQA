@@ -16,7 +16,8 @@ FROM eclipse-temurin:25-jre-noble
 
 WORKDIR /app
 
-RUN apt-get update \
+RUN rm -rf /var/lib/apt/lists/* /etc/apt/keyrings/* \
+    && apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
