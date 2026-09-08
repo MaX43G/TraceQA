@@ -22,6 +22,11 @@ public class AdminProperties {
     private Observability observability = new Observability();
 
     /**
+     * DBX 内网地址
+     */
+    private String dbxBaseUrl = "http://localhost:4224";
+
+    /**
      * 可观测性配置
      */
     @Data

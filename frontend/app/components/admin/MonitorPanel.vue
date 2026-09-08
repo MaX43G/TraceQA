@@ -16,6 +16,12 @@
           </template>
           打开 Prometheus
         </a-button>
+        <a-button :loading="dbxLoading" @click="openDbx">
+          <template #icon>
+            <DatabaseOutlined/>
+          </template>
+          数据库管理
+        </a-button>
         <a-button :loading="refreshing" @click="load(true)">
           <template #icon>
             <ReloadOutlined/>
@@ -156,7 +162,7 @@
  * 每分钟自动刷新。
  */
 import {getAuthHeaders} from '@/utils/request'
-import {BarChartOutlined, LineChartOutlined, ReloadOutlined} from '@ant-design/icons-vue'
+import {BarChartOutlined, LineChartOutlined, ReloadOutlined, DatabaseOutlined} from '@ant-design/icons-vue'
 import {useIntervalFn} from '@vueuse/core'
 import VChart from '@/components/common/VChart.vue'
 
@@ -348,6 +354,21 @@ async function openPrometheus(): Promise<void> {
     // 忽略
   } finally {
     prometheusLoading.value = false
+  }
+}
+
+/** 打开 DBX（经后端代理 /dbx/**，需先获取 DBX 会话 Cookie） */
+const dbxLoading = ref(false)
+
+async function openDbx(): Promise<void> {
+  dbxLoading.value = true
+  try {
+    await fetch('/api/monitor/dbx/session', {method: 'POST', headers: getAuthHeaders()})
+    window.open('/dbx/', '_blank', 'noopener')
+  } catch {
+    // 忽略
+  } finally {
+    dbxLoading.value = false
   }
 }
 

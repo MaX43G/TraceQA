@@ -436,6 +436,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
       OTEL_METRICS_EXPORTER: none
       OTEL_LOGS_EXPORTER: none
+      DBX_BASE_URL: http://dbx:4224
       TZ: Asia/Shanghai
     ports:
       - "6126:8086"
@@ -446,6 +447,31 @@ services:
         condition: service_healthy
       nacos:
         condition: service_healthy
+      dbx:
+        condition: service_healthy
+
+  # ===================== 工具服务 =====================
+  dbx:
+    image: t8y2/dbx:0.6.6
+    container_name: traceqa-dbx
+    labels: { logging: promtail }
+    logging: *default-logging
+    restart: unless-stopped
+    mem_limit: 512m
+    command: ["--set-password", "${DBX_PASSWORD:-traceqa-dbx-2026}"]
+    environment:
+      DBX_PUBLIC_BASE_PATH: /dbx
+      TZ: Asia/Shanghai
+    volumes:
+      - traceqa-dbx-data:/app/data
+    ports:
+      - "4224:4224"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4224/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # ===================== 前端 + 网关入口 =====================
   frontend:
@@ -597,6 +623,7 @@ volumes:
   traceqa-lightrag-data:
   traceqa-minio-data:
   traceqa-kb-data:
+  traceqa-dbx-data:
   traceqa-grafana-data:
   traceqa-caddy-data:
   traceqa-caddy-config:

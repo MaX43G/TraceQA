@@ -2,6 +2,7 @@ package edu.zjut.traceqa.adminservice.controller;
 
 import edu.zjut.traceqa.common.api.ApiResponse;
 import edu.zjut.traceqa.common.rbac.RequireRole;
+import edu.zjut.traceqa.adminservice.config.DbxSessionStore;
 import edu.zjut.traceqa.adminservice.config.LightRagWebuiSessionStore;
 import edu.zjut.traceqa.adminservice.config.ObservabilitySessionStore;
 import edu.zjut.traceqa.adminservice.service.LightRagMonitorService;
@@ -34,6 +35,8 @@ public class MonitorController {
     private LightRagWebuiSessionStore webuiSessionStore;
     @Resource
     private ObservabilitySessionStore observabilitySessionStore;
+    @Resource
+    private DbxSessionStore dbxSessionStore;
 
     /**
      * 查询系统运行指标
@@ -126,6 +129,24 @@ public class MonitorController {
         cookie.setSecure(true);
         cookie.setPath("/");
         cookie.setMaxAge(60 * 60);
+        cookie.setAttribute("SameSite", "Lax");
+        response.addCookie(cookie);
+        return ApiResponse.ok();
+    }
+
+    /**
+     * 获取 DBX 访问会话（签发短期 HttpOnly Cookie，供反向代理鉴权）
+     */
+    @Operation(summary = "获取 DBX 访问会话")
+    @RequireRole("ADMIN")
+    @PostMapping("/dbx/session")
+    public ApiResponse<Void> dbxSession(HttpServletResponse response) {
+        String token = dbxSessionStore.create();
+        Cookie cookie = new Cookie("tq_dbx", token);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(24 * 60 * 60);
         cookie.setAttribute("SameSite", "Lax");
         response.addCookie(cookie);
         return ApiResponse.ok();

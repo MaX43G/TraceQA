@@ -290,6 +290,9 @@ async function handleSend(content: string, toggles?: { vector: boolean; graph: b
   // 携带模型选择：优先服务端模型（平台默认 Key/URL），其次自定义模型
   const serverModel = modelStore.activeServerModel
   const modelConfig = modelStore.activeCustomConfig
+  // 用于 onEnd 等待 loadFollowup 完成后再捕获 followup 值
+  let followupPromise: Promise<void> | undefined
+
   await streamChat(
       {
         sessionId,
@@ -334,28 +337,27 @@ async function handleSend(content: string, toggles?: { vector: boolean; graph: b
         onDone: async () => {
           streamMsg.streaming = false
           streamMsg.content = streamMsg.buffer
-          // 回答已完成即解除输入锁定（onEnd 可能因 SSE 连接未及时关闭而不触发）
           chat.generating = false
-          // 猜你想问：AI 解读当前问答，推荐可能追问的问题
-          await loadFollowup(content, streamMsg)
+          followupPromise = loadFollowup(content, streamMsg)
+          await followupPromise
         },
         onError: (err) => {
           streamMsg.streaming = false
           streamMsg.content = streamMsg.buffer || err.msg || '服务异常'
           message.error(err.msg || 'AI 服务暂时不可用')
-          // 出错即解除输入锁定，避免持续禁用
           chat.generating = false
         },
         onEnd: async () => {
           chat.generating = false
           inputRef.value?.clear()
-          // 保留 followup
+          if (followupPromise) {
+            await followupPromise
+          }
           const followup = streamMsg.followup
           await chat.loadSessions()
           if (chat.currentSessionId) {
             await chat.openSession(chat.currentSessionId)
           }
-          // 将 followup 恢复到最后一条助手消息
           if (followup?.length) {
             const lastAssistant = [...chat.messages].reverse().find(m => m.role === 'ASSISTANT')
             if (lastAssistant) {
