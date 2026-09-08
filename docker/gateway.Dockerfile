@@ -1,6 +1,6 @@
 # ============================================================
 # 溯知 / TraceQA 网关镜像（Spring Cloud Gateway + Nacos）
-# 多阶段构建：阶段一编译（Maven），阶段二运行（JRE 25）
+# 多阶段构建：阶段一编译（Maven），阶段二运行（JRE 25 Alpine）
 # ============================================================
 
 # ---- 构建阶段 ----
@@ -15,16 +15,14 @@ COPY . .
 RUN --mount=type=cache,target=/root/.m2/repository mvn -T 1C -pl traceqa-gateway -am package -DskipTests -B
 
 # ---- 运行阶段 ----
-FROM eclipse-temurin:25-jre-noble
+FROM eclipse-temurin:25-jre-alpine
 
 # OpenTelemetry Java Agent 版本（自动埋点追踪，供 Tempo Traces to Logs）
 ARG OTEL_AGENT_VERSION=2.31.1
 
 WORKDIR /app
 
-RUN apt-get update -o Acquire::AllowInsecureRepositories=true \
-    && apt-get install -y --allow-unauthenticated --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache curl
 
 # 下载 OTel Java Agent（经 aliyun 镜像源）
 RUN curl -fsSL -o /app/opentelemetry-javaagent.jar \
@@ -32,8 +30,7 @@ RUN curl -fsSL -o /app/opentelemetry-javaagent.jar \
 
 COPY --from=build /app/traceqa-gateway/target/*.jar app.jar
 
-RUN groupadd -r appuser && useradd -r -g appuser appuser \
-    && mkdir -p /home/appuser \
+RUN addgroup -S appuser && adduser -S -G appuser -h /home/appuser appuser \
     && chown -R appuser:appuser /app /home/appuser
 
 ENV JAVA_OPTS="-javaagent:/app/opentelemetry-javaagent.jar -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=25.0 -Dnacos.logging.default.config.enabled=false"
@@ -46,4 +43,3 @@ HEALTHCHECK --interval=15s --timeout=5s --retries=5 \
   CMD curl -fsS http://127.0.0.1:8080/actuator/health || exit 1
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
-
