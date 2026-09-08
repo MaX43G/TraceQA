@@ -448,7 +448,7 @@ services:
       nacos:
         condition: service_healthy
       dbx:
-        condition: service_healthy
+        condition: service_started
 
   # ===================== 工具服务 =====================
   dbx:
@@ -465,12 +465,6 @@ services:
       - traceqa-dbx-data:/app/data
     ports:
       - "4224:4224"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4224/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
 
   # ===================== 前端 + 网关入口 =====================
   frontend:
