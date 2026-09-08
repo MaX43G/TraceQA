@@ -16,21 +16,19 @@ FROM eclipse-temurin:25-jre-alpine
 
 WORKDIR /app
 
-RUN apk add --no-cache curl
-
-# 下载 OTel Java Agent 2.31.1（缓存挂载避免每次重复下载）
-RUN --mount=type=cache,target=/opt/otel-cache \
-    if [ ! -f /opt/otel-cache/opentelemetry-javaagent.jar ]; then \
-      curl -fsSL -o /opt/otel-cache/opentelemetry-javaagent.jar "https://maven.aliyun.com/repository/public/io/opentelemetry/javaagent/opentelemetry-javaagent/2.31.1/opentelemetry-javaagent-2.31.1.jar"; \
-    fi \
-    && cp /opt/otel-cache/opentelemetry-javaagent.jar /app/opentelemetry-javaagent.jar
+# 清理 JRE 冗余文件
+RUN rm -rf /opt/java/openjdk/lib/src.zip \
+           /opt/java/openjdk/demo \
+           /opt/java/openjdk/man \
+           /opt/java/openjdk/sample \
+           /opt/java/openjdk/jmods \
+    2>/dev/null; true
 
 COPY --from=build /app/traceqa-admin-service/target/*.jar app.jar
 
-# 说明：管理服务需访问宿主机 Docker Engine（/var/run/docker.sock 挂载）以提供
+# 管理服务需访问宿主机 Docker Engine（/var/run/docker.sock 挂载）以提供
 # 「系统资源检测 / 无用资源清理」能力。挂载 socket 已等价于宿主机 root 权限，
-# 故此处以 root 运行（与 Portainer 等容器管理工具一致）。若不需要该能力，
-# 可移除此行并去掉 compose 中的 socket 挂载。
+# 故此处以 root 运行（与 Portainer 等容器管理工具一致）。
 USER root
 
 EXPOSE 8086

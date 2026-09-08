@@ -1,6 +1,5 @@
 # ============================================================
 # 溯知 / TraceQA 网关镜像（Spring Cloud Gateway + Nacos）
-# 多阶段构建：阶段一编译（Maven），阶段二运行（JRE 25 Alpine）
 # ============================================================
 
 # ---- 构建阶段 ----
@@ -17,29 +16,29 @@ RUN --mount=type=cache,target=/root/.m2/repository mvn -T 1C -pl traceqa-gateway
 # ---- 运行阶段 ----
 FROM eclipse-temurin:25-jre-alpine
 
-# OpenTelemetry Java Agent 版本（自动埋点追踪，供 Tempo Traces to Logs）
-ARG OTEL_AGENT_VERSION=2.31.1
-
 WORKDIR /app
 
-RUN apk add --no-cache curl
-
-# 下载 OTel Java Agent（经 aliyun 镜像源）
-RUN curl -fsSL -o /app/opentelemetry-javaagent.jar \
-    "https://maven.aliyun.com/repository/public/io/opentelemetry/javaagent/opentelemetry-javaagent/${OTEL_AGENT_VERSION}/opentelemetry-javaagent-${OTEL_AGENT_VERSION}.jar"
+# 清理 JRE 冗余文件
+RUN rm -rf /opt/java/openjdk/lib/src.zip \
+           /opt/java/openjdk/demo \
+           /opt/java/openjdk/man \
+           /opt/java/openjdk/sample \
+           /opt/java/openjdk/jmods \
+    2>/dev/null; true
 
 COPY --from=build /app/traceqa-gateway/target/*.jar app.jar
 
 RUN addgroup -S appuser && adduser -S -G appuser -h /home/appuser appuser \
     && chown -R appuser:appuser /app /home/appuser
 
-ENV JAVA_OPTS="-javaagent:/app/opentelemetry-javaagent.jar -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=25.0 -Dnacos.logging.default.config.enabled=false"
+ENV JAVA_OPTS="-javaagent:/app/otel/opentelemetry-javaagent.jar -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=25.0 -Dnacos.logging.default.config.enabled=false"
 
 USER appuser
 
 EXPOSE 8080
 
+# Alpine 自带 busybox wget，无需安装 curl
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 \
-  CMD curl -fsS http://127.0.0.1:8080/actuator/health || exit 1
+  CMD wget -qO- http://127.0.0.1:8080/actuator/health || exit 1
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
