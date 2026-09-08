@@ -9,6 +9,7 @@ import edu.zjut.traceqa.common.enums.DocumentStatus;
 import edu.zjut.traceqa.common.enums.ErrorCode;
 import edu.zjut.traceqa.common.exception.BizException;
 import edu.zjut.traceqa.common.model.po.Document;
+import edu.zjut.traceqa.common.model.po.EsChunk;
 import edu.zjut.traceqa.common.model.vo.BatchUploadVO;
 import edu.zjut.traceqa.common.model.vo.DocumentUploadVO;
 import edu.zjut.traceqa.common.model.vo.DocumentVO;
