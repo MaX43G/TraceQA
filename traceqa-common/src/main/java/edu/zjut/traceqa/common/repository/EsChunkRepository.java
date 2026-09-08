@@ -7,7 +7,9 @@ import co.elastic.clients.elasticsearch.core.DeleteByQueryRequest;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.bulk.BulkOperation;
+import co.elastic.clients.elasticsearch.core.search.HighlightField;
 import co.elastic.clients.elasticsearch.core.search.Hit;
+import co.elastic.clients.util.NamedValue;
 import edu.zjut.traceqa.common.config.ElasticsearchClientFactory;
 import edu.zjut.traceqa.common.config.ElasticsearchProperties;
 import edu.zjut.traceqa.common.model.po.EsChunk;
@@ -113,7 +115,7 @@ public class EsChunkRepository {
                     .highlight(h -> h
                             .preTags("<em>")
                             .postTags("</em>")
-                            .fields("content", f -> f));
+                            .fields(NamedValue.of("content", HighlightField.of(f -> f.fragmentSize(150).numberOfFragments(3)))));
 
             SearchResponse<EsChunk> response = client.search(builder.build(), EsChunk.class);
             List<EsChunk> results = new ArrayList<>();
