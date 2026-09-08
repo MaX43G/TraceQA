@@ -136,6 +136,10 @@ export default defineNuxtConfig({
         '/prometheus/**': {
             proxy: `${API_PROXY}/prometheus/**`
         },
+        // DBX 数据库管理工具：经后端反向代理（管理员 Cookie 鉴权）访问
+        '/dbx/**': {
+            proxy: `${API_PROXY}/dbx/**`
+        },
         // 页面 HTML 不缓存，避免浏览器加载旧版 JS（新版部署后状态图等失效）
         '/': {headers: {'Cache-Control': 'no-store'}},
         '/chat': {headers: {'Cache-Control': 'no-store'}},

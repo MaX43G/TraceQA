@@ -67,11 +67,11 @@ spring:
               predicates:
                 - Path=/api/announcement/**,/api/monitor/**,/api/health
 
-            # ---- 管理服务：可观测性 / LightRAG WebUI 反向代理 ----
+            # ---- 管理服务：可观测性 / LightRAG WebUI / DBX 反向代理 ----
             - id: traceqa-admin-proxy
               uri: lb://traceqa-admin-service
               predicates:
-                - Path=/lightrag-webui/**,/grafana/**,/prometheus/**,/docs,/redoc,/openapi.json
+                - Path=/lightrag-webui/**,/grafana/**,/prometheus/**,/dbx/**,/docs,/redoc,/openapi.json
 
             # ---- 接口文档聚合（各服务 /v3/api-docs）----
             - id: traceqa-user-service-docs
