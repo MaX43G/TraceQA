@@ -246,7 +246,7 @@ async function loadFollowup(content: string, streamMsg: StreamMessage): Promise<
 }
 
 /** 发送消息（SSE 流式消费） */
-async function handleSend(content: string, toggles?: { vector: boolean; graph: boolean; keyword: boolean }): Promise<void> {
+async function handleSend(content: string): Promise<void> {
   if (chat.generating) {
     return
   }
@@ -299,12 +299,7 @@ async function handleSend(content: string, toggles?: { vector: boolean; graph: b
         knowledgeBaseId: null,
         content,
         ...(serverModel ? {serverModel} : {}),
-        ...(modelConfig ? {model: modelConfig.model, baseUrl: modelConfig.baseUrl, apiKey: modelConfig.apiKey} : {}),
-        ...(toggles ? {
-          enableVector: toggles.vector,
-          enableGraph: toggles.graph,
-          enableKeyword: toggles.keyword
-        } : {})
+        ...(modelConfig ? {model: modelConfig.model, baseUrl: modelConfig.baseUrl, apiKey: modelConfig.apiKey} : {})
       },
       {
         onThinking: (node) => {

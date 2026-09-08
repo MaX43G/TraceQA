@@ -108,7 +108,7 @@ public class RagAgentOrchestrator {
             if (isDirectAnswer(intent)) {
                 answer = respondDirect(emitter, thinking, request.getContent(), modelConfig, cancelled);
             } else {
-                RetrievalResult result = retrieve(emitter, thinking, request.getContent(), history, modelConfig, cancelled, request);
+                RetrievalResult result = retrieve(emitter, thinking, request.getContent(), history, modelConfig, cancelled);
                 if (!result.hasContent()) {
                     List<RetrievedChunk> fallback = retrievalService.retryWithStrategy(request.getContent());
                     if (!fallback.isEmpty()) {
@@ -196,8 +196,7 @@ public class RagAgentOrchestrator {
      * 查询意图路由 + 三路检索 + ReRead + 精排节点
      */
     private RetrievalResult retrieve(SseEmitter emitter, List<ThinkingNodeVO> thinking, String content,
-                                     String history, LlmConfig config, AtomicBoolean cancelled,
-                                     ChatStreamRequest request) {
+                                     String history, LlmConfig config, AtomicBoolean cancelled) {
         long retrieveStart = System.currentTimeMillis();
         ThinkingNodeVO routerNode = startThinking(thinking, "检索策略调度", "router-agent",
                 "正在由模型规划检索策略并选择检索工具");
@@ -214,10 +213,8 @@ public class RagAgentOrchestrator {
 
         if (type == RetrievalService.QueryType.DEFINITION) {
             EnhancedQuery simple = new EnhancedQuery(content, null, null);
-            List<RetrievedChunk> vectorChunks = request.isVectorEnabled()
-                    ? runVector(emitter, thinking, content, simple, cancelled) : List.of();
-            List<RetrievedChunk> keywordChunks = request.isKeywordEnabled()
-                    && vectorChunks.size() < KEYWORD_FALLBACK_THRESHOLD
+            List<RetrievedChunk> vectorChunks = runVector(emitter, thinking, content, simple, cancelled);
+            List<RetrievedChunk> keywordChunks = vectorChunks.size() < KEYWORD_FALLBACK_THRESHOLD
                     ? runKeyword(emitter, thinking, content, config, cancelled) : List.of();
             List<RetrievedChunk> fused = retrievalService.fuse(List.of(vectorChunks, keywordChunks));
             ThinkingNodeVO fuseNode = startThinking(thinking, "融合与补全", "fusion-agent",
@@ -230,8 +227,7 @@ public class RagAgentOrchestrator {
 
         if (type == RetrievalService.QueryType.SIMPLE) {
             EnhancedQuery simple = new EnhancedQuery(content, null, null);
-            List<RetrievedChunk> vectorChunks = request.isVectorEnabled()
-                    ? runVector(emitter, thinking, content, simple, cancelled) : List.of();
+            List<RetrievedChunk> vectorChunks = runVector(emitter, thinking, content, simple, cancelled);
             emitRetrievalStats(emitter, 0, vectorChunks.size(), 0, vectorChunks, retrieveStart);
             return new RetrievalResult(vectorChunks, true);
         }
@@ -252,8 +248,7 @@ public class RagAgentOrchestrator {
                 "subqueries", enhanced.getSubqueries() == null ? List.of() : enhanced.getSubqueries()));
         finishThinking(thinking, emitter, "查询重写与 HyDE", enhanceDetail);
 
-        CompletableFuture<List<RetrievedChunk>> graphFuture = request.isGraphEnabled()
-                ? CompletableFuture.supplyAsync(() -> {
+        CompletableFuture<List<RetrievedChunk>> graphFuture = CompletableFuture.supplyAsync(() -> {
                     ThinkingNodeVO gNode = startThinking(thinking, "图谱检索", "graph-agent", "正在执行知识图谱检索");
                     ssePublisher.send(emitter, "thinking", gNode);
                     List<RetrievedChunk> chunks = retrievalService.queryGraph(content,
@@ -261,17 +256,13 @@ public class RagAgentOrchestrator {
                     gNode.setData(Map.of("hits", chunks.size(), "sources", filePaths(chunks)));
                     finishThinking(thinking, emitter, "图谱检索", "图谱命中 " + chunks.size() + " 条");
                     return chunks;
-                })
-                : CompletableFuture.completedFuture(List.of());
-        CompletableFuture<List<RetrievedChunk>> vectorFuture = request.isVectorEnabled()
-                ? CompletableFuture.supplyAsync(
-                        () -> runVector(emitter, thinking, content, enhanced, cancelled))
-                : CompletableFuture.completedFuture(List.of());
+                });
+        CompletableFuture<List<RetrievedChunk>> vectorFuture = CompletableFuture.supplyAsync(
+                        () -> runVector(emitter, thinking, content, enhanced, cancelled));
         List<RetrievedChunk> graphChunks = graphFuture.join();
         List<RetrievedChunk> vectorChunks = vectorFuture.join();
 
-        List<RetrievedChunk> keywordChunks = request.isKeywordEnabled()
-                ? runKeyword(emitter, thinking, content, config, cancelled) : List.of();
+        List<RetrievedChunk> keywordChunks = runKeyword(emitter, thinking, content, config, cancelled);
 
         // 1) 结果融合
         ThinkingNodeVO fuseNode = startThinking(thinking, "结果融合", "fusion-agent", "正在融合三路检索结果");
