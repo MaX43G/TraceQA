@@ -460,6 +460,7 @@ services:
     mem_limit: 512m
     environment:
       DBX_PUBLIC_BASE_PATH: /dbx
+      DBX_DISABLE_PASSWORD: "1"
       TZ: Asia/Shanghai
     volumes:
       - traceqa-dbx-data:/app/data
