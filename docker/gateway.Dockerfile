@@ -22,9 +22,8 @@ ARG OTEL_AGENT_VERSION=2.31.1
 
 WORKDIR /app
 
-RUN rm -rf /var/lib/apt/lists/* /etc/apt/keyrings/* \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+RUN apt-get update -o Acquire::AllowInsecureRepositories=true \
+    && apt-get install -y --allow-unauthenticated --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
 # 下载 OTel Java Agent（经 aliyun 镜像源）
