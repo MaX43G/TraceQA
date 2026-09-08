@@ -458,7 +458,6 @@ services:
     logging: *default-logging
     restart: unless-stopped
     mem_limit: 512m
-    command: ["--set-password", "${DBX_PASSWORD:-traceqa-dbx-2026}"]
     environment:
       DBX_PUBLIC_BASE_PATH: /dbx
       TZ: Asia/Shanghai
