@@ -4,7 +4,9 @@ import edu.zjut.traceqa.common.config.LightRagClient;
 import edu.zjut.traceqa.common.enums.DocumentStatus;
 import edu.zjut.traceqa.common.exception.BizException;
 import edu.zjut.traceqa.common.model.po.Document;
+import edu.zjut.traceqa.common.model.po.EsChunk;
 import edu.zjut.traceqa.common.model.vo.DocumentVO;
+import edu.zjut.traceqa.common.repository.EsChunkRepository;
 import edu.zjut.traceqa.kbservice.mapper.DocumentMapper;
 import jakarta.annotation.Resource;
 import lombok.AllArgsConstructor;
@@ -67,6 +69,8 @@ public class DocumentParseWorker {
     private LightRagClient lightRagClient;
     @Resource
     private DocumentProgressStore progressStore;
+    @Resource
+    private EsChunkRepository esChunkRepository;
 
     @Data
     @AllArgsConstructor
@@ -102,6 +106,16 @@ public class DocumentParseWorker {
                 }
             }
             progressStore.putTrackIds(doc.getId(), trackIds);
+
+            // 异步索引到 ES（关键词全文检索）
+            try {
+                List<EsChunk> esChunks = splitForEs(content, doc.getId(), doc.getKnowledgeBaseId(), doc.getOriginalName());
+                esChunkRepository.indexAll(esChunks);
+                log.info("ES 索引完成：{}，chunk 数={}", doc.getOriginalName(), esChunks.size());
+            } catch (Exception e) {
+                log.warn("ES 索引失败（不影响 LightRAG）：{}, err={}", doc.getOriginalName(), e.getMessage());
+            }
+
             return true;
         } catch (BizException e) {
             failDocument(doc, e.getMessage());
@@ -318,5 +332,60 @@ public class DocumentParseWorker {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    /**
+     * 将文档内容按段落切分为 ES 索引片段。
+     *
+     * <p>切分策略：按双换行（段落边界）切分，每段 300-1000 字符，
+     * 自动提取 Markdown 标题作为 headings。</p>
+     */
+    public List<EsChunk> splitForEs(byte[] content, Long documentId, Long knowledgeBaseId, String fileName) {
+        String text = new String(content, StandardCharsets.UTF_8);
+        List<EsChunk> chunks = new ArrayList<>();
+        String[] paragraphs = text.split("\\n\\s*\\n");
+        StringBuilder buffer = new StringBuilder();
+        List<String> currentHeadings = new ArrayList<>();
+        int chunkIndex = 0;
+
+        for (String para : paragraphs) {
+            String trimmed = para.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            // 提取 Markdown 标题
+            if (trimmed.startsWith("#")) {
+                String heading = trimmed.replaceFirst("^#+\\s*", "").trim();
+                if (!heading.isEmpty()) {
+                    // 根据标题层级更新 headings
+                    int level = 0;
+                    for (char c : trimmed.toCharArray()) {
+                        if (c == '#') level++;
+                        else break;
+                    }
+                    while (currentHeadings.size() >= level) {
+                        currentHeadings.removeLast();
+                    }
+                    currentHeadings.add(heading);
+                }
+            }
+
+            if (buffer.length() + trimmed.length() > 1000 && buffer.length() >= 300) {
+                // 当前 buffer 已积累足够内容，切分为一个 chunk
+                chunks.add(new EsChunk(documentId, knowledgeBaseId, fileName,
+                        buffer.toString().trim(), List.copyOf(currentHeadings), chunkIndex++));
+                buffer.setLength(0);
+            }
+            if (!buffer.isEmpty()) {
+                buffer.append("\n\n");
+            }
+            buffer.append(trimmed);
+        }
+        // 最后一个 chunk
+        if (!buffer.isEmpty()) {
+            chunks.add(new EsChunk(documentId, knowledgeBaseId, fileName,
+                    buffer.toString().trim(), List.copyOf(currentHeadings), chunkIndex));
+        }
+        return chunks;
     }
 }

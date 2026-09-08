@@ -5,6 +5,8 @@ import edu.zjut.traceqa.common.config.LightRagClient;
 import edu.zjut.traceqa.common.model.dto.EnhancedQuery;
 import edu.zjut.traceqa.common.model.dto.LlmConfig;
 import edu.zjut.traceqa.common.model.dto.RetrievedChunk;
+import edu.zjut.traceqa.common.model.po.EsChunk;
+import edu.zjut.traceqa.common.repository.EsChunkRepository;
 import edu.zjut.traceqa.qaservice.config.QaProperties;
 import edu.zjut.traceqa.qaservice.config.RerankClient;
 import edu.zjut.traceqa.qaservice.service.LlmService;
@@ -54,6 +56,9 @@ public class RetrievalService {
 
     @Resource
     private QaProperties qaProperties;
+
+    @Resource
+    private EsChunkRepository esChunkRepository;
 
     /**
      * 查询类型
@@ -154,7 +159,7 @@ public class RetrievalService {
     }
 
     /**
-     * 关键词检索（提取关键词后流式检索），5 分钟缓存
+     * 关键词检索（ES BM25 全文检索），5 分钟缓存
      */
     public List<RetrievedChunk> queryKeyword(String question, LlmConfig config, Consumer<String> progress) {
         String key = "kw:" + sha256(question);
@@ -164,8 +169,22 @@ public class RetrievalService {
             return cached.get();
         }
         List<String> keywords = extractKeywords(question, config);
-        List<RetrievedChunk> result = parseReferences(
-                lightRagClient.queryStream(question, "naive", keywords, progress), "keyword");
+        String queryText = keywords.isEmpty() ? question : String.join(" ", keywords);
+        if (progress != null) {
+            progress.accept("关键词检索：" + shortText(queryText));
+        }
+        List<EsChunk> esChunks = esChunkRepository.search(queryText, 10, null);
+        List<RetrievedChunk> result = new ArrayList<>();
+        for (int i = 0; i < esChunks.size(); i++) {
+            EsChunk es = esChunks.get(i);
+            result.add(new RetrievedChunk(
+                    "es_" + es.getDocumentId() + "_" + es.getChunkIndex(),
+                    es.getFileName(),
+                    es.getContent(),
+                    1.0 / (RRF_K + i + 1),
+                    "keyword",
+                    es.getHeadings() != null ? es.getHeadings() : List.of()));
+        }
         redisCacheService.put(key, result, Duration.ofMinutes(5));
         return result;
     }

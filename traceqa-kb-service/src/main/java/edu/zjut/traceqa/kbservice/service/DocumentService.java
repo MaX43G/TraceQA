@@ -12,6 +12,7 @@ import edu.zjut.traceqa.common.model.po.Document;
 import edu.zjut.traceqa.common.model.vo.BatchUploadVO;
 import edu.zjut.traceqa.common.model.vo.DocumentUploadVO;
 import edu.zjut.traceqa.common.model.vo.DocumentVO;
+import edu.zjut.traceqa.common.repository.EsChunkRepository;
 import edu.zjut.traceqa.kbservice.config.StorageProperties;
 import edu.zjut.traceqa.kbservice.mapper.DocumentMapper;
 import jakarta.annotation.Resource;
@@ -62,6 +63,8 @@ public class DocumentService {
     private DocumentParseWorker parseWorker;
     @Resource
     private KnowledgeBaseService knowledgeBaseService;
+    @Resource
+    private EsChunkRepository esChunkRepository;
 
     /**
      * 单文档上传
@@ -164,6 +167,12 @@ public class DocumentService {
         documentMapper.deleteById(id);
         progressStore.remove(id);
         deleteLocalFile(doc.getStoredPath());
+        // 清理 ES 索引
+        try {
+            esChunkRepository.deleteByDocumentId(id);
+        } catch (Exception e) {
+            log.warn("ES 清理失败（不影响文档删除）：docId={}, err={}", id, e.getMessage());
+        }
         log.info("文档已删除：{}", doc.getOriginalName());
     }
 
@@ -183,6 +192,49 @@ public class DocumentService {
      */
     public Map<String, Object> queueStats() {
         return documentQueueWorker.queueStats();
+    }
+
+    /**
+     * 将所有已完成文档重建到 ES 索引（一次性迁移）
+     *
+     * @param knowledgeBaseId 指定知识库 ID（null 表示全部）
+     * @return 索引的文档数
+     */
+    public int reindexEs(Long knowledgeBaseId) {
+        LambdaQueryWrapper<Document> wrapper = new LambdaQueryWrapper<Document>()
+                .eq(knowledgeBaseId != null, Document::getKnowledgeBaseId, knowledgeBaseId)
+                .eq(Document::getStatus, DocumentStatus.DONE.name());
+        List<Document> docs = documentMapper.selectList(wrapper);
+        int indexed = 0;
+        for (Document doc : docs) {
+            try {
+                byte[] content = readLocalFile(doc.getStoredPath());
+                if (content == null || content.length == 0) {
+                    log.warn("跳过空文件：{}", doc.getOriginalName());
+                    continue;
+                }
+                // 先清理旧的 ES 索引
+                esChunkRepository.deleteByDocumentId(doc.getId());
+                // 切段并索引
+                List<EsChunk> chunks = parseWorker.splitForEs(content, doc.getId(), doc.getKnowledgeBaseId(), doc.getOriginalName());
+                esChunkRepository.indexAll(chunks);
+                indexed++;
+                log.info("ES reindex 完成：{}，chunk 数={}", doc.getOriginalName(), chunks.size());
+            } catch (Exception e) {
+                log.error("ES reindex 失败：{}, err={}", doc.getOriginalName(), e.getMessage(), e);
+            }
+        }
+        log.info("ES reindex 全部完成：共 {} 个文档", indexed);
+        return indexed;
+    }
+
+    private byte[] readLocalFile(String storedPath) {
+        try {
+            return Files.readAllBytes(Paths.get(storedPath));
+        } catch (Exception e) {
+            log.warn("读取本地文件失败：{}, err={}", storedPath, e.getMessage());
+            return null;
+        }
     }
 
     private DocumentUploadVO uploadContent(String originalName, byte[] content, Long knowledgeBaseId) {

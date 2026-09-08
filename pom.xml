@@ -64,6 +64,7 @@
         <spring-ai.version>2.0.1</spring-ai.version>
         <httpcore5.version>5.4.3</httpcore5.version>
         <bcprov.version>1.85.2</bcprov.version>
+        <elasticsearch-java.version>9.5.3</elasticsearch-java.version>
     </properties>
 
     <dependencyManagement>
@@ -253,6 +254,12 @@
                 <groupId>io.github.resilience4j</groupId>
                 <artifactId>resilience4j-circuitbreaker</artifactId>
                 <version>2.2.0</version>
+            </dependency>
+            <!-- Elasticsearch Java Client -->
+            <dependency>
+                <groupId>co.elastic.clients</groupId>
+                <artifactId>elasticsearch-java</artifactId>
+                <version>${elasticsearch-java.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

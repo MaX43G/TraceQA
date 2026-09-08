@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 文档接口。
@@ -100,5 +101,16 @@ public class DocumentController {
     public ApiResponse<Void> delete(@PathVariable Long id) {
         documentService.delete(id);
         return ApiResponse.ok();
+    }
+
+    /**
+     * 将已完成文档批量重建到 ES 索引（一次性迁移）
+     */
+    @Operation(summary = "将已完成文档批量重建到 ES 索引")
+    @PostMapping("/reindex-es")
+    public ApiResponse<Map<String, Object>> reindexEs(
+            @RequestParam(required = false) Long knowledgeBaseId) {
+        int count = documentService.reindexEs(knowledgeBaseId);
+        return ApiResponse.ok(Map.of("indexedDocuments", count));
     }
 }

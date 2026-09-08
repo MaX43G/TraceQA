@@ -69,6 +69,11 @@ app:
     top-k: ${LIGHTRAG_TOP_K:8}
     connect-timeout: 5000
     read-timeout: 120000
+  # Elasticsearch（关键词全文检索）
+  elasticsearch:
+    host: ${ES_HOST:localhost}
+    port: ${ES_PORT:9200}
+    index-name: traceqa_chunks
 
 # springdoc
 springdoc:
