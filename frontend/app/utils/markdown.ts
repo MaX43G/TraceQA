@@ -123,11 +123,11 @@ md.use(taskLists, {enabled: true, label: false})
 md.use(footnote)
 
 // 代码块工具栏：包装高亮后的代码，提供「复制 / 运行」按钮
-const defaultFence = md.renderer.rules.fence!
+const defaultFence = md.renderer.rules.fence
 md.renderer.rules.fence = function (tokens, idx, options, env, self) {
     const token = tokens[idx]!
     const lang = (token.info.trim().split(/\s+/)[0] || '').toLowerCase()
-    const body = defaultFence(tokens, idx, options, env, self)
+    const body = defaultFence ? defaultFence(tokens, idx, options, env, self) : self.renderToken(tokens, idx, options)
     const runnable = ['javascript', 'js', 'python', 'py'].includes(lang)
     const codeB64 = encodeBase64(token.content)
     const runBtn = runnable
@@ -161,17 +161,20 @@ function escapeHtml(text: string): string {
 }
 
 // 链接在新标签页打开，并加上安全 rel
-const defaultLinkOpen = md.renderer.rules.link_open!
+const defaultLinkOpen = md.renderer.rules.link_open
 md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
     const token = tokens[idx]!
     token.attrSet('target', '_blank')
     token.attrSet('rel', 'noopener noreferrer')
-    return defaultLinkOpen(tokens, idx, options, env, self)
+    if (defaultLinkOpen) {
+        return defaultLinkOpen(tokens, idx, options, env, self)
+    }
+    return self.renderToken(tokens, idx, options)
 }
 
 // 提示框/告警：> [!NOTE] / [!TIP] / [!WARNING] / [!DANGER] / [!INFO]
 const calloutRe = /^\s*\[!(NOTE|TIP|WARNING|DANGER|INFO)]\s*/i
-const defaultBqOpen = md.renderer.rules.blockquote_open!
+const defaultBqOpen = md.renderer.rules.blockquote_open
 md.renderer.rules.blockquote_open = function (tokens, idx, options, env, self) {
     const inline = tokens[idx + 1]
     if (inline && inline.type === 'inline' && inline.children && inline.children.length) {
@@ -184,7 +187,10 @@ md.renderer.rules.blockquote_open = function (tokens, idx, options, env, self) {
                 `<div class="tq-callout-title">${m[1]?.toUpperCase()}</div>`
         }
     }
-    return defaultBqOpen(tokens, idx, options, env, self)
+    if (defaultBqOpen) {
+        return defaultBqOpen(tokens, idx, options, env, self)
+    }
+    return self.renderToken(tokens, idx, options)
 }
 
 export function renderMarkdown(content: string, availableIndexes?: Set<number>): string {
