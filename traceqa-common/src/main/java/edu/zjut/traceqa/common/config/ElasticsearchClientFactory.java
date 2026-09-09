@@ -33,6 +33,7 @@ public class ElasticsearchClientFactory {
     @Getter
     private ElasticsearchClient client;
 
+    @Getter
     private RestClient restClient;
 
     @PostConstruct

@@ -9,11 +9,13 @@ import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.bulk.BulkOperation;
 import co.elastic.clients.elasticsearch.core.search.HighlightField;
 import co.elastic.clients.elasticsearch.core.search.Hit;
+import co.elastic.clients.elasticsearch.indices.ExistsRequest;
 import co.elastic.clients.util.NamedValue;
 import edu.zjut.traceqa.common.config.ElasticsearchClientFactory;
 import edu.zjut.traceqa.common.config.ElasticsearchProperties;
 import edu.zjut.traceqa.common.model.po.EsChunk;
 import jakarta.annotation.Resource;
+import org.elasticsearch.client.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
@@ -40,12 +42,46 @@ public class EsChunkRepository {
     private ElasticsearchProperties properties;
 
     /**
+     * 确保 ES 索引存在，不存在则创建并配置 mapping。
+     */
+    public void ensureIndexExists() {
+        try {
+            ElasticsearchClient client = clientFactory.getClient();
+            boolean exists = client.indices().exists(
+                    ExistsRequest.of(e -> e.index(properties.getIndexName()))
+            ).value();
+            if (exists) {
+                return;
+            }
+            Request request = new Request("PUT", "/" + properties.getIndexName());
+            request.setJsonEntity("""
+                    {
+                      "mappings": {
+                        "properties": {
+                          "documentId": { "type": "keyword" },
+                          "knowledgeBaseId": { "type": "keyword" },
+                          "fileName": { "type": "text" },
+                          "content": { "type": "text", "analyzer": "standard" },
+                          "headings": { "type": "text" },
+                          "chunkIndex": { "type": "integer" }
+                        }
+                      }
+                    }""");
+            clientFactory.getRestClient().performRequest(request);
+            log.info("ES 索引已创建：{}", properties.getIndexName());
+        } catch (IOException e) {
+            log.error("ES 创建索引失败：{}", e.getMessage(), e);
+        }
+    }
+
+    /**
      * 批量索引文档片段
      */
     public void indexAll(List<EsChunk> chunks) {
         if (chunks == null || chunks.isEmpty()) {
             return;
         }
+        ensureIndexExists();
         try {
             ElasticsearchClient client = clientFactory.getClient();
             List<BulkOperation> operations = new ArrayList<>();
@@ -67,7 +103,7 @@ public class EsChunkRepository {
     }
 
     /**
-     * 按文档 ID 删除所有关联片段
+     * 按文档 ID 删除所有关联片段（索引不存在时静默跳过）
      */
     public void deleteByDocumentId(Long documentId) {
         if (documentId == null) {
@@ -75,6 +111,13 @@ public class EsChunkRepository {
         }
         try {
             ElasticsearchClient client = clientFactory.getClient();
+            boolean exists = client.indices().exists(
+                    ExistsRequest.of(e -> e.index(properties.getIndexName()))
+            ).value();
+            if (!exists) {
+                log.debug("ES 索引不存在，跳过删除：documentId={}", documentId);
+                return;
+            }
             DeleteByQueryRequest request = DeleteByQueryRequest.of(b -> b
                     .index(properties.getIndexName())
                     .query(q -> q.term(t -> t
