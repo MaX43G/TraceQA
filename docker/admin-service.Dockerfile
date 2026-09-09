@@ -16,15 +16,10 @@ FROM eclipse-temurin:25-jre-alpine
 
 WORKDIR /app
 
-# 清理 JRE 冗余文件
-RUN rm -rf /opt/java/openjdk/lib/src.zip \
-           /opt/java/openjdk/demo \
-           /opt/java/openjdk/man \
-           /opt/java/openjdk/sample \
-           /opt/java/openjdk/jmods \
-    2>/dev/null; true
-
 COPY --from=build /app/traceqa-admin-service/target/*.jar app.jar
+
+RUN rm -rf /opt/java/openjdk/lib/src.zip /opt/java/openjdk/demo \
+           /opt/java/openjdk/man /opt/java/openjdk/sample /opt/java/openjdk/jmods
 
 # 管理服务需访问宿主机 Docker Engine（/var/run/docker.sock 挂载）以提供
 # 「系统资源检测 / 无用资源清理」能力。挂载 socket 已等价于宿主机 root 权限，
