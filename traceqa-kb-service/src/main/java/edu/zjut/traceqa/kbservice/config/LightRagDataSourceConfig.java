@@ -9,10 +9,13 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 
 /**
- * LightRAG 数据库（traceqa_lightrag）独立数据源配置。
+ * 多数据源配置：
+ * - 主库（traceqa_kb）：Spring Boot 自动配置，@Primary
+ * - LightRAG 库（traceqa_lightrag）：独立 SqlSessionFactory
  */
 @Configuration
 @MapperScan(basePackages = "edu.zjut.traceqa.kbservice.lightrag",
@@ -27,6 +30,26 @@ public class LightRagDataSourceConfig {
 
     @Value("${app.lightrag.datasource.password}")
     private String password;
+
+    /**
+     * 显式声明主库 DataSource，标记 @Primary，
+     * 防止 Spring Boot 自动配置的 DataSource 被 LightRAG 覆盖。
+     */
+    @Bean("dataSource")
+    @Primary
+    public HikariDataSource dataSource(
+            @Value("${spring.datasource.url}") String url,
+            @Value("${spring.datasource.username}") String dbUsername,
+            @Value("${spring.datasource.password}") String dbPassword) {
+        HikariDataSource ds = new HikariDataSource();
+        ds.setJdbcUrl(url);
+        ds.setUsername(dbUsername);
+        ds.setPassword(dbPassword);
+        ds.setDriverClassName("org.postgresql.Driver");
+        ds.setMaximumPoolSize(10);
+        ds.setPoolName("main-pool");
+        return ds;
+    }
 
     @Bean("lightRagDataSource")
     public HikariDataSource lightRagDataSource() {
