@@ -48,11 +48,11 @@
           <div class="data-item__body">
             <template v-for="(value, key) in node.data" :key="String(key)">
               <div v-if="String(key) === 'prompt'" class="data-kv">
-                <a-button type="link" size="small" @click="openPrompt(value as string)">
+                <a-button type="link" size="small" @click="openPrompt(value as string, node.data?.systemPrompt as string | undefined)">
                   查看完整提示词 ({{ (value as string).length }} 字符)
                 </a-button>
               </div>
-              <div v-else class="data-kv">
+              <div v-else-if="String(key) !== 'systemPrompt'" class="data-kv">
                 <span class="data-kv__key">{{ formatKey(String(key)) }}：</span>
                 <span class="data-kv__value">{{ formatValue(value) }}</span>
               </div>
@@ -146,8 +146,10 @@ function nodeOf(stage: string): ThinkingNodeVO | undefined {
   return props.nodes.find((n) => n.stage === stage)
 }
 
-function openPrompt(prompt: string) {
-  promptContent.value = prompt
+function openPrompt(prompt: string, systemPrompt?: string) {
+  promptContent.value = systemPrompt
+    ? `【System Prompt】\n${systemPrompt}\n\n【User Message】\n${prompt}`
+    : prompt
   promptModalOpen.value = true
 }
 
@@ -215,7 +217,8 @@ function formatKey(key: string): string {
     fusedCount: '融合总数',
     fusedSources: '融合来源',
     pathLabel: '检索路径',
-    promptLength: '提示词长度'
+    promptLength: '提示词长度',
+    systemPrompt: '系统提示词'
   }
   return map[key] || key
 }

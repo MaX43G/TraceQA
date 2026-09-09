@@ -10,6 +10,7 @@ import edu.zjut.traceqa.common.model.dto.RetrievalResult;
 import edu.zjut.traceqa.common.model.dto.RetrievedChunk;
 import edu.zjut.traceqa.common.model.po.ChatMessage;
 import edu.zjut.traceqa.common.model.po.ChatSession;
+import edu.zjut.traceqa.common.model.po.SystemPrompt;
 import edu.zjut.traceqa.common.model.vo.ReferenceVO;
 import edu.zjut.traceqa.common.model.vo.ThinkingNodeVO;
 import edu.zjut.traceqa.qaservice.retrieval.RetrievalService;
@@ -17,6 +18,7 @@ import edu.zjut.traceqa.qaservice.service.ChatService;
 import edu.zjut.traceqa.qaservice.service.LlmService;
 import edu.zjut.traceqa.qaservice.service.OpenAiCompatClient;
 import edu.zjut.traceqa.qaservice.service.RedisCacheService;
+import edu.zjut.traceqa.qaservice.service.SystemPromptService;
 import edu.zjut.traceqa.qaservice.sse.SsePublisher;
 import edu.zjut.traceqa.qaservice.metrics.RagMetrics;
 import jakarta.annotation.Resource;
@@ -68,6 +70,8 @@ public class RagAgentOrchestrator {
     private RedisCacheService redisCacheService;
     @Resource
     private RagMetrics ragMetrics;
+    @Resource
+    private SystemPromptService systemPromptService;
 
     /**
      * 并行检索时保护 thinking 节点列表与 SSE 进度推送的锁
@@ -399,7 +403,16 @@ public class RagAgentOrchestrator {
             ssePublisher.send(emitter, "delta", Map.of("content", answer));
         }
         String modelName = config != null && config.getModel() != null ? config.getModel() : "平台默认";
-        node.setData(Map.of("model", modelName, "promptLength", prompt.length(), "prompt", prompt));
+        SystemPrompt sp = systemPromptService.getActive("summary");
+        String systemPrompt = sp != null ? sp.getContent() : null;
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("model", modelName);
+        data.put("promptLength", prompt.length());
+        if (systemPrompt != null && !systemPrompt.isBlank()) {
+            data.put("systemPrompt", systemPrompt);
+        }
+        data.put("prompt", prompt);
+        node.setData(data);
         finishThinking(thinking, emitter, "总结生成", "回答生成完毕（模型：" + modelName + "）");
         return answer;
     }
