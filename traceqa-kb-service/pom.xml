@@ -60,12 +60,6 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- JdbcTemplate -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-jdbc</artifactId>
-        </dependency>
-
         <!-- Flyway 数据库迁移 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -1,17 +1,18 @@
 package edu.zjut.traceqa.kbservice.service;
 
+import edu.zjut.traceqa.common.model.po.LightRagChunk;
+import edu.zjut.traceqa.kbservice.lightrag.LightRagChunkMapper;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.Resource;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 从 LightRAG 数据库（lightrag_chunks 表）读取文档切片内容。
+ *
+ * <p>当本地文件丢失时，作为 reindexEs 的降级数据源。</p>
  */
 @Service
 public class LightRagChunkService {
@@ -19,8 +20,7 @@ public class LightRagChunkService {
     private static final Logger log = LoggerFactory.getLogger(LightRagChunkService.class);
 
     @Resource
-    @Qualifier("lightRagJdbcTemplate")
-    private JdbcTemplate lightRagJdbcTemplate;
+    private LightRagChunkMapper lightRagChunkMapper;
 
     /**
      * 根据文件名匹配，获取该文档所有 LightRAG 切片内容并按顺序拼接。
@@ -30,17 +30,15 @@ public class LightRagChunkService {
      */
     public String getDocumentContent(String fileName) {
         try {
-            String searchPattern = "%" + extractBaseName(fileName) + "%";
-            List<Map<String, Object>> rows = lightRagJdbcTemplate.queryForList(
-                    "SELECT content, metadata FROM lightrag_chunks WHERE metadata->>'file_path' LIKE ? ORDER BY id",
-                    searchPattern);
-            if (rows.isEmpty()) {
+            String pattern = "%" + extractBaseName(fileName) + "%";
+            List<LightRagChunk> chunks = lightRagChunkMapper.selectByFilePathPattern(pattern);
+            if (chunks.isEmpty()) {
                 log.debug("LightRAG 中未找到匹配切片：{}", fileName);
                 return null;
             }
             StringBuilder sb = new StringBuilder();
-            for (Map<String, Object> row : rows) {
-                String content = (String) row.get("content");
+            for (LightRagChunk chunk : chunks) {
+                String content = chunk.getContent();
                 if (content != null && !content.isBlank()) {
                     if (!sb.isEmpty()) {
                         sb.append("\n\n");
@@ -48,7 +46,7 @@ public class LightRagChunkService {
                     sb.append(content);
                 }
             }
-            log.info("从 LightRAG 恢复文档内容：{}，切片数={}", fileName, rows.size());
+            log.info("从 LightRAG 恢复文档内容：{}，切片数={}", fileName, chunks.size());
             return sb.toString();
         } catch (Exception e) {
             log.error("查询 LightRAG 切片失败：{}, err={}", fileName, e.getMessage());
@@ -56,9 +54,6 @@ public class LightRagChunkService {
         }
     }
 
-    /**
-     * 提取文件名基础部分（去掉 _partXofY 后缀和扩展名）。
-     */
     private String extractBaseName(String fileName) {
         if (fileName == null) return "";
         String name = fileName.contains(".") ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
