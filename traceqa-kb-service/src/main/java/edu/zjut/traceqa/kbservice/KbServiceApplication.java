@@ -11,7 +11,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * 扫描 {@code edu.zjut.traceqa} 以加载通用库与共享的 LightRAG 客户端。</p>
  */
 @SpringBootApplication(scanBasePackages = "edu.zjut.traceqa")
-@MapperScan("edu.zjut.traceqa.kbservice.mapper")
+@MapperScan(basePackages = "edu.zjut.traceqa.kbservice.mapper",
+        sqlSessionFactoryRef = "sqlSessionFactory")
 public class KbServiceApplication {
 
     /**

@@ -14,7 +14,7 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 
 /**
  * 多数据源配置：
- * - 主库（traceqa_kb）：Spring Boot 自动配置，@Primary
+ * - 主库（traceqa_kb）：@Primary，供主 Mapper 使用
  * - LightRAG 库（traceqa_lightrag）：独立 SqlSessionFactory
  */
 @Configuration
@@ -31,10 +31,7 @@ public class LightRagDataSourceConfig {
     @Value("${app.lightrag.datasource.password}")
     private String password;
 
-    /**
-     * 显式声明主库 DataSource，标记 @Primary，
-     * 防止 Spring Boot 自动配置的 DataSource 被 LightRAG 覆盖。
-     */
+    /** 主库 DataSource（traceqa_kb） */
     @Bean("dataSource")
     @Primary
     public HikariDataSource dataSource(
@@ -51,6 +48,23 @@ public class LightRagDataSourceConfig {
         return ds;
     }
 
+    /** 主库 SqlSessionFactory（traceqa_kb） */
+    @Bean("sqlSessionFactory")
+    @Primary
+    public SqlSessionFactory sqlSessionFactory(
+            @Qualifier("dataSource") HikariDataSource dataSource) throws Exception {
+        MybatisSqlSessionFactoryBean factory = new MybatisSqlSessionFactoryBean();
+        factory.setDataSource(dataSource);
+        com.baomidou.mybatisplus.core.config.GlobalConfig globalConfig = new com.baomidou.mybatisplus.core.config.GlobalConfig();
+        globalConfig.setBanner(false);
+        factory.setGlobalConfig(globalConfig);
+        com.baomidou.mybatisplus.core.MybatisConfiguration config = new com.baomidou.mybatisplus.core.MybatisConfiguration();
+        config.setMapUnderscoreToCamelCase(true);
+        factory.setConfiguration(config);
+        return factory.getObject();
+    }
+
+    /** LightRAG 库 DataSource（traceqa_lightrag） */
     @Bean("lightRagDataSource")
     public HikariDataSource lightRagDataSource() {
         HikariDataSource ds = new HikariDataSource();
@@ -63,6 +77,7 @@ public class LightRagDataSourceConfig {
         return ds;
     }
 
+    /** LightRAG 库 SqlSessionFactory（traceqa_lightrag） */
     @Bean("lightRagSqlSessionFactory")
     public SqlSessionFactory lightRagSqlSessionFactory(
             @Qualifier("lightRagDataSource") HikariDataSource dataSource) throws Exception {
