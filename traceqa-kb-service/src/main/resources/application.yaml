@@ -69,6 +69,10 @@ app:
     top-k: ${LIGHTRAG_TOP_K:8}
     connect-timeout: 5000
     read-timeout: 120000
+    datasource:
+      jdbc-url: jdbc:postgresql://${PG_HOST:localhost}:${PG_PORT:5432}/traceqa_lightrag?currentSchema=public
+      username: ${PG_USER:traceqa}
+      password: ${PG_PASSWORD:traceqa123}
   # Elasticsearch（关键词全文检索）
   elasticsearch:
     host: ${ES_HOST:localhost}

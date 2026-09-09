@@ -66,6 +66,8 @@ public class DocumentService {
     private KnowledgeBaseService knowledgeBaseService;
     @Resource
     private EsChunkRepository esChunkRepository;
+    @Resource
+    private LightRagChunkService lightRagChunkService;
 
     /**
      * 单文档上传
@@ -209,10 +211,16 @@ public class DocumentService {
         int indexed = 0;
         for (Document doc : docs) {
             try {
+                // 优先读本地文件，若不存在则从 LightRAG 数据库恢复
                 byte[] content = readLocalFile(doc.getStoredPath());
                 if (content == null || content.length == 0) {
-                    log.warn("跳过空文件：{}", doc.getOriginalName());
-                    continue;
+                    log.info("本地文件缺失，尝试从 LightRAG 恢复：{}", doc.getOriginalName());
+                    String lightragContent = lightRagChunkService.getDocumentContent(doc.getOriginalName());
+                    if (lightragContent == null || lightragContent.isBlank()) {
+                        log.warn("跳过：本地文件和 LightRAG 中均无内容：{}", doc.getOriginalName());
+                        continue;
+                    }
+                    content = lightragContent.getBytes(java.nio.charset.StandardCharsets.UTF_8);
                 }
                 // 先清理旧的 ES 索引
                 esChunkRepository.deleteByDocumentId(doc.getId());
