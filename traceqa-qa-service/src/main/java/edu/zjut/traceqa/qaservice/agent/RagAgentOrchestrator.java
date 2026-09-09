@@ -405,7 +405,7 @@ public class RagAgentOrchestrator {
             ssePublisher.send(emitter, "delta", Map.of("content", answer));
         }
         String modelName = config != null && config.getModel() != null ? config.getModel() : "平台默认";
-        node.setData(Map.of("model", modelName, "promptLength", prompt.length()));
+        node.setData(Map.of("model", modelName, "promptLength", prompt.length(), "prompt", prompt));
         finishThinking(thinking, emitter, "总结生成", "回答生成完毕（模型：" + modelName + "）");
         return answer;
     }

@@ -47,7 +47,12 @@
           </div>
           <div class="data-item__body">
             <template v-for="(value, key) in node.data" :key="String(key)">
-              <div class="data-kv">
+              <div v-if="String(key) === 'prompt'" class="data-kv">
+                <a-button type="link" size="small" @click="openPrompt(value as string)">
+                  查看完整提示词 ({{ (value as string).length }} 字符)
+                </a-button>
+              </div>
+              <div v-else class="data-kv">
                 <span class="data-kv__key">{{ formatKey(String(key)) }}：</span>
                 <span class="data-kv__value">{{ formatValue(value) }}</span>
               </div>
@@ -56,6 +61,11 @@
         </div>
       </div>
     </div>
+
+    <!-- 完整提示词弹窗 -->
+    <a-modal v-model:open="promptModalOpen" title="完整提示词" :footer="null" width="720px" destroy-on-close>
+      <div class="prompt-content">{{ promptContent }}</div>
+    </a-modal>
   </div>
 </template>
 
@@ -128,10 +138,17 @@ const nodesWithData = computed<ThinkingNodeVO[]>(() =>
 )
 
 const showData = ref(false)
+const promptModalOpen = ref(false)
+const promptContent = ref('')
 
 /** 获取某阶段的节点 */
 function nodeOf(stage: string): ThinkingNodeVO | undefined {
   return props.nodes.find((n) => n.stage === stage)
+}
+
+function openPrompt(prompt: string) {
+  promptContent.value = prompt
+  promptModalOpen.value = true
 }
 
 /** 判断某阶段是否处于指定状态 */
@@ -384,5 +401,19 @@ function formatValue(value: unknown): string {
   50% {
     box-shadow: 0 0 0 6px rgba(22, 119, 255, 0.2);
   }
+}
+
+.prompt-content {
+  max-height: 600px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  background: #f7f8fa;
+  padding: 12px;
+  border-radius: 6px;
+  color: #1d2129;
+  word-break: break-all;
 }
 </style>
