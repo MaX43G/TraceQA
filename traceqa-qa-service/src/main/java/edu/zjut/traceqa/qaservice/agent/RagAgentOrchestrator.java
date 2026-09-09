@@ -213,9 +213,13 @@ public class RagAgentOrchestrator {
 
         if (type == RetrievalService.QueryType.DEFINITION) {
             EnhancedQuery simple = new EnhancedQuery(content, null, null);
-            List<RetrievedChunk> vectorChunks = runVector(emitter, thinking, content, simple, cancelled);
+            CompletableFuture<List<RetrievedChunk>> defVectorFuture = CompletableFuture.supplyAsync(
+                    () -> runVector(emitter, thinking, content, simple, cancelled));
+            CompletableFuture<List<RetrievedChunk>> defKeywordFuture = CompletableFuture.supplyAsync(
+                    () -> runKeyword(emitter, thinking, content, config, cancelled));
+            List<RetrievedChunk> vectorChunks = defVectorFuture.join();
             List<RetrievedChunk> keywordChunks = vectorChunks.size() < KEYWORD_FALLBACK_THRESHOLD
-                    ? runKeyword(emitter, thinking, content, config, cancelled) : List.of();
+                    ? defKeywordFuture.join() : List.of();
             List<RetrievedChunk> fused = retrievalService.fuse(List.of(vectorChunks, keywordChunks));
             ThinkingNodeVO fuseNode = startThinking(thinking, "融合与补全", "fusion-agent",
                     "正在融合关键词与向量结果");
@@ -259,10 +263,11 @@ public class RagAgentOrchestrator {
                 });
         CompletableFuture<List<RetrievedChunk>> vectorFuture = CompletableFuture.supplyAsync(
                         () -> runVector(emitter, thinking, content, enhanced, cancelled));
+        CompletableFuture<List<RetrievedChunk>> keywordFuture = CompletableFuture.supplyAsync(
+                        () -> runKeyword(emitter, thinking, content, config, cancelled));
         List<RetrievedChunk> graphChunks = graphFuture.join();
         List<RetrievedChunk> vectorChunks = vectorFuture.join();
-
-        List<RetrievedChunk> keywordChunks = runKeyword(emitter, thinking, content, config, cancelled);
+        List<RetrievedChunk> keywordChunks = keywordFuture.join();
 
         // 1) 结果融合
         ThinkingNodeVO fuseNode = startThinking(thinking, "结果融合", "fusion-agent", "正在融合三路检索结果");

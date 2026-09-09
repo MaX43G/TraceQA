@@ -112,10 +112,14 @@ const displayedStages = computed<string[]>(() =>
 /** 是否存在运行中的节点 */
 const anyRunning = computed<boolean>(() => props.nodes.some((n) => n.status === 'running'))
 
-/** 所有节点总耗时*/
-const totalCostMs = computed<number>(() =>
-    props.nodes.reduce((sum, n) => sum + Number(n.costMs ?? 0), 0)
-)
+/** 所有节点总耗时（并行节点取最晚结束时间，不重复累加）*/
+const totalCostMs = computed<number>(() => {
+    const nodes = props.nodes.filter(n => n.startMillis && n.costMs)
+    if (!nodes.length) return 0
+    const earliest = Math.min(...nodes.map(n => n.startMillis!))
+    const latest = Math.max(...nodes.map(n => n.startMillis! + n.costMs!))
+    return latest - earliest
+})
 
 /** 是否有节点携带 data 字段 */
 const hasAnyData = computed<boolean>(() => props.nodes.some((n) => n.data && Object.keys(n.data).length > 0))

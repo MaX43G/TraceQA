@@ -373,6 +373,7 @@ declare namespace API {
         message?: string;
         detail?: string;
         costMs?: number;
+        startMillis?: number;
         data?: Record<string, unknown>;
     };
 
