@@ -52,11 +52,6 @@ public class RagAgentOrchestrator {
 
     private static final Logger log = LoggerFactory.getLogger(RagAgentOrchestrator.class);
 
-    /**
-     * 关键词检索作为首次查询补充：命中数达到该阈值时跳过关键词
-     */
-    private static final int KEYWORD_FALLBACK_THRESHOLD = 4;
-
     @Resource
     private ChatService chatService;
     @Resource
@@ -218,8 +213,7 @@ public class RagAgentOrchestrator {
             CompletableFuture<List<RetrievedChunk>> defKeywordFuture = CompletableFuture.supplyAsync(
                     () -> runKeyword(emitter, thinking, content, config, cancelled));
             List<RetrievedChunk> vectorChunks = defVectorFuture.join();
-            List<RetrievedChunk> keywordChunks = vectorChunks.size() < KEYWORD_FALLBACK_THRESHOLD
-                    ? defKeywordFuture.join() : List.of();
+            List<RetrievedChunk> keywordChunks = defKeywordFuture.join();
             List<RetrievedChunk> fused = retrievalService.fuse(List.of(vectorChunks, keywordChunks));
             ThinkingNodeVO fuseNode = startThinking(thinking, "结果融合", "fusion-agent",
                     "正在融合关键词与向量结果");
