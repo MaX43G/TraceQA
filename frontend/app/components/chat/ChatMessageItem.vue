@@ -152,8 +152,7 @@ const resolvedStats = computed<RetrievalStats | undefined>(() => {
   const keywordHits = Number(d.keywordCount ?? 0)
   const fusedCount = Number(d.fusedCount ?? 0)
   if (graphHits + vectorHits + keywordHits === 0) return undefined
-  const sysNode = trace.find(n => n.stage === '系统参数')
-  const elapsedMs = sysNode?.data ? Number((sysNode.data as Record<string, unknown>).totalLatencyMs ?? 0) : 0
+  const elapsedMs = Number(props.msg.stats?.elapsedMs ?? 0)
   const sourceDocs: Record<string, number> = {}
   const fusedSources = d.fusedSources
   if (Array.isArray(fusedSources)) {

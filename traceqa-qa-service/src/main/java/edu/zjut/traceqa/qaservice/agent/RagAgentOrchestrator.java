@@ -221,10 +221,13 @@ public class RagAgentOrchestrator {
             List<RetrievedChunk> keywordChunks = vectorChunks.size() < KEYWORD_FALLBACK_THRESHOLD
                     ? defKeywordFuture.join() : List.of();
             List<RetrievedChunk> fused = retrievalService.fuse(List.of(vectorChunks, keywordChunks));
-            ThinkingNodeVO fuseNode = startThinking(thinking, "融合与补全", "fusion-agent",
+            ThinkingNodeVO fuseNode = startThinking(thinking, "结果融合", "fusion-agent",
                     "正在融合关键词与向量结果");
             ssePublisher.send(emitter, "thinking", fuseNode);
-            finishThinking(thinking, emitter, "融合与补全", "融合后共 " + fused.size() + " 条");
+            fuseNode.setData(Map.of(
+                    "fusedCount", fused.size(),
+                    "fusedSources", filePaths(fused)));
+            finishThinking(thinking, emitter, "结果融合", "融合后共 " + fused.size() + " 条");
             emitRetrievalStats(emitter, 0, vectorChunks.size(), keywordChunks.size(), fused, retrieveStart);
             return new RetrievalResult(fused, true);
         }
@@ -278,9 +281,6 @@ public class RagAgentOrchestrator {
                 "vectorCount", vectorChunks.size(),
                 "keywordCount", keywordChunks.size(),
                 "fusedCount", fused.size(),
-                "graphSources", filePaths(graphChunks),
-                "vectorSources", filePaths(vectorChunks),
-                "keywordSources", filePaths(keywordChunks),
                 "fusedSources", filePaths(fused)));
         finishThinking(thinking, emitter, "结果融合", "融合后共 " + fused.size() + " 条");
 

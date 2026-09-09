@@ -93,12 +93,10 @@ const FLOW_STAGES = [
   '向量检索',
   '关键词检索',
   '结果融合',
-  '融合与补全',
   '二次检索补全',
   '结果精排',
   '总结生成',
-  '直接应答',
-  '系统参数'
+  '直接应答'
 ]
 
 /** 可选阶段：未启用（后端未下发对应节点）时不展示，避免流程图出现永不执行的步骤 */
@@ -198,9 +196,6 @@ function formatKey(key: string): string {
     vectorCount: '向量命中',
     keywordCount: '关键词命中',
     fusedCount: '融合总数',
-    graphSources: '图谱来源',
-    vectorSources: '向量来源',
-    keywordSources: '关键词来源',
     fusedSources: '融合来源',
     pathLabel: '检索路径',
     promptLength: '提示词长度'
