@@ -155,6 +155,7 @@ declare namespace API {
         content?: string;
         thinkingTrace?: ThinkingNodeVO[];
         references?: ReferenceVO[];
+        reasoningContent?: string;
         latencyMs?: number;
         createTime?: string;
     };

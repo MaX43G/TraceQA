@@ -44,6 +44,11 @@ public class ChatMessage extends BaseEntity {
     private String references;
 
     /**
+     * 推理过程内容（DeepSeek R1 等推理模型的思考链）
+     */
+    private String reasoningContent;
+
+    /**
      * 生成耗时（毫秒，AI 消息）
      */
     private Long latencyMs;

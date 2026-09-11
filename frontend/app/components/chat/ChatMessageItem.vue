@@ -135,10 +135,15 @@ const avatarStyle = computed<Record<string, string>>(() =>
 /** 是否存在思考链路 */
 const hasThinking = computed<boolean>(() => (props.msg.thinkingTrace?.length ?? 0) > 0)
 
-/** 推理过程内容（流式阶段取 reasoningBuffer，回答完成后同样保留显示供用户查看） */
-const reasoningContent = computed<string>(() =>
-    props.msg.reasoningBuffer ?? ''
-)
+/** 推理过程内容（流式阶段取 reasoningBuffer，回答完成后从 msg.reasoningContent 读取持久化内容） */
+const reasoningContent = computed<string>(() => {
+    // 流式阶段使用 reasoningBuffer
+    if (props.streaming && props.msg.reasoningBuffer) {
+        return props.msg.reasoningBuffer
+    }
+    // 回答完成后从持久化字段读取
+    return (props.msg as any).reasoningContent ?? props.msg.reasoningBuffer ?? ''
+})
 
 const resolvedStats = computed<RetrievalStats | undefined>(() => {
   if (props.msg.stats) return props.msg.stats

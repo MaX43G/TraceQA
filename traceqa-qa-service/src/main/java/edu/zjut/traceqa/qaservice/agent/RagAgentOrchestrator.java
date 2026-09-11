@@ -113,6 +113,7 @@ public class RagAgentOrchestrator {
     public void streamChat(Long userId, ChatStreamRequest request, SseEmitter emitter, AtomicBoolean cancelled) {
         ragMetrics.queryStart();
         List<ThinkingNodeVO> thinking = new ArrayList<>();
+        StringBuilder reasoningAccumulator = new StringBuilder();
         long start = System.currentTimeMillis();
         LlmConfig modelConfig = toLlmConfig(request);
         try {
@@ -126,7 +127,7 @@ public class RagAgentOrchestrator {
             String answer;
             List<ReferenceVO> references = List.of();
             if (isDirectAnswer(intent)) {
-                answer = respondDirect(emitter, thinking, request.getContent(), modelConfig, cancelled);
+                answer = respondDirect(emitter, thinking, request.getContent(), modelConfig, cancelled, reasoningAccumulator);
             } else {
                 RetrievalResult result = retrieve(emitter, thinking, request.getContent(), history, modelConfig, cancelled);
                 if (!result.hasContent()) {
@@ -137,10 +138,10 @@ public class RagAgentOrchestrator {
                 }
                 List<String> highlight = extractHighlightTerms(request.getContent());
                 references = emitReferences(emitter, result, highlight);
-                answer = generateAnswer(emitter, thinking, request.getContent(), history, result, modelConfig, cancelled);
+                answer = generateAnswer(emitter, thinking, request.getContent(), history, result, modelConfig, cancelled, reasoningAccumulator);
             }
 
-            persistAndFinish(session, thinking, references, answer, start, emitter);
+            persistAndFinish(session, thinking, references, answer, reasoningAccumulator.toString(), start, emitter);
             ssePublisher.complete(emitter);
         } catch (Exception e) {
             String trace = java.util.Arrays.stream(e.getStackTrace())
@@ -412,12 +413,12 @@ public class RagAgentOrchestrator {
      */
     private String generateAnswer(SseEmitter emitter, List<ThinkingNodeVO> thinking,
                                   String content, String history, RetrievalResult result, LlmConfig config,
-                                  AtomicBoolean cancelled) {
+                                  AtomicBoolean cancelled, StringBuilder reasoningAccumulator) {
         ThinkingNodeVO node = startThinking(thinking, "总结生成", "answer-agent", "正在生成回答");
         ssePublisher.send(emitter, "thinking", node);
 
         String prompt = buildAnswerPrompt(content, history, result);
-        String answer = streamAnswer(emitter, prompt, config, cancelled);
+        String answer = streamAnswer(emitter, prompt, config, cancelled, reasoningAccumulator);
         answer = fixCitationFormat(answer);
         if (answer.isBlank()) {
             answer = degradedAnswer(result);
@@ -443,10 +444,10 @@ public class RagAgentOrchestrator {
      * 寒暄/系统咨询：直接应答，不进入检索链路
      */
     private String respondDirect(SseEmitter emitter, List<ThinkingNodeVO> thinking, String content,
-                                 LlmConfig config, AtomicBoolean cancelled) {
+                                 LlmConfig config, AtomicBoolean cancelled, StringBuilder reasoningAccumulator) {
         ThinkingNodeVO node = startThinking(thinking, "直接应答", "answer-agent", "无需检索，直接应答");
         ssePublisher.send(emitter, "thinking", node);
-        String answer = consumeWithReasoning(emitter, llmService.callStreamWithReasoning("chat", content, config), cancelled);
+        String answer = consumeWithReasoning(emitter, llmService.callStreamWithReasoning("chat", content, config), cancelled, reasoningAccumulator);
         if (answer.isBlank()) {
             answer = FALLBACK_ANSWER;
             ssePublisher.send(emitter, "delta", Map.of("content", answer));
@@ -455,9 +456,10 @@ public class RagAgentOrchestrator {
         return answer;
     }
 
-    private String streamAnswer(SseEmitter emitter, String prompt, LlmConfig config, AtomicBoolean cancelled) {
+    private String streamAnswer(SseEmitter emitter, String prompt, LlmConfig config, AtomicBoolean cancelled,
+                                 StringBuilder reasoningAccumulator) {
         StringBuilder acc = new StringBuilder();
-        acc.append(consumeWithReasoning(emitter, llmService.callStreamWithReasoning("summary", prompt, config), cancelled));
+        acc.append(consumeWithReasoning(emitter, llmService.callStreamWithReasoning("summary", prompt, config), cancelled, reasoningAccumulator));
         if (acc.isEmpty()) {
             acc.append(consume(emitter, answerAgent.streamAnswer(prompt, config), cancelled));
         }
@@ -480,10 +482,13 @@ public class RagAgentOrchestrator {
      * 消费含推理过程的内容块流：content → delta 事件，reasoning_content → reasoning 事件
      */
     private String consumeWithReasoning(SseEmitter emitter, Flux<OpenAiCompatClient.DeltaChunk> flux,
-                                        AtomicBoolean cancelled) {
+                                        AtomicBoolean cancelled, StringBuilder reasoningAccumulator) {
         StringBuilder acc = new StringBuilder();
         flux.takeWhile(_ -> !cancelled.get()).toIterable().forEach(chunk -> {
             if (!chunk.reasoningContent().isEmpty()) {
+                if (reasoningAccumulator != null) {
+                    reasoningAccumulator.append(chunk.reasoningContent());
+                }
                 ssePublisher.send(emitter, "reasoning", Map.of("content", chunk.reasoningContent()));
             }
             if (!chunk.content().isEmpty()) {
@@ -499,7 +504,7 @@ public class RagAgentOrchestrator {
      */
     private void persistAndFinish(ChatSession session, List<ThinkingNodeVO> thinking,
                                   List<ReferenceVO> references, String answer,
-                                  long start, SseEmitter emitter) {
+                                  String reasoningContent, long start, SseEmitter emitter) {
         long latency = System.currentTimeMillis() - start;
         if (answer == null || answer.isBlank()) {
             ragMetrics.recordQueryLatency(latency, "unknown");
@@ -511,7 +516,7 @@ public class RagAgentOrchestrator {
         }
         try {
             ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer,
-                    thinking, references, latency);
+                    thinking, references, reasoningContent, latency);
             ssePublisher.send(emitter, "done", Map.of(
                     "sessionId", session.getId(),
                     "messageId", assistant.getId(),
@@ -522,7 +527,7 @@ public class RagAgentOrchestrator {
             log.warn("持久化消息失败（thinking trace 序列化异常？），降级保存：{}", e.getMessage());
             try {
                 ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer,
-                        List.of(), references, latency);
+                        List.of(), references, reasoningContent, latency);
                 ssePublisher.send(emitter, "done", Map.of(
                         "sessionId", session.getId(),
                         "messageId", assistant.getId(),

@@ -351,6 +351,7 @@ async function handleSend(content: string): Promise<void> {
         onDone: async () => {
           streamMsg.streaming = false
           streamMsg.content = streamMsg.buffer
+          streamMsg.reasoningContent = streamMsg.reasoningBuffer
           chat.generating = false
           followupPromise = loadFollowup(content, streamMsg)
           await followupPromise
@@ -368,14 +369,20 @@ async function handleSend(content: string): Promise<void> {
             await followupPromise
           }
           const followup = streamMsg.followup
+          const reasoningContent = streamMsg.reasoningBuffer
           await chat.loadSessions()
           if (chat.currentSessionId) {
             await chat.openSession(chat.currentSessionId)
           }
-          if (followup?.length) {
+          if (followup?.length || reasoningContent) {
             const lastAssistant = [...chat.messages].reverse().find(m => m.role === 'ASSISTANT')
             if (lastAssistant) {
-              (lastAssistant as any).followup = followup
+              if (followup?.length) {
+                (lastAssistant as any).followup = followup
+              }
+              if (reasoningContent) {
+                (lastAssistant as any).reasoningContent = reasoningContent
+              }
             }
           }
         }
@@ -466,6 +473,7 @@ async function handleSendManual(content: string, strategies: string[]): Promise<
         onDone: async () => {
           streamMsg.streaming = false
           streamMsg.content = streamMsg.buffer
+          streamMsg.reasoningContent = streamMsg.reasoningBuffer
           chat.generating = false
           followupPromise = loadFollowup(content, streamMsg)
           await followupPromise
@@ -483,14 +491,20 @@ async function handleSendManual(content: string, strategies: string[]): Promise<
             await followupPromise
           }
           const followup = streamMsg.followup
+          const reasoningContent = streamMsg.reasoningBuffer
           await chat.loadSessions()
           if (chat.currentSessionId) {
             await chat.openSession(chat.currentSessionId)
           }
-          if (followup?.length) {
+          if (followup?.length || reasoningContent) {
             const lastAssistant = [...chat.messages].reverse().find(m => m.role === 'ASSISTANT')
             if (lastAssistant) {
-              (lastAssistant as any).followup = followup
+              if (followup?.length) {
+                (lastAssistant as any).followup = followup
+              }
+              if (reasoningContent) {
+                (lastAssistant as any).reasoningContent = reasoningContent
+              }
             }
           }
         }
