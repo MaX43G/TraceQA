@@ -66,6 +66,8 @@
         <httpclient4.version>4.5.14</httpclient4.version>
         <bcprov.version>1.85.2</bcprov.version>
         <elasticsearch-java.version>9.5.3</elasticsearch-java.version>
+        <jieba.version>1.0.2</jieba.version>
+        <langchain4j.version>1.19.0</langchain4j.version>
     </properties>
 
     <dependencyManagement>
@@ -261,6 +263,18 @@
                 <groupId>co.elastic.clients</groupId>
                 <artifactId>elasticsearch-java</artifactId>
                 <version>${elasticsearch-java.version}</version>
+            </dependency>
+            <!-- jieba 中文分词（关键词提取） -->
+            <dependency>
+                <groupId>io.github.arbing</groupId>
+                <artifactId>jieba-analysis</artifactId>
+                <version>${jieba.version}</version>
+            </dependency>
+            <!-- LangChain4j（递归文本切分） -->
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j</artifactId>
+                <version>${langchain4j.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.elasticsearch.client</groupId>

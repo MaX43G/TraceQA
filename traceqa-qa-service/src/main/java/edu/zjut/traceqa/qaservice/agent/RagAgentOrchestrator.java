@@ -54,6 +54,11 @@ public class RagAgentOrchestrator {
 
     private static final Logger log = LoggerFactory.getLogger(RagAgentOrchestrator.class);
 
+    /**
+     * 汇总提示词中最多包含的检索片段数
+     */
+    private static final int MAX_CONTEXT_CHUNKS = 8;
+
     @Resource
     private ChatService chatService;
     @Resource
@@ -397,6 +402,7 @@ public class RagAgentOrchestrator {
 
         String prompt = buildAnswerPrompt(content, history, result);
         String answer = streamAnswer(emitter, prompt, config, cancelled);
+        answer = fixCitationFormat(answer);
         if (answer.isBlank()) {
             answer = degradedAnswer(result);
             ragMetrics.recordDegraded();
@@ -536,6 +542,20 @@ public class RagAgentOrchestrator {
     }
 
     /**
+     * 修复引用标记格式：仅修复合并形式 [citation:1,2] → [citation:1][citation:2]，
+     * 不修改 [1] 等独立序号标记。
+     */
+    private String fixCitationFormat(String answer) {
+        if (answer == null || answer.isBlank()) {
+            return answer;
+        }
+        return answer.replaceAll(
+                "\\[citation:(\\d+),(\\d+)\\]",
+                "[citation:$1][citation:$2]"
+        );
+    }
+
+    /**
      * 组装「问题 + 上下文」总结提示词
      */
     private String buildAnswerPrompt(String question, String history, RetrievalResult result) {
@@ -550,6 +570,9 @@ public class RagAgentOrchestrator {
         }
         int idx = 1;
         for (RetrievedChunk chunk : result.getChunks()) {
+            if (idx > MAX_CONTEXT_CHUNKS) {
+                break;
+            }
             sb.append("[citation:").append(idx).append("] ")
                     .append(chunk.getContent()).append("\n\n");
             idx++;

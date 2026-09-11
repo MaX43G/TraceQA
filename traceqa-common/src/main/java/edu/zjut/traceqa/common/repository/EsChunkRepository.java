@@ -56,13 +56,35 @@ public class EsChunkRepository {
             Request request = new Request("PUT", "/" + properties.getIndexName());
             request.setJsonEntity("""
                     {
+                      "settings": {
+                        "analysis": {
+                          "analyzer": {
+                            "ik_max_word_analyzer": {
+                              "type": "custom",
+                              "tokenizer": "ik_max_word"
+                            },
+                            "ik_smart_analyzer": {
+                              "type": "custom",
+                              "tokenizer": "ik_smart"
+                            }
+                          }
+                        }
+                      },
                       "mappings": {
                         "properties": {
                           "documentId": { "type": "keyword" },
                           "knowledgeBaseId": { "type": "keyword" },
                           "fileName": { "type": "text" },
-                          "content": { "type": "text", "analyzer": "standard" },
-                          "headings": { "type": "text" },
+                          "content": {
+                            "type": "text",
+                            "analyzer": "ik_max_word",
+                            "search_analyzer": "ik_smart"
+                          },
+                          "headings": {
+                            "type": "text",
+                            "analyzer": "ik_max_word",
+                            "search_analyzer": "ik_smart"
+                          },
                           "chunkIndex": { "type": "integer" }
                         }
                       }
@@ -141,12 +163,19 @@ public class EsChunkRepository {
     public List<EsChunk> search(String queryText, int topK, Long kbId) {
         try {
             ElasticsearchClient client = clientFactory.getClient();
+            boolean exists = client.indices().exists(
+                    ExistsRequest.of(e -> e.index(properties.getIndexName()))
+            ).value();
+            if (!exists) {
+                log.debug("ES 索引不存在，跳过搜索：query={}", queryText);
+                return List.of();
+            }
             SearchRequest.Builder builder = new SearchRequest.Builder()
                     .index(properties.getIndexName())
                     .query(q -> q.bool(b -> {
                         b.must(m -> m.multiMatch(mm -> mm
                                 .query(queryText)
-                                .fields("content", "headings")));
+                                .fields("content", "headings^2.0")));
                         if (kbId != null) {
                             b.filter(f -> f.term(t -> t
                                     .field("knowledgeBaseId")

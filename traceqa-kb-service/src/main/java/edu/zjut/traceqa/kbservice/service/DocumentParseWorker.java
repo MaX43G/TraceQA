@@ -8,6 +8,9 @@ import edu.zjut.traceqa.common.model.po.EsChunk;
 import edu.zjut.traceqa.common.model.vo.DocumentVO;
 import edu.zjut.traceqa.common.repository.EsChunkRepository;
 import edu.zjut.traceqa.kbservice.mapper.DocumentMapper;
+import dev.langchain4j.data.document.DocumentSplitter;
+import dev.langchain4j.data.document.splitter.DocumentSplitters;
+import dev.langchain4j.data.segment.TextSegment;
 import jakarta.annotation.Resource;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -62,6 +65,16 @@ public class DocumentParseWorker {
      * 块间提交限速（毫秒）
      */
     private static final long PART_INTERVAL_MS = 1000L;
+
+    /**
+     * ES 片段目标大小（字符数）
+     */
+    private static final int ES_CHUNK_SIZE = 600;
+
+    /**
+     * ES 片段重叠大小（字符数）
+     */
+    private static final int ES_CHUNK_OVERLAP = 150;
 
     @Resource
     private DocumentMapper documentMapper;
@@ -335,57 +348,41 @@ public class DocumentParseWorker {
     }
 
     /**
-     * 将文档内容按段落切分为 ES 索引片段。
+     * 将文档内容切分为 ES 索引片段。
      *
-     * <p>切分策略：按双换行（段落边界）切分，每段 300-1000 字符，
-     * 自动提取 Markdown 标题作为 headings。</p>
+     * <p>使用 LangChain4j 递归切分器：段落→行→句→词→字符逐级切分，
+     * 支持重叠以保留跨边界上下文，自动提取 Markdown 标题作为 headings。</p>
      */
     public List<EsChunk> splitForEs(byte[] content, Long documentId, Long knowledgeBaseId, String fileName) {
         String text = new String(content, StandardCharsets.UTF_8);
-        List<EsChunk> chunks = new ArrayList<>();
-        String[] paragraphs = text.split("\\n\\s*\\n");
-        StringBuilder buffer = new StringBuilder();
-        List<String> currentHeadings = new ArrayList<>();
-        int chunkIndex = 0;
+        dev.langchain4j.data.document.Document doc = dev.langchain4j.data.document.Document.from(text);
+        DocumentSplitter splitter = DocumentSplitters.recursive(ES_CHUNK_SIZE, ES_CHUNK_OVERLAP);
+        List<TextSegment> segments = splitter.split(doc);
 
-        for (String para : paragraphs) {
-            String trimmed = para.trim();
-            if (trimmed.isEmpty()) {
-                continue;
-            }
-            // 提取 Markdown 标题
+        List<EsChunk> chunks = new ArrayList<>();
+        for (int i = 0; i < segments.size(); i++) {
+            String segText = segments.get(i).text();
+            List<String> headings = extractHeadingsFromText(segText);
+            chunks.add(new EsChunk(documentId, knowledgeBaseId, fileName,
+                    segText.trim(), headings, i));
+        }
+        return chunks;
+    }
+
+    /**
+     * 从片段文本中提取 Markdown 标题（简单正则）
+     */
+    private List<String> extractHeadingsFromText(String text) {
+        List<String> headings = new ArrayList<>();
+        for (String line : text.split("\\n")) {
+            String trimmed = line.trim();
             if (trimmed.startsWith("#")) {
                 String heading = trimmed.replaceFirst("^#+\\s*", "").trim();
                 if (!heading.isEmpty()) {
-                    // 根据标题层级更新 headings
-                    int level = 0;
-                    for (char c : trimmed.toCharArray()) {
-                        if (c == '#') level++;
-                        else break;
-                    }
-                    while (currentHeadings.size() >= level) {
-                        currentHeadings.removeLast();
-                    }
-                    currentHeadings.add(heading);
+                    headings.add(heading);
                 }
             }
-
-            if (buffer.length() + trimmed.length() > 1000 && buffer.length() >= 300) {
-                // 当前 buffer 已积累足够内容，切分为一个 chunk
-                chunks.add(new EsChunk(documentId, knowledgeBaseId, fileName,
-                        buffer.toString().trim(), List.copyOf(currentHeadings), chunkIndex++));
-                buffer.setLength(0);
-            }
-            if (!buffer.isEmpty()) {
-                buffer.append("\n\n");
-            }
-            buffer.append(trimmed);
         }
-        // 最后一个 chunk
-        if (!buffer.isEmpty()) {
-            chunks.add(new EsChunk(documentId, knowledgeBaseId, fileName,
-                    buffer.toString().trim(), List.copyOf(currentHeadings), chunkIndex));
-        }
-        return chunks;
+        return headings;
     }
 }

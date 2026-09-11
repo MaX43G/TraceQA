@@ -4,10 +4,12 @@ import edu.zjut.traceqa.common.api.ApiResponse;
 import edu.zjut.traceqa.common.context.UserContext;
 import edu.zjut.traceqa.common.convert.DtoMapper;
 import edu.zjut.traceqa.common.model.dto.ChatStreamRequest;
+import edu.zjut.traceqa.common.model.dto.ManualStreamRequest;
 import edu.zjut.traceqa.common.model.dto.SessionCreateRequest;
 import edu.zjut.traceqa.common.model.vo.ChatMessageVO;
 import edu.zjut.traceqa.common.model.vo.SessionVO;
 import edu.zjut.traceqa.common.util.JsonUtils;
+import edu.zjut.traceqa.qaservice.agent.ManualRetrievalHandler;
 import edu.zjut.traceqa.qaservice.agent.RagAgentOrchestrator;
 import edu.zjut.traceqa.qaservice.sse.SsePublisher;
 import edu.zjut.traceqa.qaservice.service.ChatService;
@@ -48,6 +50,8 @@ public class ChatController {
     private ChatService chatService;
     @Resource
     private RagAgentOrchestrator orchestrator;
+    @Resource
+    private ManualRetrievalHandler manualHandler;
     @Resource(name = "ragExecutor")
     private Executor ragExecutor;
     @Resource
@@ -80,6 +84,34 @@ public class ChatController {
             emitter.complete();
         });
         ragExecutor.execute(() -> orchestrator.streamChat(userId, request, emitter, cancelled));
+        return emitter;
+    }
+
+    /**
+     * 手动检索模式流式对话（SSE：thinking/delta/references/done/error 事件）
+     *
+     * <p>独立于自动模式，不经过 Agent 策略调度，直接根据用户选择的检索方式执行。</p>
+     */
+    @Operation(summary = "手动检索模式流式对话（SSE）")
+    @PostMapping(value = "/stream-manual", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamManual(@Valid @RequestBody ManualStreamRequest request) {
+        Long userId = UserContext.getUserId();
+        SseEmitter emitter = new SseEmitter(0L);
+        ssePublisher.trackConnection(emitter);
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        emitter.onCompletion(() -> {
+            cancelled.set(true);
+            emitter.complete();
+        });
+        emitter.onTimeout(() -> {
+            cancelled.set(true);
+            emitter.complete();
+        });
+        emitter.onError(_ -> {
+            cancelled.set(true);
+            emitter.complete();
+        });
+        ragExecutor.execute(() -> manualHandler.streamChat(userId, request, emitter, cancelled));
         return emitter;
     }
 

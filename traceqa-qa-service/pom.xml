@@ -98,6 +98,12 @@
             <artifactId>hutool-all</artifactId>
         </dependency>
 
+        <!-- jieba 中文分词（TF-IDF 关键词提取，替代 LLM 调用） -->
+        <dependency>
+            <groupId>io.github.arbing</groupId>
+            <artifactId>jieba-analysis</artifactId>
+        </dependency>
+
         <!-- springdoc -->
         <dependency>
             <groupId>org.springdoc</groupId>

@@ -153,6 +153,13 @@ services:
       WHITELIST_PATHS: /health
       TOKEN_SECRET: ${LIGHTRAG_TOKEN_SECRET:-}
       TOKEN_EXPIRE_HOURS: ${LIGHTRAG_TOKEN_EXPIRE_HOURS:-48}
+      # ---- 文本切分策略：段落语义切分（按标题切分，适合结构化 Markdown）----
+      PROCESS_OPTIONS: ${LIGHTRAG_PROCESS_OPTIONS:-P}
+      CHUNK_SIZE: ${LIGHTRAG_CHUNK_SIZE:-1200}
+      CHUNK_OVERLAP_SIZE: ${LIGHTRAG_CHUNK_OVERLAP:-100}
+      CHUNK_P_SIZE: ${LIGHTRAG_CHUNK_P_SIZE:-2000}
+      CHUNK_P_OVERLAP_SIZE: ${LIGHTRAG_CHUNK_P_OVERLAP:-100}
+      SUMMARY_LANGUAGE: Chinese
       # ---- 图谱存储：Neo4j ----
       LIGHTRAG_STORAGE_GRAPH: Neo4jStorage
       LIGHTRAG_STORAGE_GRAPH_URL: bolt://neo4j:7687
@@ -205,7 +212,10 @@ services:
       retries: 10
 
   elasticsearch:
-    image: elasticsearch:9.5.3
+    build:
+      context: ./docker/elasticsearch
+      dockerfile: Dockerfile
+    image: traceqa-elasticsearch:9.5.3-ik
     container_name: traceqa-elasticsearch
     labels: { logging: promtail }
     logging: *default-logging

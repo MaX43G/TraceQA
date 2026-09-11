@@ -11,6 +11,8 @@ import edu.zjut.traceqa.qaservice.config.QaProperties;
 import edu.zjut.traceqa.qaservice.config.RerankClient;
 import edu.zjut.traceqa.qaservice.service.LlmService;
 import edu.zjut.traceqa.qaservice.service.RedisCacheService;
+import com.qianxinyao.analysis.jieba.keyword.TFIDFAnalyzer;
+import com.qianxinyao.analysis.jieba.keyword.Keyword;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
@@ -59,6 +61,8 @@ public class RetrievalService {
 
     @Resource
     private EsChunkRepository esChunkRepository;
+
+    private final TFIDFAnalyzer tfidfAnalyzer = new TFIDFAnalyzer();
 
     /**
      * 查询类型
@@ -168,7 +172,17 @@ public class RetrievalService {
         if (cached.isPresent()) {
             return cached.get();
         }
-        List<String> keywords = extractKeywords(question, config);
+        // 关键词缓存（30 分钟），避免重复分词
+        String kwKey = "kw_terms:" + sha256(question);
+        List<String> keywords;
+        var cachedKw = redisCacheService.get(kwKey, new tools.jackson.core.type.TypeReference<List<String>>() {
+        });
+        if (cachedKw.isPresent()) {
+            keywords = cachedKw.get();
+        } else {
+            keywords = extractKeywords(question, config);
+            redisCacheService.put(kwKey, keywords, Duration.ofMinutes(30));
+        }
         String queryText = keywords.isEmpty() ? question : String.join(" ", keywords);
         if (progress != null) {
             progress.accept("关键词检索：" + shortText(queryText));
@@ -429,16 +443,13 @@ public class RetrievalService {
     }
 
     private List<String> extractKeywords(String question, LlmConfig config) {
-        String raw = llmService.call("keyword", question, config);
-        if (raw != null && !raw.isBlank()) {
-            List<String> keywords = Arrays.stream(raw.split("[、，,；;\\n]"))
-                    .map(String::trim)
-                    .filter(k -> !k.isEmpty())
-                    .limit(6)
-                    .toList();
-            if (!keywords.isEmpty()) {
-                return keywords;
-            }
+        // jieba TF-IDF 提取关键词（毫秒级，无需 LLM 调用）
+        List<Keyword> kwList = tfidfAnalyzer.analyze(question, 6);
+        List<String> keywords = kwList.stream()
+                .map(Keyword::getName)
+                .toList();
+        if (!keywords.isEmpty()) {
+            return keywords;
         }
         return extractKeywordsFallback(question);
     }

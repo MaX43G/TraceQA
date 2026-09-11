@@ -1,5 +1,56 @@
 <template>
   <div class="chat-input">
+    <!-- 手动检索策略选择器 -->
+    <div v-if="showStrategySelector" class="chat-input__strategy">
+      <a-space :size="4" wrap>
+        <span class="chat-input__strategy-label">检索方式：</span>
+        <a-tooltip title="自动模式：Agent 根据问题复杂度自主选择检索策略">
+          <a-tag
+              :color="isAutoMode ? 'blue' : undefined"
+              style="cursor: pointer"
+              @click="setAutoMode"
+          >
+            自动
+          </a-tag>
+        </a-tooltip>
+        <a-tooltip title="假设性文档：先让 AI 生成假设性回答，再用该回答检索，提升语义匹配">
+          <a-tag
+              :color="selectedStrategies.includes('hyde') ? 'blue' : undefined"
+              style="cursor: pointer"
+              @click="toggleStrategy('hyde')"
+          >
+            HyDE
+          </a-tag>
+        </a-tooltip>
+        <a-tooltip title="向量检索：基于文本语义相似度检索">
+          <a-tag
+              :color="selectedStrategies.includes('vector') ? 'blue' : undefined"
+              style="cursor: pointer"
+              @click="toggleStrategy('vector')"
+          >
+            向量
+          </a-tag>
+        </a-tooltip>
+        <a-tooltip title="关键词检索：TF-IDF 关键词 + ES BM25 全文检索">
+          <a-tag
+              :color="selectedStrategies.includes('keyword') ? 'blue' : undefined"
+              style="cursor: pointer"
+              @click="toggleStrategy('keyword')"
+          >
+            关键词
+          </a-tag>
+        </a-tooltip>
+        <a-tooltip title="图谱检索：知识图谱实体关系检索">
+          <a-tag
+              :color="selectedStrategies.includes('graph') ? 'blue' : undefined"
+              style="cursor: pointer"
+              @click="toggleStrategy('graph')"
+          >
+            图谱
+          </a-tag>
+        </a-tooltip>
+      </a-space>
+    </div>
     <a-textarea
         v-model:value="text"
         :auto-size="{ minRows: 2, maxRows: 6 }"
@@ -8,7 +59,21 @@
         @keydown="handleKeydown"
     />
     <div class="chat-input__footer">
-      <span class="chat-input__tip">{{ generating ? 'AI 正在回答，请稍候…' : 'Enter 发送，Shift + Enter 换行' }}</span>
+      <a-space>
+        <a-tooltip title="切换手动/自动检索模式">
+          <a-button
+              type="text"
+              size="small"
+              :disabled="generating"
+              @click="showStrategySelector = !showStrategySelector"
+          >
+            <template #icon>
+              <SettingOutlined/>
+            </template>
+          </a-button>
+        </a-tooltip>
+        <span class="chat-input__tip">{{ generating ? 'AI 正在回答，请稍候…' : 'Enter 发送，Shift + Enter 换行' }}</span>
+      </a-space>
       <a-space>
         <a-tooltip :title="listening ? '正在聆听，点击停止' : '语音输入'">
           <a-button
@@ -35,11 +100,14 @@
 
 <script setup lang="ts">
 /**
- * 聊天输入组件：Enter 快捷发送 + 语音输入。
- * 语音输入采用浏览器原生 Web Speech API（SpeechRecognition），前端实时识别并填入输入框，
- * 完全免费、无需后端参与；Chrome/Edge 支持，其它浏览器自动隐藏。
+ * 聊天输入组件：Enter 快捷发送 + 语音输入 + 手动检索策略选择。
+ *
+ * <p>语音输入采用浏览器原生 Web Speech API（SpeechRecognition），前端实时识别并填入输入框，
+ * 完全免费、无需后端参与；Chrome/Edge 支持，其它浏览器自动隐藏。</p>
+ *
+ * <p>手动检索策略：用户可点击设置按钮展开策略选择器，自由组合 HyDE、向量、关键词、图谱四种检索方式。</p>
  */
-import {SendOutlined, AudioOutlined} from '@ant-design/icons-vue'
+import {SendOutlined, AudioOutlined, SettingOutlined} from '@ant-design/icons-vue'
 import {message} from 'ant-design-vue'
 
 const props = defineProps<{
@@ -51,13 +119,52 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'send', content: string): void
+  (e: 'send-manual', content: string, strategies: string[]): void
+  (e: 'mode-change', isManual: boolean, strategies: string[]): void
 }>()
 
 const text = ref('')
 const resetKey = ref(0)
 const listening = ref(false)
 
-// 浏览器原生语音识别（免费、前端实时；Chrome/Edge 支持）
+/** 手动检索策略选择器是否展开 */
+const showStrategySelector = ref(false)
+/** 当前选中的检索策略列表 */
+const selectedStrategies = ref<string[]>([])
+/** 是否为自动模式 */
+const isAutoMode = computed(() => selectedStrategies.value.length === 0)
+
+/** 切换自动模式 */
+function setAutoMode(): void {
+  selectedStrategies.value = []
+  emitModeChange()
+}
+
+/** 切换单个策略 */
+function toggleStrategy(strategy: string): void {
+  const idx = selectedStrategies.value.indexOf(strategy)
+  if (idx >= 0) {
+    selectedStrategies.value.splice(idx, 1)
+  } else {
+    selectedStrategies.value.push(strategy)
+  }
+  emitModeChange()
+}
+
+/** 通知父组件当前模式 */
+function emitModeChange(): void {
+  emit('mode-change', !isAutoMode.value, [...selectedStrategies.value])
+}
+
+/** 获取检索策略字符串（用于传给后端） */
+function getRetrievalStrategy(): string {
+  if (isAutoMode.value) {
+    return 'auto'
+  }
+  return selectedStrategies.value.join(',')
+}
+
+// 浏览器原生语音识别
 const SpeechRecognition =
     (typeof window !== 'undefined' && (window as any).SpeechRecognition) ||
     (typeof window !== 'undefined' && (window as any).webkitSpeechRecognition) ||
@@ -164,7 +271,11 @@ function submit(): void {
   }
   text.value = ''
   resetKey.value++
-  emit('send', content)
+  if (isAutoMode.value) {
+    emit('send', content)
+  } else {
+    emit('send-manual', content, [...selectedStrategies.value])
+  }
 }
 
 function clear(): void {
@@ -184,6 +295,24 @@ defineExpose({clear})
   background: #fff;
   padding: 12px 16px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.chat-input__strategy {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.chat-input__strategy-label {
+  color: #86909c;
+  font-size: 12px;
+  line-height: 24px;
+}
+
+.chat-input__strategy :deep(.ant-tag) {
+  font-size: 12px;
+  border-radius: 4px;
+  user-select: none;
 }
 
 .chat-input__footer {

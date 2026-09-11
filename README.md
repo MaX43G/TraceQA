@@ -6,8 +6,6 @@
 ，实现「意图识别 → 检索调度 → 检索/搜索 → 总结」的完整工作流；SSE 流式推送思考状态与打字机回答，支持引用溯源、随时中断、模型自由切换、多轮对话与移动端访问。平台进一步支持
 **语音输入**（Web Speech API）与**「猜你想问」智能追问**，并接入 **MinIO 对象存储**统一管理用户文件（头像）。
 
-后端已由单体重构为 **Spring Cloud 微服务**：以 **Nacos** 服务注册发现 + **Spring Cloud Gateway** 网关（负载均衡 + Sa-Token 统一鉴权 + OpenAPI 聚合），
-按业务边界拆分为 **用户 / 文件 / 知识库 / 问答 / 管理** 五个高内聚、低耦合的微服务，各服务间通过 **OpenFeign** 完成 RPC 调用，共享一个 `common` 通用库。
 
 ---
 
@@ -75,7 +73,7 @@
 意图识别 → 检索策略调度 → 查询重写与HyDE → 图谱检索(local+global) → 向量检索(多查询) → 关键词检索 → 融合与补全(RRF+ReRead+LLM精排) → 总结生成
 ```
 
-调度节点按问题复杂度分流：**简单问题仅向量检索（更快）**，**复杂问题走完整聚合链路**。
+调度节点按问题复杂度分流： **简单问题仅向量检索（更快）**， **复杂问题走完整聚合链路**。
 
 ## 核心特性
 
@@ -85,48 +83,50 @@
 - **熔断降级**：LLM 失败自动熔断（Redis 状态机），逐级降级（Agent → ChatClient → 纯检索 → 友好提示）
 - **三路混合检索**：查询重写、HyDE、图谱 (local+global)+向量 (多查询)+关键词 (hl_keywords)、RRF 融合、ReRead 补全、语义重排
 - **Agentic 检索策略** + **查询分解**（对比类问题拆分）
+- **手动/自动双模式**：自动模式由 Agent 自主调度检索策略；手动模式用户可自由勾选假设性文档、向量、关键词、图谱四种检索方式的组合
 - **Redis 缓存**：查询/决策短 TTL 缓存，降低 LLM 调用与延迟
-- **多轮对话**、**SSE 流式**、**引用溯源**、**模型自由切换**
+- **多轮对话**、 **SSE 流式**、 **引用溯源**、 **模型自由切换**
 - **异步文档解析**：.md/.txt 上传与 zip 批量导入，内容指纹去重，Redis Stream 任务队列 + LightRAG 入库
-- **RBAC 管理后台**、**用户禁用即时生效**
+- **RBAC 管理后台**、 **用户禁用即时生效**
 - **可观测性**：管理服务 Actuator + Prometheus + Grafana，经代理统一鉴权访问
-- **语音输入**（Web Speech API）、**猜你想问**、**头像与个人信息**（MinIO + cropperjs）、**公告栏**
+- **语音输入**（Web Speech API）、 **猜你想问**、 **头像与个人信息**（MinIO + cropperjs）、 **公告栏**
 
 ## 微服务划分
 
-| 模块 | 职责 | 独立数据表 | 端口 |
-|------|----------------|------------|------|
-| `traceqa-common` | 通用库：统一响应/异常/实体/DTO/VO/RBAC/Feign 契约/LightRAG 客户端 | — | 库 |
-| `traceqa-gateway` | 网关：Nacos 负载均衡路由、Sa-Token 鉴权、OpenAPI 聚合 | — | 8080 |
-| `traceqa-user-service` | 用户注册登录、用户/角色 RBAC 管理、头像（经文件服务） | t_user, t_role | 8081 |
-| `traceqa-file-service` | MinIO 对象存储，统一文件上传下载 | — | 8083 |
-| `traceqa-kb-service` | 知识库与文档管理、异步解析入库（LightRAG） | t_knowledge_base, t_document | 8084 |
-| `traceqa-qa-service` | 会话消息、多 Agent 检索编排、LLM、系统提示词、模型 | t_chat_session, t_chat_message, t_system_prompt | 8085 |
-| `traceqa-admin-service` | 系统公告、监控聚合、健康检查、可观测性反向代理 | t_announcement | 8086 |
+| 模块                    | 职责                                                              | 独立数据表                                      | 端口 |
+|-------------------------|-------------------------------------------------------------------|-------------------------------------------------|------|
+| `traceqa-common`        | 通用库：统一响应/异常/实体/DTO/VO/RBAC/Feign 契约/LightRAG 客户端 | —                                               | 库   |
+| `traceqa-gateway`       | 网关：Nacos 负载均衡路由、Sa-Token 鉴权、OpenAPI 聚合             | —                                               | 8080 |
+| `traceqa-user-service`  | 用户注册登录、用户/角色 RBAC 管理、头像（经文件服务）             | t_user, t_role                                  | 8081 |
+| `traceqa-file-service`  | MinIO 对象存储，统一文件上传下载                                  | —                                               | 8083 |
+| `traceqa-kb-service`    | 知识库与文档管理、异步解析入库（LightRAG）                        | t_knowledge_base, t_document                    | 8084 |
+| `traceqa-qa-service`    | 会话消息、多 Agent 检索编排、LLM、系统提示词、模型                | t_chat_session, t_chat_message, t_system_prompt | 8085 |
+| `traceqa-admin-service` | 系统公告、监控聚合、健康检查、可观测性反向代理                    | t_announcement                                  | 8086 |
 
 微服务间通过 **OpenFeign** 完成 RPC：用户服务调用文件服务上传头像字节；管理服务拉取知识库服务队列统计与问答服务熔断状态。
 
 ## 端口规划
 
-服务器对外 **仅开放 80 / 443 / 6115 / 6116** 四个端口（Caddy 前端 HTTPS 与 MinIO 头像直链）；其余端口在 Docker 容器内开放供微服务间通信，
+服务器对外 **仅开放 80 / 443 / 6115 / 6116** 四个端口（Caddy 前端 HTTPS 与 MinIO 头像直链）；其余端口在 Docker
+容器内开放供微服务间通信，
 需在服务器防火墙阻断外网访问。
 
-| 服务 | 容器内端口 | 宿主端口 | 对外 |
-|------|-----------|----------|------|
-| Caddy（前端 HTTPS） | 80/443 | 80 / 443 / 6115 | ✅ 公开 |
-| MinIO（S3 头像直链） | 9000 | 6116 | ✅ 公开 |
-| 网关 gateway | 8080 | 6114 | 内网 |
-| 用户服务 | 8081 | 6122 | 内网 |
-| 文件服务 | 8083 | 6123 | 内网 |
-| 知识库服务 | 8084 | 6124 | 内网 |
-| 问答服务 | 8085 | 6125 | 内网 |
-| 管理服务 | 8086 | 6126 | 内网 |
-| Nacos | 8848/9848 | 6120/6121 | 内网 |
-| MySQL | 3306 | 6118 | 内网 |
-| Redis | 6379 | 6117 | 内网 |
-| LightRAG | 9621 | 6119 | 内网 |
-| Prometheus | 9090 | 6127 | 内网 |
-| Grafana | 3000 | 6128 | 内网 |
+| 服务                 | 容器内端口 | 宿主端口        | 对外    |
+|----------------------|------------|-----------------|---------|
+| Caddy（前端 HTTPS）  | 80/443     | 80 / 443 / 6115 | ✅ 公开 |
+| MinIO（S3 头像直链） | 9000       | 6116            | ✅ 公开 |
+| 网关 gateway         | 8080       | 6114            | 内网    |
+| 用户服务             | 8081       | 6122            | 内网    |
+| 文件服务             | 8083       | 6123            | 内网    |
+| 知识库服务           | 8084       | 6124            | 内网    |
+| 问答服务             | 8085       | 6125            | 内网    |
+| 管理服务             | 8086       | 6126            | 内网    |
+| Nacos                | 8848/9848  | 6120/6121       | 内网    |
+| MySQL                | 3306       | 6118            | 内网    |
+| Redis                | 6379       | 6117            | 内网    |
+| LightRAG             | 9621       | 6119            | 内网    |
+| Prometheus           | 9090       | 6127            | 内网    |
+| Grafana              | 3000       | 6128            | 内网    |
 
 ## 模型体系
 
@@ -139,6 +139,50 @@
 | DeepSeek-R1-0528 | `deepseek-ai/DeepSeek-R1-0528-Qwen3-8B` |
 | Qwen3-8B         | `Qwen/Qwen3-8B`                         |
 | Qwen3.5-4B       | `Qwen/Qwen3.5-4B`                       |
+
+## 文本切分与向量化
+
+### ES 知识库切分（用于 BM25 关键词检索）
+
+系统采用 **LangChain4j 递归文本切分器**，按「段落 → 行 → 句 → 词 → 字符」逐级切分，自动提取 Markdown 标题作为 headings。
+
+| 参数       | 默认值        | 说明                                   |
+|------------|---------------|----------------------------------------|
+| 块大小     | 600 字符      | 每个 ES 片段的目标长度                 |
+| 重叠区域   | 150 字符      | 相邻片段的重叠字符数，保留跨边界上下文 |
+| 索引分词器 | `ik_max_word` | 写入时细粒度切分，最大化召回           |
+| 查询分词器 | `ik_smart`    | 查询时粗粒度切分，提高精准度           |
+| 标题权重   | 2.0x          | headings 字段在 BM25 评分中的加权倍数  |
+
+### LightRAG 知识图谱切分（用于图谱+向量检索）
+
+默认采用 **P 策略（段落语义切分）**，按 Markdown 标题层级切分，适合结构化教材与 PPT 内容。
+
+| 参数         | 默认值        | 说明                                   |
+|--------------|---------------|----------------------------------------|
+| 图谱分块大小 | 1200 tokens   | 知识图谱实体/关系抽取的最大段落长度    |
+| 图谱重叠     | 100 tokens    | 图谱分块间的重叠 token 数              |
+| ES 分块大小  | 2000 tokens   | LightRAG ES 存储的分块长度             |
+| ES 重叠      | 100 tokens    | LightRAG ES 分块的重叠 token 数        |
+| 嵌入模型     | `BAAI/bge-m3` | 支持 1024 维向量，输入上限 8192 tokens |
+| 摘要语言     | Chinese       | 图谱摘要生成使用中文                   |
+| 并发写入     | 1             | 低并发写入以避免 API 限流              |
+
+### 查询调度模式
+
+系统支持两种查询调度模式，用户可在对话输入框中切换：
+
+| 模式                 | 说明                                                                                                               |
+|----------------------|--------------------------------------------------------------------------------------------------------------------|
+| **自动模式**（默认） | Agent 工作流自主控制：意图识别 → 问题分类 → 按复杂度自动选择检索策略（简单问题仅向量检索，复杂问题走完整聚合链路） |
+| **手动模式**         | 用户自由勾选检索方式，可任意组合以下四种策略：                                                                     |
+| ↳ 假设性文档（HyDE） | 先让 LLM 生成假设性回答，再用该回答的向量进行检索，提升语义匹配精度                                                |
+| ↳ 向量检索           | 基于 LightRAG 的向量相似度检索，支持多查询（原问题+改写+HyDE）                                                     |
+| ↳ 关键词检索         | jieba TF-IDF 提取关键词 → Elasticsearch BM25 全文检索                                                              |
+| ↳ 图谱检索           | 基于 LightRAG 的知识图谱检索（local + global 双路），捕获实体关系                                                  |
+
+手动模式下，用户至少选择一种检索方式；未选择 HyDE 时系统直接使用原始问题检索，选择 HyDE 时系统自动对问题进行假设性文档生成后再检索。所有检索结果通过
+RRF（Reciprocal Rank Fusion）融合排序后送入 LLM 生成最终回答。
 
 ## 快速开始（Docker 一键部署）
 
@@ -153,25 +197,24 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-> **已有 MySQL 数据卷需迁移**：`docker-entrypoint-initdb.d` 仅在 MySQL 数据卷首次初始化时执行。若本机此前已运行过单体版 TraceQA（已存在 `traceqa` 库），
-> 首次启动微服务会报 `Access denied for user 'traceqa'@'%' to database 'traceqa_user'`。补建独立库并授权即可（表结构由各服务 Flyway 自动创建）：
 > ```bash
 > docker compose exec mysql bash /docker-entrypoint-initdb.d/migrate-existing.sh
 > docker compose up -d --build   # 启动服务，Flyway 自动建表
 > ```
 启动后访问：
 
-| 服务                           | 地址                                                                                                     |
-|--------------------------------|----------------------------------------------------------------------------------------------------------|
-| 前端（HTTPS）                  | https://localhost:6115                                                                                   |
-| 网关 / 后端 API                | http://localhost:6114                                                                                    |
-| OpenAPI 聚合文档（Swagger UI） | http://localhost:6114/swagger-ui.html                                                                    |
-| MinIO 对象存储（S3，对外公开） | http://localhost:6116                                                                                    |
-| Nacos 控制台                   | http://localhost:6120/nacos（默认 nacos/nacos）                                                          |
-| MySQL                          | localhost:6118                                                                                           |
-| Redis                          | localhost:6117                                                                                           |
+| 服务                           | 地址                                            |
+|--------------------------------|-------------------------------------------------|
+| 前端（HTTPS）                  | https://localhost:6115                          |
+| 网关 / 后端 API                | http://localhost:6114                           |
+| OpenAPI 聚合文档（Swagger UI） | http://localhost:6114/swagger-ui.html           |
+| MinIO 对象存储（S3，对外公开） | http://localhost:6116                           |
+| Nacos 控制台                   | http://localhost:6120/nacos（默认 nacos/nacos） |
+| MySQL                          | localhost:6118                                  |
+| Redis                          | localhost:6117                                  |
 
-**默认账号**：`admin` / `user`（密码由环境变量 `DEFAULT_ADMIN_PASSWORD` / `DEFAULT_USER_PASSWORD` 注入，见 `.env`；未配置则不创建默认账号。生产环境务必修改）。
+**默认账号**：`admin` / `user`（密码由环境变量 `DEFAULT_ADMIN_PASSWORD` / `DEFAULT_USER_PASSWORD` 注入，见 `.env`
+；未配置则不创建默认账号。生产环境务必修改）。
 
 > **HTTPS / 麦克风（重要）**：浏览器要求页面为 **安全上下文**才允许调用麦克风（语音输入）。前端经 **Caddy** 在 `:6115` 提供
 > HTTPS（`tls internal` 自签证书）。无公网域名时可将 Caddy 内部 CA 安装为受信根证书获得绿锁：
@@ -221,14 +264,14 @@ cd frontend && pnpm gen:api
 
 主要接口（网关按路径路由到对应微服务）：
 
-| 模块       | 接口                                                               | 路由到            |
-|------------|--------------------------------------------------------------------|-------------------|
-| 认证/管理   | `/api/auth/*`、`/api/admin/*`                                      | user-service      |
-| 文件       | `/api/files/*`                                                     | file-service      |
-| 知识库/文档 | `/api/kbs/*`、`/api/documents/*`                                   | kb-service        |
-| 对话/模型/提示词 | `/api/chat/*`、`/api/models`、`/api/prompts/*`                 | qa-service        |
-| 公告/监控/健康 | `/api/announcement/*`、`/api/monitor/*`、`/api/health`         | admin-service     |
-| 代理       | `/lightrag-webui/**`、`/grafana/**`、`/prometheus/**`              | admin-service     |
+| 模块             | 接口                                                   | 路由到        |
+|------------------|--------------------------------------------------------|---------------|
+| 认证/管理        | `/api/auth/*`、`/api/admin/*`                          | user-service  |
+| 文件             | `/api/files/*`                                         | file-service  |
+| 知识库/文档      | `/api/kbs/*`、`/api/documents/*`                       | kb-service    |
+| 对话/模型/提示词 | `/api/chat/*`、`/api/models`、`/api/prompts/*`         | qa-service    |
+| 公告/监控/健康   | `/api/announcement/*`、`/api/monitor/*`、`/api/health` | admin-service |
+| 代理             | `/lightrag-webui/**`、`/grafana/**`、`/prometheus/**`  | admin-service |
 
 ## 目录结构
 
@@ -253,9 +296,11 @@ TraceQA/
 ## 常见问题
 
 - **服务如何被发现？** 各微服务与网关注册到 Nacos，网关经 `lb://服务名` 负载均衡路由。
-- **登录态如何跨服务生效？** sa-token 登录态存于共享 Redis；网关校验后将用户信息以 `X-User-Id` 等请求头透传下游，下游解析为 `UserContext`。
+- **登录态如何跨服务生效？** sa-token 登录态存于共享 Redis；网关校验后将用户信息以 `X-User-Id` 等请求头透传下游，下游解析为
+  `UserContext`。
 - **如何查看接口文档？** 访问 `http://localhost:6114/swagger-ui.html`（网关聚合所有微服务）。
 - **LightRAG 限流上传失败 / 上传慢？** 已内置低并发 + 重试 + 超时调优，小文档不再切块；仍慢可改本地 Ollama。
 - **禁用用户还能继续对话？** 网关校验登录 + 各服务二次鉴权，禁用即踢下线并阻止再次登录。
 - **修改了后端接口？** `cd frontend && pnpm gen:api` 重新生成客户端。
-- **只开放 80/443/6115/6116？** 微服务各端口在容器内开放供内部通信；请在服务器防火墙阻断 6114、6122-6128、6117-6121 等端口的外网访问。
+- **只开放 80/443/6115/6116？** 微服务各端口在容器内开放供内部通信；请在服务器防火墙阻断 6114、6122-6128、6117-6121
+  等端口的外网访问。
