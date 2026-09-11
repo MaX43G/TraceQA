@@ -1,12 +1,106 @@
-# ============================================================
-# 溯知 / TraceQA 管理服务配置（本地最小化）
-# 完整配置已迁移至 Nacos 配置中心
-# ============================================================
+# 溯知 / TraceQA 管理服务配置
 server:
   port: ${SERVER_PORT:8086}
 
 spring:
   application:
     name: traceqa-admin-service
+  main:
+    web-application-type: servlet
+  threads:
+    virtual:
+      enabled: true
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${NACOS_GROUP:DEFAULT_GROUP}
+    openfeign:
+      client:
+        config:
+          default:
+            connect-timeout: 5000
+            read-timeout: 30000
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: 6379
+      timeout: 6s
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 55MB
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  sql:
+    init:
+      mode: never
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # 已有表但无历史表时，将其作为基线（跳过已存在的 V1，不重复建表）
+    baseline-on-migrate: true
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${PG_HOST:localhost}:${PG_PORT:5432}/${PG_DATABASE_ADMIN:traceqa_admin}?currentSchema=public
+    username: ${PG_USER:traceqa}
+    password: ${PG_PASSWORD:traceqa123}
+
+# MyBatis-Plus
+mybatis-plus:
+  global-config:
+    banner: false
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+# 应用配置
+app:
+  # 会话 Cookie 是否标记 Secure（HTTPS 部署建议 true，本地 HTTP 调试设 false）
+  cookie-secure: ${APP_COOKIE_SECURE:false}
+  dbx-base-url: ${DBX_BASE_URL:http://localhost:4224}
+  observability:
+    scrape-token: ${APP_OBSERVABILITY_SCRAPE_TOKEN:}
+    grafana-base-url: ${OBSERVABILITY_GRAFANA_BASE_URL:http://grafana:3000}
+    prometheus-base-url: ${OBSERVABILITY_PROMETHEUS_BASE_URL:http://prometheus:9090}
+  lightrag:
+    base-url: ${LIGHTRAG_BASE_URL:http://localhost:9621}
+    api-key: ${LIGHTRAG_API_KEY:}
+  nacos:
+    server-addr: ${NACOS_SERVER_ADDR:http://localhost:8848}
+    access-token: ${NACOS_ACCESS_TOKEN:}
+    cookie-expire-hours: 24
+
+# 可观测性（Actuator / Prometheus）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+# springdoc
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    edu.zjut.traceqa: info
