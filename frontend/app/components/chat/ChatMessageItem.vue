@@ -135,9 +135,9 @@ const avatarStyle = computed<Record<string, string>>(() =>
 /** 是否存在思考链路 */
 const hasThinking = computed<boolean>(() => (props.msg.thinkingTrace?.length ?? 0) > 0)
 
-/** 推理过程内容（流式阶段取 reasoningBuffer，持久化后为空——DeepSeek R1 推理 token 不入库） */
+/** 推理过程内容（流式阶段取 reasoningBuffer，回答完成后同样保留显示供用户查看） */
 const reasoningContent = computed<string>(() =>
-    props.streaming ? props.msg.reasoningBuffer ?? '' : ''
+    props.msg.reasoningBuffer ?? ''
 )
 
 const resolvedStats = computed<RetrievalStats | undefined>(() => {
