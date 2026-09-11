@@ -49,6 +49,10 @@ public class RedisCacheService {
 
     /**
      * 读取简单类型缓存
+     *
+     * @param key  缓存键
+     * @param type 目标类型
+     * @return 缓存值（Optional），缓存不存在或解析失败返回 empty
      */
     public <T> Optional<T> get(String key, Class<T> type) {
         try {
@@ -60,12 +64,17 @@ public class RedisCacheService {
             cacheHits.incrementAndGet();
             return Optional.ofNullable(objectMapper.readValue(raw, type));
         } catch (Exception e) {
+            log.debug("缓存读取失败（降级返回空）：key={}, err={}", key, e.getMessage());
             return Optional.empty();
         }
     }
 
     /**
      * 读取泛型类型缓存
+     *
+     * @param key     缓存键
+     * @param typeRef 泛型类型引用
+     * @return 缓存值（Optional），缓存不存在或解析失败返回 empty
      */
     public <T> Optional<T> get(String key, TypeReference<T> typeRef) {
         try {
@@ -77,6 +86,7 @@ public class RedisCacheService {
             cacheHits.incrementAndGet();
             return Optional.ofNullable(objectMapper.readValue(raw, typeRef));
         } catch (Exception e) {
+            log.debug("缓存读取失败（降级返回空）：key={}, err={}", key, e.getMessage());
             return Optional.empty();
         }
     }

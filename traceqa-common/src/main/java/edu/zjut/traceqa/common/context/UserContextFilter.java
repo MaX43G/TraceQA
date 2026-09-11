@@ -78,12 +78,17 @@ public class UserContextFilter extends OncePerRequestFilter {
         if (userId == null || userId.isBlank()) {
             return;
         }
-        String username = request.getHeader(AuthHeaders.USERNAME);
-        String role = request.getHeader(AuthHeaders.ROLE);
-        String perms = request.getHeader(AuthHeaders.PERMISSIONS);
-        List<String> permissions = perms == null || perms.isBlank()
-                ? List.of()
-                : Arrays.stream(perms.split(",")).map(String::trim).filter(p -> !p.isEmpty()).toList();
-        UserContext.set(new CurrentUser(Long.valueOf(userId), username, role, permissions));
+        try {
+            Long parsedUserId = Long.valueOf(userId.trim());
+            String username = request.getHeader(AuthHeaders.USERNAME);
+            String role = request.getHeader(AuthHeaders.ROLE);
+            String perms = request.getHeader(AuthHeaders.PERMISSIONS);
+            List<String> permissions = perms == null || perms.isBlank()
+                    ? List.of()
+                    : Arrays.stream(perms.split(",")).map(String::trim).filter(p -> !p.isEmpty()).toList();
+            UserContext.set(new CurrentUser(parsedUserId, username, role, permissions));
+        } catch (NumberFormatException e) {
+            log.warn("用户 ID 格式无效：userId={}", userId);
+        }
     }
 }

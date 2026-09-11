@@ -49,20 +49,24 @@ public class DocumentParseWorker {
      * 文本切块阈值（>1MB 才切）
      */
     private static final long TEXT_SPLIT_THRESHOLD_BYTES = 1024L * 1024;
+
     /**
      * 文本目标单块大小
      */
     private static final long TEXT_PART_BYTES = 1024L * 1024;
+
     /**
      * 文本最大切块数
      */
     private static final int MAX_TEXT_PARTS = 8;
+
     /**
-     * 全局最大切块数
+     * 全局最大切块数（防止 zip bomb）
      */
     private static final int MAX_PARTS = 50;
+
     /**
-     * 块间提交限速（毫秒）
+     * 块间提交限速（毫秒），避免对 LightRAG 服务造成过大压力
      */
     private static final long PART_INTERVAL_MS = 1000L;
 
@@ -72,7 +76,7 @@ public class DocumentParseWorker {
     private static final int ES_CHUNK_SIZE = 600;
 
     /**
-     * ES 片段重叠大小（字符数）
+     * ES 片段重叠大小（字符数），保留跨边界上下文
      */
     private static final int ES_CHUNK_OVERLAP = 150;
 
@@ -344,6 +348,7 @@ public class DocumentParseWorker {
             Thread.sleep(PART_INTERVAL_MS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            log.debug("文档提交限速被中断");
         }
     }
 

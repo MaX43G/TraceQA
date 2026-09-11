@@ -66,22 +66,23 @@ public class SsePublisher {
 
     /**
      * 注册 SSE 连接（在创建 SseEmitter 后调用）
+     *
+     * <p>跟踪活跃连接数用于监控指标，连接结束时自动移除跟踪。</p>
      */
     public void trackConnection(SseEmitter emitter) {
-        if (emitter != null && trackedEmitters.putIfAbsent(emitter, Boolean.TRUE) == null) {
+        if (emitter == null) {
+            return;
+        }
+        if (trackedEmitters.putIfAbsent(emitter, Boolean.TRUE) == null) {
             activeConnections.incrementAndGet();
-            emitter.onCompletion(() -> {
-                trackedEmitters.remove(emitter);
-                activeConnections.decrementAndGet();
-            });
-            emitter.onTimeout(() -> {
-                trackedEmitters.remove(emitter);
-                activeConnections.decrementAndGet();
-            });
-            emitter.onError( _ -> {
-                trackedEmitters.remove(emitter);
-                activeConnections.decrementAndGet();
-            });
+            Runnable onEnd = () -> {
+                if (trackedEmitters.remove(emitter) != null) {
+                    activeConnections.decrementAndGet();
+                }
+            };
+            emitter.onCompletion(onEnd);
+            emitter.onTimeout(onEnd);
+            emitter.onError(_ -> onEnd.run());
         }
     }
 

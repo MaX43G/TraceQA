@@ -1,0 +1,71 @@
+# ============================================================
+# 溯知 / TraceQA Nacos 公共配置参考
+# 以下配置需要复制到每个服务的配置中，或通过 import 方式加载
+# ============================================================
+
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 6s
+  threads:
+    virtual:
+      enabled: true
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 55MB
+  encoding:
+    charset: UTF-8
+    enabled: true
+    force: true
+
+# Sa-Token 配置
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer
+  token-style: uuid
+  timeout: 86400
+  active-timeout: -1
+  is-concurrent: false
+  is-share: false
+  is-log: false
+
+# MyBatis-Plus
+mybatis-plus:
+  global-config:
+    banner: false
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+# 可观测性
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+# springdoc
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# 日志
+logging:
+  level:
+    edu.zjut.traceqa: info

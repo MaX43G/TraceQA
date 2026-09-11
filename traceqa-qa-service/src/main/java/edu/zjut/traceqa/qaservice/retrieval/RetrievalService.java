@@ -41,8 +41,25 @@ import java.util.stream.Collectors;
 @Service
 public class RetrievalService {
 
+    /**
+     * RRF (Reciprocal Rank Fusion) 常数，控制排名靠后的结果权重衰减速度
+     */
     private static final double RRF_K = 60.0;
+
+    /**
+     * 每路检索结果的最大保留数量
+     */
     private static final int MAX_PER_PATH = 12;
+
+    /**
+     * ES 检索返回的最大文档数
+     */
+    private static final int ES_SEARCH_TOP_K = 10;
+
+    /**
+     * 关键词提取的最大数量
+     */
+    private static final int MAX_KEYWORDS = 6;
 
     @Resource
     private LightRagClient lightRagClient;
@@ -132,6 +149,11 @@ public class RetrievalService {
 
     /**
      * 向量检索（多查询：原问题 + 重写 + HyDE + 子问题），5 分钟缓存
+     *
+     * @param question 用户原始问题
+     * @param enhanced 增强后的查询（含重写、HyDE、子问题）
+     * @param progress 进度回调
+     * @return 融合后的检索结果
      */
     public List<RetrievedChunk> queryVector(String question, EnhancedQuery enhanced, Consumer<String> progress) {
         String key = "vec:" + sha256(question);
@@ -140,6 +162,20 @@ public class RetrievalService {
         if (cached.isPresent()) {
             return cached.get();
         }
+        List<String> queries = buildVectorQueries(question, enhanced);
+        List<List<RetrievedChunk>> paths = new ArrayList<>();
+        for (String q : queries) {
+            paths.add(queryPath(q, "naive", "vector", progress));
+        }
+        List<RetrievedChunk> result = mergeChunks(paths);
+        redisCacheService.put(key, result, Duration.ofMinutes(5));
+        return result;
+    }
+
+    /**
+     * 构建向量检索的查询列表
+     */
+    private List<String> buildVectorQueries(String question, EnhancedQuery enhanced) {
         List<String> queries = new ArrayList<>();
         queries.add(question);
         if (enhanced != null) {
@@ -153,13 +189,7 @@ public class RetrievalService {
                 queries.addAll(enhanced.getSubqueries());
             }
         }
-        List<List<RetrievedChunk>> paths = new ArrayList<>();
-        for (String q : queries) {
-            paths.add(queryPath(q, "naive", "vector", progress));
-        }
-        List<RetrievedChunk> result = mergeChunks(paths);
-        redisCacheService.put(key, result, Duration.ofMinutes(5));
-        return result;
+        return queries;
     }
 
     /**
@@ -187,7 +217,7 @@ public class RetrievalService {
         if (progress != null) {
             progress.accept("关键词检索：" + shortText(queryText));
         }
-        List<EsChunk> esChunks = esChunkRepository.search(queryText, 10, null);
+        List<EsChunk> esChunks = esChunkRepository.search(queryText, ES_SEARCH_TOP_K, null);
         List<RetrievedChunk> result = new ArrayList<>();
         for (int i = 0; i < esChunks.size(); i++) {
             EsChunk es = esChunks.get(i);
@@ -444,7 +474,7 @@ public class RetrievalService {
 
     private List<String> extractKeywords(String question, LlmConfig config) {
         // jieba TF-IDF 提取关键词（毫秒级，无需 LLM 调用）
-        List<Keyword> kwList = tfidfAnalyzer.analyze(question, 6);
+        List<Keyword> kwList = tfidfAnalyzer.analyze(question, MAX_KEYWORDS);
         List<String> keywords = kwList.stream()
                 .map(Keyword::getName)
                 .toList();

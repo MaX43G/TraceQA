@@ -34,9 +34,14 @@ public class AuthHeaderGlobalFilter implements GlobalFilter, Ordered {
     private static final Logger log = LoggerFactory.getLogger(AuthHeaderGlobalFilter.class);
 
     /**
-     * Bearer 前缀
+     * Bearer 前缀（用于解析 Authorization 请求头）
      */
     private static final String BEARER_PREFIX = "Bearer ";
+
+    /**
+     * 内部服务路径前缀（不记录访问日志）
+     */
+    private static final String INTERNAL_PATH_PREFIX = "/internal/";
 
     @Resource
     private GatewayMetrics metrics;

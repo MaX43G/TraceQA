@@ -229,6 +229,7 @@ public class LightRagClient {
                 })));
             }
         } catch (Exception e) {
+            log.debug("LightRAG 流式响应解析跳过：{}", e.getMessage());
         }
     }
 

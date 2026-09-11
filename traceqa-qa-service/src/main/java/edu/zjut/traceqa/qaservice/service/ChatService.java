@@ -32,7 +32,21 @@ import java.util.List;
 public class ChatService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatService.class);
+
+    /**
+     * 会话标题最大长度（超出部分截断并添加省略号）
+     */
     private static final int TITLE_MAX_LENGTH = 20;
+
+    /**
+     * 默认会话标题
+     */
+    private static final String DEFAULT_SESSION_TITLE = "新对话";
+
+    /**
+     * 构建历史消息时默认获取的最近消息轮数
+     */
+    private static final int DEFAULT_HISTORY_LIMIT = 6;
 
     @Resource
     private ChatSessionMapper sessionMapper;
@@ -43,25 +57,41 @@ public class ChatService {
 
     /**
      * 创建会话
+     *
+     * @param userId          用户 ID
+     * @param title           会话标题（可选，为空时使用默认标题）
+     * @param knowledgeBaseId 绑定的知识库 ID（可选）
+     * @return 新创建的会话实体
      */
     public ChatSession createSession(Long userId, String title, Long knowledgeBaseId) {
         ChatSession session = new ChatSession();
         session.setUserId(userId);
-        session.setTitle(title == null || title.isBlank() ? "新对话" : title);
+        session.setTitle(title == null || title.isBlank() ? DEFAULT_SESSION_TITLE : title);
         session.setKnowledgeBaseId(knowledgeBaseId);
         session.setPinned(0);
         session.setStatus(1);
         sessionMapper.insert(session);
+        log.debug("创建会话：sessionId={}, userId={}", session.getId(), userId);
         return session;
     }
 
     /**
-     * 获取或创建会话
+     * 获取或创建会话。
+     *
+     * <p>若 sessionId 非空则查询已有会话（校验归属权），并将默认标题更新为首条消息摘要；
+     * 若 sessionId 为空则新建会话。</p>
+     *
+     * @param userId          用户 ID
+     * @param sessionId       会话 ID（可选）
+     * @param knowledgeBaseId 知识库 ID（新建时使用）
+     * @param firstMessage    首条用户消息（用于自动生成标题）
+     * @return 已有或新建的会话实体
      */
     public ChatSession getOrCreateSession(Long userId, Long sessionId, Long knowledgeBaseId, String firstMessage) {
         if (sessionId != null) {
             ChatSession session = requireOwnedSession(userId, sessionId);
-            if (session.getTitle() == null || session.getTitle().isBlank() || "新对话".equals(session.getTitle())) {
+            if (session.getTitle() == null || session.getTitle().isBlank()
+                    || DEFAULT_SESSION_TITLE.equals(session.getTitle())) {
                 session.setTitle(buildTitle(firstMessage));
                 sessionMapper.updateById(session);
             }
@@ -222,7 +252,14 @@ public class ChatService {
     }
 
     /**
-     * 构建最近 N 轮对话历史（时间升序）
+     * 构建最近 N 轮对话历史（时间升序）。
+     *
+     * <p>返回格式为 "用户：xxx\nAI：xxx\n" 的文本，供 LLM 上下文参考。
+     * 若消息为空或会话不存在，返回空字符串。</p>
+     *
+     * @param sessionId 会话 ID
+     * @param limit     获取最近的消息数量
+     * @return 对话历史文本
      */
     public String buildHistoryText(Long sessionId, int limit) {
         var page = messageMapper.selectPage(new Page<>(1, limit),
@@ -251,9 +288,12 @@ public class ChatService {
         return ChatMessageVO.of(message, thinking, references);
     }
 
+    /**
+     * 从首条消息构建会话标题（截取前 N 个字符）
+     */
     private String buildTitle(String message) {
         if (message == null || message.isBlank()) {
-            return "新对话";
+            return DEFAULT_SESSION_TITLE;
         }
         String collapsed = message.replaceAll("\\s+", " ").trim();
         if (collapsed.length() <= TITLE_MAX_LENGTH) {

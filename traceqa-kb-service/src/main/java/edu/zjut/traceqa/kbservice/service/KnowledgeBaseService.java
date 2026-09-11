@@ -69,14 +69,17 @@ public class KnowledgeBaseService {
     }
 
     /**
-     * 删除知识库（同时逻辑删除其下文档）
+     * 删除知识库（同时逻辑删除其下文档，注意：不删除本地文件，保留审计追踪）
+     *
+     * @param id 知识库 ID
      */
     public void delete(Long id) {
         requireById(id);
-        documentMapper.delete(new LambdaQueryWrapper<Document>()
+        // 逻辑删除文档（本地文件保留，可通过手动清理工具处理）
+        int deletedDocs = documentMapper.delete(new LambdaQueryWrapper<Document>()
                 .eq(Document::getKnowledgeBaseId, id));
         knowledgeBaseMapper.deleteById(id);
-        log.info("删除知识库：{}", id);
+        log.info("删除知识库：id={}, deletedDocs={}", id, deletedDocs);
     }
 
     /**

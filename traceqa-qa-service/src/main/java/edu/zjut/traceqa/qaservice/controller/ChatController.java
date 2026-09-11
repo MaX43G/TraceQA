@@ -62,15 +62,11 @@ public class ChatController {
     private SsePublisher ssePublisher;
 
     /**
-     * 流式对话（SSE：thinking/delta/references/done/error 事件）
+     * 创建 SSE 连接并注册取消回调
      */
-    @Operation(summary = "流式对话（SSE）")
-    @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter stream(@Valid @RequestBody ChatStreamRequest request) {
-        Long userId = UserContext.getUserId();
+    private SseEmitter createSseEmitter(AtomicBoolean cancelled) {
         SseEmitter emitter = new SseEmitter(0L);
         ssePublisher.trackConnection(emitter);
-        AtomicBoolean cancelled = new AtomicBoolean(false);
         emitter.onCompletion(() -> {
             cancelled.set(true);
             emitter.complete();
@@ -83,6 +79,18 @@ public class ChatController {
             cancelled.set(true);
             emitter.complete();
         });
+        return emitter;
+    }
+
+    /**
+     * 流式对话（SSE：thinking/delta/references/done/error 事件）
+     */
+    @Operation(summary = "流式对话（SSE）")
+    @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter stream(@Valid @RequestBody ChatStreamRequest request) {
+        Long userId = UserContext.getUserId();
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        SseEmitter emitter = createSseEmitter(cancelled);
         ragExecutor.execute(() -> orchestrator.streamChat(userId, request, emitter, cancelled));
         return emitter;
     }
@@ -96,21 +104,8 @@ public class ChatController {
     @PostMapping(value = "/stream-manual", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamManual(@Valid @RequestBody ManualStreamRequest request) {
         Long userId = UserContext.getUserId();
-        SseEmitter emitter = new SseEmitter(0L);
-        ssePublisher.trackConnection(emitter);
         AtomicBoolean cancelled = new AtomicBoolean(false);
-        emitter.onCompletion(() -> {
-            cancelled.set(true);
-            emitter.complete();
-        });
-        emitter.onTimeout(() -> {
-            cancelled.set(true);
-            emitter.complete();
-        });
-        emitter.onError(_ -> {
-            cancelled.set(true);
-            emitter.complete();
-        });
+        SseEmitter emitter = createSseEmitter(cancelled);
         ragExecutor.execute(() -> manualHandler.streamChat(userId, request, emitter, cancelled));
         return emitter;
     }
@@ -123,13 +118,27 @@ public class ChatController {
     public ApiResponse<List<String>> followup(@RequestBody Map<String, Object> body) {
         String content = body.get("content") == null ? "" : String.valueOf(body.get("content"));
         String answer = body.get("answer") == null ? "" : String.valueOf(body.get("answer"));
-        String prompt = "用户刚刚提问：\"" + content + "\"\nAI 的回答是：\"" + (answer.length() > 800 ? answer.substring(0, 800) + "..." : answer)
-                + "\"\n请解读以上问答，站在用户角度，推荐用户最可能继续追问的 1 到 2 个问题。"
-                + "严格只输出一个 JSON 字符串数组，如 [\"问题1\",\"问题2\"]，不要输出任何其他文字或 Markdown 代码块。";
+        String truncatedAnswer = answer.length() > 800 ? answer.substring(0, 800) + "..." : answer;
+        String prompt = String.format(
+                "用户刚刚提问：\"%s\"\nAI 的回答是：\"%s\"\n"
+                        + "请解读以上问答，站在用户角度，推荐用户最可能继续追问的 1 到 2 个问题。"
+                        + "严格只输出一个 JSON 字符串数组，如 [\"问题1\",\"问题2\"]，不要输出任何其他文字或 Markdown 代码块。",
+                content, truncatedAnswer);
         String raw = llmService.call("chat_followup", prompt, null);
         if (raw == null || raw.isBlank()) {
             return ApiResponse.ok(List.of());
         }
+        List<String> list = parseFollowupQuestions(raw);
+        if (list.size() > 3) {
+            list = list.subList(0, 3);
+        }
+        return ApiResponse.ok(list);
+    }
+
+    /**
+     * 解析 LLM 返回的追问问题 JSON 数组
+     */
+    private List<String> parseFollowupQuestions(String raw) {
         String cleaned = raw.trim();
         int start = cleaned.indexOf("[");
         int end = cleaned.lastIndexOf("]");
@@ -137,10 +146,10 @@ public class ChatController {
             cleaned = cleaned.substring(start, end + 1);
         }
         List<String> list = jsonUtils.parseList(cleaned);
-        if (list.size() > 3) {
-            list = list.subList(0, 3);
-        }
-        return ApiResponse.ok(list);
+        // 过滤空字符串和过长的问题
+        return list.stream()
+                .filter(q -> q != null && !q.isBlank() && q.length() <= 100)
+                .toList();
     }
 
     /**

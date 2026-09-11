@@ -52,6 +52,11 @@ public class DocumentService {
      */
     private static final Set<String> ALLOWED_TYPES = Set.of("md", "txt");
 
+    /**
+     * 压缩包内文件路径最大深度（防止 zip bomb 或路径穿越）
+     */
+    private static final int MAX_PATH_DEPTH = 5;
+
     @Resource
     private DocumentMapper documentMapper;
     @Resource
@@ -71,6 +76,10 @@ public class DocumentService {
 
     /**
      * 单文档上传
+     *
+     * @param file             上传的文件
+     * @param knowledgeBaseId  目标知识库 ID
+     * @return 文档上传结果（含文档 ID）
      */
     public DocumentUploadVO upload(MultipartFile file, Long knowledgeBaseId) {
         try {
@@ -108,9 +117,10 @@ public class DocumentService {
                     continue;
                 }
                 String name = entry.getName();
-                if (name.startsWith("/") || name.startsWith("\\") || name.contains("..")) {
+                if (name.startsWith("/") || name.startsWith("\\") || name.contains("..")
+                        || name.split("/").length > MAX_PATH_DEPTH) {
                     failed++;
-                    errors.add(name + "：非法文件名（拒绝路径穿越）");
+                    errors.add(name + "：非法文件名（拒绝路径穿越或过深嵌套）");
                     continue;
                 }
                 try {

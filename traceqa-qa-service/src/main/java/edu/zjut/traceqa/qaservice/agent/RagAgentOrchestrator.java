@@ -59,6 +59,22 @@ public class RagAgentOrchestrator {
      */
     private static final int MAX_CONTEXT_CHUNKS = 8;
 
+    /**
+     * 对话历史最大轮数
+     */
+    private static final int MAX_HISTORY_ROUNDS = 6;
+
+    /**
+     * 生成失败时的友好提示
+     */
+    private static final String FALLBACK_ANSWER = "您好！我是「溯知」，可以为你解答《数据挖掘》课程相关问题，"
+            + "也可以询问平台的使用方式。请描述你的问题。";
+
+    /**
+     * AI 服务不可用时的降级提示
+     */
+    private static final String DEGRADED_PREFIX = "> \u26a0\ufe0f AI 服务暂时不可用，已降级为「纯检索模式」，以下为检索到的原始资料：\n\n";
+
     @Resource
     private ChatService chatService;
     @Resource
@@ -102,7 +118,7 @@ public class RagAgentOrchestrator {
         try {
             ChatSession session = chatService.getOrCreateSession(userId, request.getSessionId(),
                     request.getKnowledgeBaseId(), request.getContent());
-            String history = chatService.buildHistoryText(session.getId(), 6);
+            String history = chatService.buildHistoryText(session.getId(), MAX_HISTORY_ROUNDS);
             chatService.saveUserMessage(session.getId(), request.getContent());
 
             IntentType intent = recognizeIntent(emitter, thinking, request.getContent(), history, modelConfig);
@@ -432,8 +448,7 @@ public class RagAgentOrchestrator {
         ssePublisher.send(emitter, "thinking", node);
         String answer = consumeWithReasoning(emitter, llmService.callStreamWithReasoning("chat", content, config), cancelled);
         if (answer.isBlank()) {
-            answer = "您好！我是「溯知」，可以为你解答《数据挖掘》课程相关问题，"
-                    + "也可以询问平台的使用方式。请描述你的问题。";
+            answer = FALLBACK_ANSWER;
             ssePublisher.send(emitter, "delta", Map.of("content", answer));
         }
         finishThinking(thinking, emitter, "直接应答", "应答完成");
@@ -527,7 +542,7 @@ public class RagAgentOrchestrator {
      */
     private String degradedAnswer(RetrievalResult result) {
         StringBuilder sb = new StringBuilder();
-        sb.append("> ⚠️ AI 服务暂时不可用，已降级为「纯检索模式」，以下为检索到的原始资料：\n\n");
+        sb.append(DEGRADED_PREFIX);
         if (result == null || !result.hasContent()) {
             sb.append("未检索到相关资料，请尝试更换提问方式。");
             return sb.toString();

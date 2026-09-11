@@ -59,8 +59,26 @@ public class AuthService {
      * 登录防爆破：允许的最大失败次数与锁定时长
      */
     private static final int LOGIN_MAX_FAIL = 5;
+
+    /**
+     * 账号锁定时长
+     */
     private static final Duration LOGIN_LOCK_TTL = Duration.ofMinutes(10);
+
+    /**
+     * 登录失败计数过期时间
+     */
     private static final Duration LOGIN_FAIL_TTL = Duration.ofMinutes(10);
+
+    /**
+     * 密码最小长度
+     */
+    private static final int PASSWORD_MIN_LENGTH = 6;
+
+    /**
+     * 密码最大长度（BCrypt 限制为 72 字节，预留安全余量）
+     */
+    private static final int PASSWORD_MAX_LENGTH = 64;
 
     @Resource
     private UserMapper userMapper;
@@ -75,11 +93,13 @@ public class AuthService {
 
     /**
      * 用户注册（默认角色 USER；账号需英文数字且唯一，注册后不可修改）。
+     *
+     * @param request 注册请求（含用户名、密码、确认密码、昵称）
+     * @return 新注册用户的视图对象
+     * @throws BizException 参数校验失败或账号已存在时抛出
      */
     public UserInfo register(RegisterRequest request) {
-        if (!request.getPassword().equals(request.getConfirmPassword())) {
-            throw new BizException(ErrorCode.PARAM_ERROR, "两次输入的密码不一致");
-        }
+        validatePassword(request.getPassword(), request.getConfirmPassword());
         User exist = findByUsername(request.getUsername());
         if (exist != null) {
             throw new BizException(ErrorCode.PARAM_ERROR, "账号已被占用");
@@ -249,6 +269,21 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(newPassword));
         userMapper.updateById(user);
         log.info("用户修改密码成功：{}", user.getUsername());
+    }
+
+    /**
+     * 校验密码强度
+     */
+    private void validatePassword(String password, String confirmPassword) {
+        if (password == null || password.length() < PASSWORD_MIN_LENGTH) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "密码长度不能少于" + PASSWORD_MIN_LENGTH + "位");
+        }
+        if (password.length() > PASSWORD_MAX_LENGTH) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "密码长度不能超过" + PASSWORD_MAX_LENGTH + "位");
+        }
+        if (!password.equals(confirmPassword)) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "两次输入的密码不一致");
+        }
     }
 
     /**

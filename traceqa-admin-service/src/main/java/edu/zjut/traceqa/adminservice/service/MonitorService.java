@@ -28,8 +28,14 @@ public class MonitorService {
 
     private static final Logger log = LoggerFactory.getLogger(MonitorService.class);
 
-    /** sa-token 登录 token 的 Redis key 前缀：{tokenName}:login:token: */
+    /**
+     * sa-token 登录 token 的 Redis key 前缀：{tokenName}:login:token: */
     private static final String LOGIN_TOKEN_KEY_SUFFIX = ":login:token:";
+
+    /**
+     * keys 命令扫描的最大 key 数量限制（避免 Redis 阻塞）
+     */
+    private static final int MAX_KEYS_SCAN = 1000;
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
@@ -132,13 +138,18 @@ public class MonitorService {
 
     /**
      * 统计活跃会话（sa-token 登录 token 数量，近似）。
-     * sa-token 将登录 token 存于 Redis key：{tokenName}:login:token:{tokenValue}。
+     *
+     * <p>sa-token 将登录 token 存于 Redis key：{tokenName}:login:token:{tokenValue}。
+     * 注意：使用 keys 命令仅用于管理后台展示，生产环境应考虑使用 SCAN 替代。</p>
      */
     private long countActiveSessions() {
         try {
             String pattern = tokenName + LOGIN_TOKEN_KEY_SUFFIX + "*";
             var keys = stringRedisTemplate.keys(pattern);
-            return keys == null ? 0 : keys.size();
+            if (keys == null) {
+                return 0;
+            }
+            return Math.min(keys.size(), MAX_KEYS_SCAN);
         } catch (Exception e) {
             log.debug("统计活跃会话失败：{}", e.getMessage());
             return 0;

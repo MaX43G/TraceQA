@@ -4,6 +4,7 @@ import edu.zjut.traceqa.common.api.ApiResponse;
 import edu.zjut.traceqa.common.rbac.RequireRole;
 import edu.zjut.traceqa.adminservice.config.DbxSessionStore;
 import edu.zjut.traceqa.adminservice.config.LightRagWebuiSessionStore;
+import edu.zjut.traceqa.adminservice.config.NacosWebuiSessionStore;
 import edu.zjut.traceqa.adminservice.config.ObservabilitySessionStore;
 import edu.zjut.traceqa.adminservice.service.LightRagMonitorService;
 import edu.zjut.traceqa.adminservice.service.MonitorService;
@@ -37,6 +38,8 @@ public class MonitorController {
     private ObservabilitySessionStore observabilitySessionStore;
     @Resource
     private DbxSessionStore dbxSessionStore;
+    @Resource
+    private NacosWebuiSessionStore nacosSessionStore;
 
     /**
      * 查询系统运行指标
@@ -143,6 +146,24 @@ public class MonitorController {
     public ApiResponse<Void> dbxSession(HttpServletResponse response) {
         String token = dbxSessionStore.create();
         Cookie cookie = new Cookie("tq_dbx", token);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(24 * 60 * 60);
+        cookie.setAttribute("SameSite", "Lax");
+        response.addCookie(cookie);
+        return ApiResponse.ok();
+    }
+
+    /**
+     * 获取 Nacos 控制台访问会话（签发短期 HttpOnly Cookie，供反向代理鉴权）
+     */
+    @Operation(summary = "获取 Nacos 控制台访问会话")
+    @RequireRole("ADMIN")
+    @PostMapping("/nacos/session")
+    public ApiResponse<Void> nacosSession(HttpServletResponse response) {
+        String token = nacosSessionStore.create();
+        Cookie cookie = new Cookie("tq_nacos", token);
         cookie.setHttpOnly(true);
         cookie.setSecure(true);
         cookie.setPath("/");

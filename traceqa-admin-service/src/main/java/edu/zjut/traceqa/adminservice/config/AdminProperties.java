@@ -27,6 +27,11 @@ public class AdminProperties {
     private String dbxBaseUrl = "http://localhost:4224";
 
     /**
+     * Nacos 配置
+     */
+    private NacosConfig nacos = new NacosConfig();
+
+    /**
      * 可观测性配置
      */
     @Data
@@ -44,5 +49,25 @@ public class AdminProperties {
          * Prometheus 内网地址
          */
         private String prometheusBaseUrl = "http://prometheus:9090";
+    }
+
+    /**
+     * Nacos 配置
+     */
+    @Data
+    @NoArgsConstructor
+    public static class NacosConfig {
+        /**
+         * Nacos Server 地址（内网）
+         */
+        private String serverAddr = "http://localhost:8848";
+        /**
+         * Nacos 访问令牌（可选，用于免密登录）
+         */
+        private String accessToken = "";
+        /**
+         * Cookie 过期时间（小时）
+         */
+        private int cookieExpireHours = 24;
     }
 }

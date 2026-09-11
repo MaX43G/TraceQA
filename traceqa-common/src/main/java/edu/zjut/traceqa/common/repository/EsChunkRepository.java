@@ -43,6 +43,9 @@ public class EsChunkRepository {
 
     /**
      * 确保 ES 索引存在，不存在则创建并配置 mapping。
+     *
+     * <p>使用 ik 分词器支持中文全文检索，仅在索引不存在时执行创建。
+     * 创建失败不影响后续操作，会记录错误日志。</p>
      */
     public void ensureIndexExists() {
         try {
@@ -126,6 +129,8 @@ public class EsChunkRepository {
 
     /**
      * 按文档 ID 删除所有关联片段（索引不存在时静默跳过）
+     *
+     * @param documentId 文档 ID
      */
     public void deleteByDocumentId(Long documentId) {
         if (documentId == null) {
@@ -153,12 +158,12 @@ public class EsChunkRepository {
     }
 
     /**
-     * BM25 全文检索
+     * BM25 全文检索（支持 IK 中文分词 + 标题加权）
      *
-     * @param queryText   查询文本
-     * @param topK        返回最大数量
-     * @param kbId        知识库 ID 过滤（可选，null 表示不过滤）
-     * @return 检索到的片段列表
+     * @param queryText 查询文本
+     * @param topK      返回最大数量
+     * @param kbId      知识库 ID 过滤（可选，null 表示不过滤）
+     * @return 检索到的片段列表（含高亮标记）
      */
     public List<EsChunk> search(String queryText, int topK, Long kbId) {
         try {

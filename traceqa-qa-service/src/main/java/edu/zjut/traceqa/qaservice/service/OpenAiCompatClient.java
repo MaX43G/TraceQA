@@ -132,7 +132,8 @@ public class OpenAiCompatClient {
                 if (content != null && !content.isEmpty()) {
                     result.add(content);
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                log.debug("SSE 数据解析跳过：{}", e.getMessage());
             }
         }
         return result;
@@ -156,7 +157,8 @@ public class OpenAiCompatClient {
                 if (chunk != null && (!chunk.content().isEmpty() || !chunk.reasoningContent().isEmpty())) {
                     result.add(chunk);
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                log.debug("SSE 推理数据解析跳过：{}", e.getMessage());
             }
         }
         return result;

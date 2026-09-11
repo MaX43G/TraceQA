@@ -1,0 +1,52 @@
+# ============================================================
+# 溯知 / TraceQA 文件服务完整配置（Nacos DataId: traceqa-file-service.yaml）
+# ============================================================
+server:
+  port: ${SERVER_PORT:8083}
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 55MB
+  encoding:
+    charset: UTF-8
+    enabled: true
+    force: true
+
+# MinIO 对象存储
+app:
+  minio:
+    endpoint: ${MINIO_ENDPOINT:http://localhost:6116}
+    access-key: ${MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${MINIO_SECRET_KEY:minioadmin}
+    bucket: ${MINIO_BUCKET:traceqa}
+    public-url: ${MINIO_PUBLIC_URL:}
+
+# springdoc
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# 可观测性
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  level:
+    edu.zjut.traceqa: info
