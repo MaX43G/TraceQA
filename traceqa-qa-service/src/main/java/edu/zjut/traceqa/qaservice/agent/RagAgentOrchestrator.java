@@ -21,7 +21,6 @@ import edu.zjut.traceqa.qaservice.service.RedisCacheService;
 import edu.zjut.traceqa.qaservice.service.SystemPromptService;
 import edu.zjut.traceqa.qaservice.sse.SsePublisher;
 import edu.zjut.traceqa.qaservice.metrics.RagMetrics;
-import edu.zjut.traceqa.qaservice.observability.LangfuseTraceService;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,8 +93,6 @@ public class RagAgentOrchestrator {
     private RagMetrics ragMetrics;
     @Resource
     private SystemPromptService systemPromptService;
-    @Resource
-    private LangfuseTraceService langfuseTrace;
 
     /**
      * 并行检索时保护 thinking 节点列表与 SSE 进度推送的锁
@@ -116,35 +113,20 @@ public class RagAgentOrchestrator {
     public void streamChat(Long userId, ChatStreamRequest request, SseEmitter emitter, AtomicBoolean cancelled) {
         ragMetrics.queryStart();
         List<ThinkingNodeVO> thinking = new ArrayList<>();
-        StringBuilder reasoningAccumulator = new StringBuilder();
         long start = System.currentTimeMillis();
         LlmConfig modelConfig = toLlmConfig(request);
-
-        // Langfuse trace
-        Map<String, Object> traceMeta = new LinkedHashMap<>();
-        traceMeta.put("userId", userId);
-        traceMeta.put("mode", "auto");
-        traceMeta.put("content", request.getContent());
-        String traceId = langfuseTrace.createTrace("rag-auto-query", traceMeta);
-
         try {
             ChatSession session = chatService.getOrCreateSession(userId, request.getSessionId(),
                     request.getKnowledgeBaseId(), request.getContent());
             String history = chatService.buildHistoryText(session.getId(), MAX_HISTORY_ROUNDS);
             chatService.saveUserMessage(session.getId(), request.getContent());
 
-            // Langfuse: 意图识别 span
-            String intentSpanId = langfuseTrace.startSpan(traceId, "意图识别", request.getContent());
-
             IntentType intent = recognizeIntent(emitter, thinking, request.getContent(), history, modelConfig);
-
-            langfuseTrace.endSpan(intentSpanId, intent.name(), Map.of("intent", intent.name()));
-            langfuseTrace.recordEvent(traceId, "intent-resolved", Map.of("intent", intent.name()));
 
             String answer;
             List<ReferenceVO> references = List.of();
             if (isDirectAnswer(intent)) {
-                answer = respondDirect(emitter, thinking, request.getContent(), modelConfig, cancelled, reasoningAccumulator);
+                answer = respondDirect(emitter, thinking, request.getContent(), modelConfig, cancelled);
             } else {
                 RetrievalResult result = retrieve(emitter, thinking, request.getContent(), history, modelConfig, cancelled);
                 if (!result.hasContent()) {
@@ -155,20 +137,12 @@ public class RagAgentOrchestrator {
                 }
                 List<String> highlight = extractHighlightTerms(request.getContent());
                 references = emitReferences(emitter, result, highlight);
-                answer = generateAnswer(emitter, thinking, request.getContent(), history, result, modelConfig, cancelled, reasoningAccumulator);
+                answer = generateAnswer(emitter, thinking, request.getContent(), history, result, modelConfig, cancelled);
             }
 
-            langfuseTrace.updateTrace(traceId, Map.of(
-                    "intent", intent.name(),
-                    "latencyMs", System.currentTimeMillis() - start,
-                    "answerLength", answer != null ? answer.length() : 0));
-            langfuseTrace.flush();
-
-            persistAndFinish(session, thinking, references, answer, reasoningAccumulator.toString(), start, emitter, traceId);
+            persistAndFinish(session, thinking, references, answer, start, emitter);
             ssePublisher.complete(emitter);
         } catch (Exception e) {
-            langfuseTrace.recordEvent(traceId, "error", Map.of("error", e.getMessage()));
-            langfuseTrace.flush();
             String trace = java.util.Arrays.stream(e.getStackTrace())
                     .limit(5)
                     .map(StackTraceElement::toString)
@@ -438,12 +412,12 @@ public class RagAgentOrchestrator {
      */
     private String generateAnswer(SseEmitter emitter, List<ThinkingNodeVO> thinking,
                                   String content, String history, RetrievalResult result, LlmConfig config,
-                                  AtomicBoolean cancelled, StringBuilder reasoningAccumulator) {
+                                  AtomicBoolean cancelled) {
         ThinkingNodeVO node = startThinking(thinking, "总结生成", "answer-agent", "正在生成回答");
         ssePublisher.send(emitter, "thinking", node);
 
         String prompt = buildAnswerPrompt(content, history, result);
-        String answer = streamAnswer(emitter, prompt, config, cancelled, reasoningAccumulator);
+        String answer = streamAnswer(emitter, prompt, config, cancelled);
         answer = fixCitationFormat(answer);
         if (answer.isBlank()) {
             answer = degradedAnswer(result);
@@ -469,10 +443,10 @@ public class RagAgentOrchestrator {
      * 寒暄/系统咨询：直接应答，不进入检索链路
      */
     private String respondDirect(SseEmitter emitter, List<ThinkingNodeVO> thinking, String content,
-                                 LlmConfig config, AtomicBoolean cancelled, StringBuilder reasoningAccumulator) {
+                                 LlmConfig config, AtomicBoolean cancelled) {
         ThinkingNodeVO node = startThinking(thinking, "直接应答", "answer-agent", "无需检索，直接应答");
         ssePublisher.send(emitter, "thinking", node);
-        String answer = consumeWithReasoning(emitter, llmService.callStreamWithReasoning("chat", content, config), cancelled, reasoningAccumulator);
+        String answer = consumeWithReasoning(emitter, llmService.callStreamWithReasoning("chat", content, config), cancelled);
         if (answer.isBlank()) {
             answer = FALLBACK_ANSWER;
             ssePublisher.send(emitter, "delta", Map.of("content", answer));
@@ -481,10 +455,9 @@ public class RagAgentOrchestrator {
         return answer;
     }
 
-    private String streamAnswer(SseEmitter emitter, String prompt, LlmConfig config, AtomicBoolean cancelled,
-                                 StringBuilder reasoningAccumulator) {
+    private String streamAnswer(SseEmitter emitter, String prompt, LlmConfig config, AtomicBoolean cancelled) {
         StringBuilder acc = new StringBuilder();
-        acc.append(consumeWithReasoning(emitter, llmService.callStreamWithReasoning("summary", prompt, config), cancelled, reasoningAccumulator));
+        acc.append(consumeWithReasoning(emitter, llmService.callStreamWithReasoning("summary", prompt, config), cancelled));
         if (acc.isEmpty()) {
             acc.append(consume(emitter, answerAgent.streamAnswer(prompt, config), cancelled));
         }
@@ -507,13 +480,10 @@ public class RagAgentOrchestrator {
      * 消费含推理过程的内容块流：content → delta 事件，reasoning_content → reasoning 事件
      */
     private String consumeWithReasoning(SseEmitter emitter, Flux<OpenAiCompatClient.DeltaChunk> flux,
-                                        AtomicBoolean cancelled, StringBuilder reasoningAccumulator) {
+                                        AtomicBoolean cancelled) {
         StringBuilder acc = new StringBuilder();
         flux.takeWhile(_ -> !cancelled.get()).toIterable().forEach(chunk -> {
             if (!chunk.reasoningContent().isEmpty()) {
-                if (reasoningAccumulator != null) {
-                    reasoningAccumulator.append(chunk.reasoningContent());
-                }
                 ssePublisher.send(emitter, "reasoning", Map.of("content", chunk.reasoningContent()));
             }
             if (!chunk.content().isEmpty()) {
@@ -529,50 +499,40 @@ public class RagAgentOrchestrator {
      */
     private void persistAndFinish(ChatSession session, List<ThinkingNodeVO> thinking,
                                   List<ReferenceVO> references, String answer,
-                                  String reasoningContent, long start, SseEmitter emitter,
-                                  String traceId) {
+                                  long start, SseEmitter emitter) {
         long latency = System.currentTimeMillis() - start;
-        String traceUrl = langfuseTrace.getTraceUrl(traceId);
         if (answer == null || answer.isBlank()) {
             ragMetrics.recordQueryLatency(latency, "unknown");
             log.info("回答为空（可能被中断），不保存 AI 消息：session={}", session.getId());
-            Map<String, Object> done = new LinkedHashMap<>();
-            done.put("sessionId", session.getId());
-            done.put("title", session.getTitle());
-            if (traceUrl != null) done.put("traceUrl", traceUrl);
-            ssePublisher.send(emitter, "done", done);
+            ssePublisher.send(emitter, "done", Map.of(
+                    "sessionId", session.getId(),
+                    "title", session.getTitle()));
             return;
         }
         try {
             ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer,
-                    thinking, references, reasoningContent, latency);
-            Map<String, Object> done = new LinkedHashMap<>();
-            done.put("sessionId", session.getId());
-            done.put("messageId", assistant.getId());
-            done.put("title", session.getTitle());
-            if (traceUrl != null) done.put("traceUrl", traceUrl);
-            ssePublisher.send(emitter, "done", done);
+                    thinking, references, latency);
+            ssePublisher.send(emitter, "done", Map.of(
+                    "sessionId", session.getId(),
+                    "messageId", assistant.getId(),
+                    "title", session.getTitle()));
             ragMetrics.recordQueryLatency(latency, "success");
             log.info("问答完成：session={}, latency={}ms", session.getId(), latency);
         } catch (Exception e) {
             log.warn("持久化消息失败（thinking trace 序列化异常？），降级保存：{}", e.getMessage());
             try {
                 ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer,
-                        List.of(), references, reasoningContent, latency);
-                Map<String, Object> done = new LinkedHashMap<>();
-                done.put("sessionId", session.getId());
-                done.put("messageId", assistant.getId());
-                done.put("title", session.getTitle());
-                if (traceUrl != null) done.put("traceUrl", traceUrl);
-                ssePublisher.send(emitter, "done", done);
+                        List.of(), references, latency);
+                ssePublisher.send(emitter, "done", Map.of(
+                        "sessionId", session.getId(),
+                        "messageId", assistant.getId(),
+                        "title", session.getTitle()));
                 log.info("问答完成（降级保存，thinking trace 已丢弃）：session={}", session.getId());
             } catch (Exception ex) {
                 log.error("降级保存也失败：{}", ex.getMessage());
-                Map<String, Object> done = new LinkedHashMap<>();
-                done.put("sessionId", session.getId());
-                done.put("title", session.getTitle());
-                if (traceUrl != null) done.put("traceUrl", traceUrl);
-                ssePublisher.send(emitter, "done", done);
+                ssePublisher.send(emitter, "done", Map.of(
+                        "sessionId", session.getId(),
+                        "title", session.getTitle()));
             }
         }
     }

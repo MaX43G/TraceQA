@@ -16,7 +16,6 @@ import edu.zjut.traceqa.qaservice.service.LlmService;
 import edu.zjut.traceqa.qaservice.service.OpenAiCompatClient;
 import edu.zjut.traceqa.qaservice.sse.SsePublisher;
 import edu.zjut.traceqa.qaservice.metrics.RagMetrics;
-import edu.zjut.traceqa.qaservice.observability.LangfuseTraceService;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,8 +54,6 @@ public class ManualRetrievalHandler {
     private SsePublisher ssePublisher;
     @Resource
     private RagMetrics ragMetrics;
-    @Resource
-    private LangfuseTraceService langfuseTrace;
 
     @Value("${spring.ai.openai.base-url:https://api.siliconflow.cn}")
     private String springAiBaseUrl;
@@ -70,19 +67,8 @@ public class ManualRetrievalHandler {
     public void streamChat(Long userId, ManualStreamRequest request, SseEmitter emitter, AtomicBoolean cancelled) {
         ragMetrics.queryStart();
         List<ThinkingNodeVO> thinking = new ArrayList<>();
-        StringBuilder reasoningAccumulator = new StringBuilder();
         long start = System.currentTimeMillis();
         LlmConfig modelConfig = toLlmConfig(request);
-
-        // Langfuse trace
-        Map<String, Object> traceMeta = new LinkedHashMap<>();
-        traceMeta.put("userId", userId);
-        traceMeta.put("mode", "manual");
-        traceMeta.put("content", request.getContent());
-        traceMeta.put("strategies", request.getStrategies());
-        traceMeta.put("graphMode", request.getGraphModeOrDefault());
-        String traceId = langfuseTrace.createTrace("rag-manual-query", traceMeta);
-
         try {
             ChatSession session = chatService.getOrCreateSession(userId, request.getSessionId(),
                     request.getKnowledgeBaseId(), request.getContent());
@@ -107,18 +93,11 @@ public class ManualRetrievalHandler {
 
             List<String> highlight = extractHighlightTerms(request.getContent());
             List<ReferenceVO> references = emitReferences(emitter, result, highlight);
-            String answer = generateAnswer(emitter, thinking, request.getContent(), history, result, modelConfig, cancelled, reasoningAccumulator);
+            String answer = generateAnswer(emitter, thinking, request.getContent(), history, result, modelConfig, cancelled);
 
-            langfuseTrace.updateTrace(traceId, Map.of(
-                    "latencyMs", System.currentTimeMillis() - start,
-                    "answerLength", answer.length()));
-            langfuseTrace.flush();
-
-            persistAndFinish(session, thinking, references, answer, reasoningAccumulator.toString(), start, emitter, traceId);
+            persistAndFinish(session, thinking, references, answer, start, emitter);
             ssePublisher.complete(emitter);
         } catch (Exception e) {
-            langfuseTrace.recordEvent(traceId, "error", Map.of("error", e.getMessage()));
-            langfuseTrace.flush();
             String trace = java.util.Arrays.stream(e.getStackTrace())
                     .limit(5)
                     .map(StackTraceElement::toString)
@@ -165,15 +144,13 @@ public class ManualRetrievalHandler {
         List<String> futureLabels = new ArrayList<>();
 
         if (useGraph) {
-            String graphMode = request.getGraphModeOrDefault();
             futures.add(CompletableFuture.supplyAsync(() -> {
-                ThinkingNodeVO gNode = startThinking(thinking, "图谱检索", "graph-agent",
-                        "正在执行知识图谱检索（" + graphMode + " 模式）");
+                ThinkingNodeVO gNode = startThinking(thinking, "图谱检索", "graph-agent", "正在执行知识图谱检索");
                 ssePublisher.send(emitter, "thinking", gNode);
-                List<RetrievedChunk> chunks = retrievalService.queryGraph(content, graphMode,
+                List<RetrievedChunk> chunks = retrievalService.queryGraph(content,
                         progress -> pushProgress(emitter, gNode, cancelled, progress));
-                gNode.setData(Map.of("hits", chunks.size(), "sources", filePaths(chunks), "graphMode", graphMode));
-                finishThinking(thinking, emitter, "图谱检索", "图谱命中 " + chunks.size() + " 条（" + graphMode + "）");
+                gNode.setData(Map.of("hits", chunks.size(), "sources", filePaths(chunks)));
+                finishThinking(thinking, emitter, "图谱检索", "图谱命中 " + chunks.size() + " 条");
                 return chunks;
             }));
             futureLabels.add("graph");
@@ -260,12 +237,12 @@ public class ManualRetrievalHandler {
 
     private String generateAnswer(SseEmitter emitter, List<ThinkingNodeVO> thinking,
                                   String content, String history, RetrievalResult result,
-                                  LlmConfig config, AtomicBoolean cancelled, StringBuilder reasoningAccumulator) {
+                                  LlmConfig config, AtomicBoolean cancelled) {
         ThinkingNodeVO node = startThinking(thinking, "总结生成", "answer-agent", "正在生成回答");
         ssePublisher.send(emitter, "thinking", node);
 
         String prompt = buildAnswerPrompt(content, history, result);
-        String answer = consumeWithReasoning(emitter, llmService.callStreamWithReasoning("summary", prompt, config), cancelled, reasoningAccumulator);
+        String answer = consumeWithReasoning(emitter, llmService.callStreamWithReasoning("summary", prompt, config), cancelled);
         if (answer.isBlank()) {
             answer = degradedAnswer(result);
             ragMetrics.recordDegraded();
@@ -305,10 +282,7 @@ public class ManualRetrievalHandler {
         if (request.useHyde()) sb.append("HyDE + ");
         if (request.useVector()) sb.append("向量 + ");
         if (request.useKeyword()) sb.append("关键词 + ");
-        if (request.useGraph()) {
-            String gm = request.getGraphModeOrDefault();
-            sb.append("图谱(").append(gm).append(") + ");
-        }
+        if (request.useGraph()) sb.append("图谱 + ");
         return sb.length() > 7 ? sb.substring(0, sb.length() - 3) : "手动模式";
     }
 
@@ -409,44 +383,26 @@ public class ManualRetrievalHandler {
 
     private void persistAndFinish(ChatSession session, List<ThinkingNodeVO> thinking,
                                   List<ReferenceVO> references, String answer,
-                                  String reasoningContent, long start, SseEmitter emitter,
-                                  String traceId) {
+                                  long start, SseEmitter emitter) {
         long latency = System.currentTimeMillis() - start;
-        String traceUrl = langfuseTrace.getTraceUrl(traceId);
         if (answer == null || answer.isBlank()) {
             ragMetrics.recordQueryLatency(latency, "unknown");
-            Map<String, Object> done = new LinkedHashMap<>();
-            done.put("sessionId", session.getId());
-            done.put("title", session.getTitle());
-            if (traceUrl != null) done.put("traceUrl", traceUrl);
-            ssePublisher.send(emitter, "done", done);
+            ssePublisher.send(emitter, "done", Map.of("sessionId", session.getId(), "title", session.getTitle()));
             return;
         }
         try {
-            ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer, thinking, references, reasoningContent, latency);
-            Map<String, Object> done = new LinkedHashMap<>();
-            done.put("sessionId", session.getId());
-            done.put("messageId", assistant.getId());
-            done.put("title", session.getTitle());
-            if (traceUrl != null) done.put("traceUrl", traceUrl);
-            ssePublisher.send(emitter, "done", done);
+            ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer, thinking, references, latency);
+            ssePublisher.send(emitter, "done", Map.of(
+                    "sessionId", session.getId(), "messageId", assistant.getId(), "title", session.getTitle()));
             ragMetrics.recordQueryLatency(latency, "success");
         } catch (Exception e) {
             log.warn("持久化消息失败：{}", e.getMessage());
             try {
-                ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer, List.of(), references, reasoningContent, latency);
-                Map<String, Object> done = new LinkedHashMap<>();
-                done.put("sessionId", session.getId());
-                done.put("messageId", assistant.getId());
-                done.put("title", session.getTitle());
-                if (traceUrl != null) done.put("traceUrl", traceUrl);
-                ssePublisher.send(emitter, "done", done);
+                ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer, List.of(), references, latency);
+                ssePublisher.send(emitter, "done", Map.of(
+                        "sessionId", session.getId(), "messageId", assistant.getId(), "title", session.getTitle()));
             } catch (Exception ex) {
-                Map<String, Object> done = new LinkedHashMap<>();
-                done.put("sessionId", session.getId());
-                done.put("title", session.getTitle());
-                if (traceUrl != null) done.put("traceUrl", traceUrl);
-                ssePublisher.send(emitter, "done", done);
+                ssePublisher.send(emitter, "done", Map.of("sessionId", session.getId(), "title", session.getTitle()));
             }
         }
     }
@@ -461,13 +417,10 @@ public class ManualRetrievalHandler {
         }
     }
 
-    private String consumeWithReasoning(SseEmitter emitter, Flux<OpenAiCompatClient.DeltaChunk> flux, AtomicBoolean cancelled, StringBuilder reasoningAccumulator) {
+    private String consumeWithReasoning(SseEmitter emitter, Flux<OpenAiCompatClient.DeltaChunk> flux, AtomicBoolean cancelled) {
         StringBuilder acc = new StringBuilder();
         flux.takeWhile(_ -> !cancelled.get()).toIterable().forEach(chunk -> {
             if (!chunk.reasoningContent().isEmpty()) {
-                if (reasoningAccumulator != null) {
-                    reasoningAccumulator.append(chunk.reasoningContent());
-                }
                 ssePublisher.send(emitter, "reasoning", Map.of("content", chunk.reasoningContent()));
             }
             if (!chunk.content().isEmpty()) {

@@ -198,14 +198,13 @@ public class ChatService {
      * 保存 AI 消息
      */
     public ChatMessage saveAssistantMessage(Long sessionId, String content, List<ThinkingNodeVO> thinkingTrace,
-                                            List<ReferenceVO> references, String reasoningContent, long latencyMs) {
+                                            List<ReferenceVO> references, long latencyMs) {
         ChatMessage message = new ChatMessage();
         message.setSessionId(sessionId);
         message.setRole(ChatRole.ASSISTANT.name());
         message.setContent(content);
         message.setThinkingTrace(jsonUtils.toJson(thinkingTrace));
         message.setReferences(jsonUtils.toJson(references));
-        message.setReasoningContent(reasoningContent);
         message.setLatencyMs(latencyMs);
         message.setStatus(1);
         messageMapper.insert(message);
