@@ -47,6 +47,11 @@ public class ChatMessageVO {
     private List<ReferenceVO> references;
 
     /**
+     * AI 推理过程内容
+     */
+    private String reasoningContent;
+
+    /**
      * 生成耗时（毫秒）
      */
     private Long latencyMs;
@@ -61,6 +66,7 @@ public class ChatMessageVO {
      */
     public static ChatMessageVO of(ChatMessage message, List<ThinkingNodeVO> thinkingTrace, List<ReferenceVO> references) {
         return new ChatMessageVO(message.getId(), message.getSessionId(), message.getRole(),
-                message.getContent(), thinkingTrace, references, message.getLatencyMs(), message.getCreateTime());
+                message.getContent(), thinkingTrace, references, message.getReasoningContent(),
+                message.getLatencyMs(), message.getCreateTime());
     }
 }

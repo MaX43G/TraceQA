@@ -44,6 +44,12 @@ public class ChatMessage extends BaseEntity {
     private String references;
 
     /**
+     * AI 推理过程内容（CoT 思维链）
+     */
+    @TableField("reasoning_content")
+    private String reasoningContent;
+
+    /**
      * 生成耗时（毫秒，AI 消息）
      */
     private Long latencyMs;
