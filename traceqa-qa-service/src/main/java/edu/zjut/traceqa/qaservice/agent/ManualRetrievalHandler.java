@@ -93,9 +93,11 @@ public class ManualRetrievalHandler {
 
             List<String> highlight = extractHighlightTerms(request.getContent());
             List<ReferenceVO> references = emitReferences(emitter, result, highlight);
-            String answer = generateAnswer(emitter, thinking, request.getContent(), history, result, modelConfig, cancelled);
+            String[] answerResult = generateAnswer(emitter, thinking, request.getContent(), history, result, modelConfig, cancelled);
+            String answer = answerResult[0];
+            String reasoningContent = answerResult[1];
 
-            persistAndFinish(session, thinking, references, answer, start, emitter);
+            persistAndFinish(session, thinking, references, answer, reasoningContent, start, emitter);
             ssePublisher.complete(emitter);
         } catch (Exception e) {
             String trace = java.util.Arrays.stream(e.getStackTrace())
@@ -235,14 +237,16 @@ public class ManualRetrievalHandler {
 
     // ========== 生成回答 ==========
 
-    private String generateAnswer(SseEmitter emitter, List<ThinkingNodeVO> thinking,
+    private String[] generateAnswer(SseEmitter emitter, List<ThinkingNodeVO> thinking,
                                   String content, String history, RetrievalResult result,
                                   LlmConfig config, AtomicBoolean cancelled) {
         ThinkingNodeVO node = startThinking(thinking, "总结生成", "answer-agent", "正在生成回答");
         ssePublisher.send(emitter, "thinking", node);
 
         String prompt = buildAnswerPrompt(content, history, result);
-        String answer = consumeWithReasoning(emitter, llmService.callStreamWithReasoning("summary", prompt, config), cancelled);
+        String[] answerAndReasoning = consumeWithReasoning(emitter, llmService.callStreamWithReasoning("summary", prompt, config), cancelled);
+        String answer = answerAndReasoning[0];
+        String reasoningContent = answerAndReasoning[1];
         if (answer.isBlank()) {
             answer = degradedAnswer(result);
             ragMetrics.recordDegraded();
@@ -255,7 +259,7 @@ public class ManualRetrievalHandler {
         data.put("prompt", prompt);
         node.setData(data);
         finishThinking(thinking, emitter, "总结生成", "回答生成完毕（模型：" + modelName + "）");
-        return answer;
+        return new String[]{answer, reasoningContent};
     }
 
     // ========== 工具方法（与 RagAgentOrchestrator 一致） ==========
@@ -383,7 +387,7 @@ public class ManualRetrievalHandler {
 
     private void persistAndFinish(ChatSession session, List<ThinkingNodeVO> thinking,
                                   List<ReferenceVO> references, String answer,
-                                  long start, SseEmitter emitter) {
+                                  String reasoningContent, long start, SseEmitter emitter) {
         long latency = System.currentTimeMillis() - start;
         if (answer == null || answer.isBlank()) {
             ragMetrics.recordQueryLatency(latency, "unknown");
@@ -391,14 +395,14 @@ public class ManualRetrievalHandler {
             return;
         }
         try {
-            ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer, thinking, references, latency);
+            ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer, thinking, references, reasoningContent, latency);
             ssePublisher.send(emitter, "done", Map.of(
                     "sessionId", session.getId(), "messageId", assistant.getId(), "title", session.getTitle()));
             ragMetrics.recordQueryLatency(latency, "success");
         } catch (Exception e) {
             log.warn("持久化消息失败：{}", e.getMessage());
             try {
-                ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer, List.of(), references, latency);
+                ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer, List.of(), references, reasoningContent, latency);
                 ssePublisher.send(emitter, "done", Map.of(
                         "sessionId", session.getId(), "messageId", assistant.getId(), "title", session.getTitle()));
             } catch (Exception ex) {
@@ -417,10 +421,12 @@ public class ManualRetrievalHandler {
         }
     }
 
-    private String consumeWithReasoning(SseEmitter emitter, Flux<OpenAiCompatClient.DeltaChunk> flux, AtomicBoolean cancelled) {
+    private String[] consumeWithReasoning(SseEmitter emitter, Flux<OpenAiCompatClient.DeltaChunk> flux, AtomicBoolean cancelled) {
         StringBuilder acc = new StringBuilder();
+        StringBuilder reasoningAcc = new StringBuilder();
         flux.takeWhile(_ -> !cancelled.get()).toIterable().forEach(chunk -> {
             if (!chunk.reasoningContent().isEmpty()) {
+                reasoningAcc.append(chunk.reasoningContent());
                 ssePublisher.send(emitter, "reasoning", Map.of("content", chunk.reasoningContent()));
             }
             if (!chunk.content().isEmpty()) {
@@ -428,7 +434,7 @@ public class ManualRetrievalHandler {
                 ssePublisher.send(emitter, "delta", Map.of("content", chunk.content()));
             }
         });
-        return acc.toString();
+        return new String[]{acc.toString(), reasoningAcc.toString()};
     }
 
     private ThinkingNodeVO startThinking(List<ThinkingNodeVO> thinking, String stage, String agent, String message) {
