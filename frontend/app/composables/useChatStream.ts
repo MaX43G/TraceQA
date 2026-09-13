@@ -20,8 +20,8 @@ export interface ChatStreamHandlers {
     onReferences?: (references: ReferenceVO[]) => void
     /** 检索分析（三路命中数 / 来源文档分布 / 耗时） */
     onStats?: (stats: RetrievalStats) => void
-    /** 结束（携带会话/消息 ID） */
-    onDone?: (payload: { sessionId?: number; messageId?: number; title?: string }) => void
+    /** 结束（携带会话/消息 ID + Langfuse 追踪链接） */
+    onDone?: (payload: { sessionId?: number; messageId?: number; title?: string; traceUrl?: string }) => void
     /** 服务端错误 */
     onError?: (error: { code?: number; msg?: string }) => void
     /** 流结束（无论成功失败均触发） */
@@ -125,6 +125,7 @@ export async function streamChatManual(
         knowledgeBaseId?: number | null
         content: string
         strategies: string[]
+        graphMode?: string
         serverModel?: string
         model?: string
         baseUrl?: string
@@ -136,6 +137,78 @@ export async function streamChatManual(
     let res: Response | undefined
     try {
         res = await fetch('/api/chat/stream-manual', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
+            body: JSON.stringify(body),
+            signal
+        })
+    } catch (err) {
+        handlers.onError?.({msg: '网络异常，请检查后端服务是否可用'})
+        handlers.onEnd?.()
+        return
+    }
+
+    const contentType = res.headers.get('content-type') || ''
+    if (!res || !res.ok || !res.body || !contentType.includes('text/event-stream')) {
+        let msg = `请求失败(${res?.status ?? '未知'})`
+        let code: number | undefined
+        try {
+            const json = await res?.json()
+            msg = json?.msg || msg
+            code = json?.code
+            handlers.onError?.({code, msg})
+        } catch {
+            handlers.onError?.({msg})
+        }
+        if (code === 40100 || code === 40101) {
+            handleAuthFailure(new ApiError(msg, code, '-'))
+        }
+        handlers.onEnd?.()
+        return
+    }
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder('utf-8')
+    let buffer = ''
+
+    try {
+        while (true) {
+            const {done, value} = await reader.read()
+            if (done) break
+            buffer += decoder.decode(value, {stream: true})
+            let sepIndex: number
+            while ((sepIndex = buffer.indexOf('\n\n')) !== -1) {
+                const block = buffer.slice(0, sepIndex)
+                buffer = buffer.slice(sepIndex + 2)
+                dispatchBlock(block, handlers)
+            }
+        }
+    } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+            handlers.onError?.({msg: '流式连接中断'})
+        }
+    } finally {
+        handlers.onEnd?.()
+    }
+}
+
+/** 发起 AI Decision 模式流式对话请求并消费事件 */
+export async function streamChatAiDecision(
+    body: {
+        sessionId?: number | null
+        knowledgeBaseId?: number | null
+        content: string
+        serverModel?: string
+        model?: string
+        baseUrl?: string
+        apiKey?: string
+    },
+    handlers: ChatStreamHandlers,
+    signal?: AbortSignal
+): Promise<void> {
+    let res: Response | undefined
+    try {
+        res = await fetch('/api/chat/stream-ai-decision', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
             body: JSON.stringify(body),
@@ -242,7 +315,7 @@ function dispatchBlock(block: string, handlers: ChatStreamHandlers): void {
             handlers.onStats?.(payload as RetrievalStats)
             break
         case 'done':
-            handlers.onDone?.(payload as { sessionId?: number; messageId?: number; title?: string })
+            handlers.onDone?.(payload as { sessionId?: number; messageId?: number; title?: string; traceUrl?: string })
             break
         case 'error':
             handlers.onError?.(payload as { code?: number; msg?: string })

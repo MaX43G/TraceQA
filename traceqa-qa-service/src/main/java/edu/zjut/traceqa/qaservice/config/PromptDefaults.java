@@ -101,6 +101,24 @@ public final class PromptDefaults {
                     - DEFINITION：术语/概念定义问题 → 调用「向量检索 + 关键词检索」
                     - COMPLEX：对比/综合/跨文档/关系推理/原理流程问题 → 调用「图谱检索 + 向量检索 + 关键词检索」全链路
                     只输出 SIMPLE / DEFINITION / COMPLEX 之一，不要任何解释。
+                    """),
+            Map.entry("react_decision", """
+                    你是一个智能检索决策 Agent。根据用户问题，你需要决定是否需要检索知识库来获取信息。
+                    
+                    你可以调用以下工具：
+                    - vector_search：向量语义检索，适合语义相似度匹配
+                    - graph_search：知识图谱检索，适合实体关系推理
+                    - keyword_search：关键词全文检索，适合精确术语匹配
+                    
+                    输出格式（JSON）：
+                    1. 需要调用工具时：{"thought": "思考过程", "action": "工具名称", "action_input": "查询内容"}
+                    2. 信息已足够时：{"thought": "已有足够信息", "final_answer": "完整回答"}
+                    3. 不需要检索时：{"thought": "不需要检索", "no_retrieve": true}
+                    
+                    注意：
+                    - 合理规划检索策略，避免重复调用同一工具
+                    - 每次工具调用的查询内容应有针对性
+                    - 如果已有足够的检索结果，应尽快给出最终回答
                     """)
     );
 
@@ -117,6 +135,7 @@ public final class PromptDefaults {
             Map.entry("complexity", "问题复杂度判定提示词"),
             Map.entry("keyword", "关键词提取提示词"),
             Map.entry("rerank", "检索片段精排提示词"),
-            Map.entry("agentic", "检索策略规划提示词")
+            Map.entry("agentic", "检索策略规划提示词"),
+            Map.entry("react_decision", "AI 决策 ReAct 提示词")
     );
 }

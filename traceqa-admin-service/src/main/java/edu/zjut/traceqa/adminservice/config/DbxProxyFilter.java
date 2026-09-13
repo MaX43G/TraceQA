@@ -55,7 +55,7 @@ public class DbxProxyFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
-        return !matchesPrefix(uri, DBX_PREFIX);
+        return !matchesPrefix(uri);
     }
 
     @Override
@@ -126,7 +126,7 @@ public class DbxProxyFilter extends OncePerRequestFilter {
                 if (isGzip(contentEncoding)) {
                     response.setHeader("Content-Encoding", "identity");
                 }
-                response.getWriter().write(rewriteRootRelativeUrls(html, DBX_PREFIX));
+                response.getWriter().write(rewriteRootRelativeUrls(html));
             } else {
                 copyStream(upstream.body(), response.getOutputStream());
             }
@@ -141,10 +141,10 @@ public class DbxProxyFilter extends OncePerRequestFilter {
     /**
      * 将根相对路径（/foo）资源引用改写为带前缀（/dbx/foo）
      */
-    private String rewriteRootRelativeUrls(String html, String prefix) {
-        String pf = prefix.substring(1);
+    private String rewriteRootRelativeUrls(String html) {
+        String pf = DbxProxyFilter.DBX_PREFIX.substring(1);
         return html.replaceAll("(?i)(href|src|action|url)(\\s*(?:=|:)\\s*['\"])/(?!/)(?!" + pf + "/)",
-                "$1$2" + prefix + "/");
+                "$1$2" + DbxProxyFilter.DBX_PREFIX + "/");
     }
 
     private HttpRequest.BodyPublisher bodyPublisher(HttpServletRequest request) throws IOException {
@@ -154,8 +154,8 @@ public class DbxProxyFilter extends OncePerRequestFilter {
         return HttpRequest.BodyPublishers.ofByteArray(request.getInputStream().readAllBytes());
     }
 
-    private boolean matchesPrefix(String uri, String prefix) {
-        return uri.equals(prefix) || uri.startsWith(prefix + "/");
+    private boolean matchesPrefix(String uri) {
+        return uri.equals(DbxProxyFilter.DBX_PREFIX) || uri.startsWith(DbxProxyFilter.DBX_PREFIX + "/");
     }
 
     private void copyStream(InputStream in, java.io.OutputStream out) throws IOException {

@@ -9,6 +9,7 @@ import edu.zjut.traceqa.common.model.dto.SessionCreateRequest;
 import edu.zjut.traceqa.common.model.vo.ChatMessageVO;
 import edu.zjut.traceqa.common.model.vo.SessionVO;
 import edu.zjut.traceqa.common.util.JsonUtils;
+import edu.zjut.traceqa.qaservice.agent.AiDecisionHandler;
 import edu.zjut.traceqa.qaservice.agent.ManualRetrievalHandler;
 import edu.zjut.traceqa.qaservice.agent.RagAgentOrchestrator;
 import edu.zjut.traceqa.qaservice.sse.SsePublisher;
@@ -52,6 +53,8 @@ public class ChatController {
     private RagAgentOrchestrator orchestrator;
     @Resource
     private ManualRetrievalHandler manualHandler;
+    @Resource
+    private AiDecisionHandler aiDecisionHandler;
     @Resource(name = "ragExecutor")
     private Executor ragExecutor;
     @Resource
@@ -111,6 +114,21 @@ public class ChatController {
     }
 
     /**
+     * AI Decision 模式流式对话（SSE：thinking/delta/references/done/error 事件）
+     *
+     * <p>基于 ReAct 模式，LLM 通过工具调用自主决策检索策略。</p>
+     */
+    @Operation(summary = "AI Decision 模式流式对话（SSE）")
+    @PostMapping(value = "/stream-ai-decision", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamAiDecision(@Valid @RequestBody ChatStreamRequest request) {
+        Long userId = UserContext.getUserId();
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        SseEmitter emitter = createSseEmitter(cancelled);
+        ragExecutor.execute(() -> aiDecisionHandler.streamChat(userId, request, emitter, cancelled));
+        return emitter;
+    }
+
+    /**
      * 猜你想问：AI 推荐追问问题
      */
     @Operation(summary = "猜你想问")
@@ -120,9 +138,11 @@ public class ChatController {
         String answer = body.get("answer") == null ? "" : String.valueOf(body.get("answer"));
         String truncatedAnswer = answer.length() > 800 ? answer.substring(0, 800) + "..." : answer;
         String prompt = String.format(
-                "用户刚刚提问：\"%s\"\nAI 的回答是：\"%s\"\n"
-                        + "请解读以上问答，站在用户角度，推荐用户最可能继续追问的 1 到 2 个问题。"
-                        + "严格只输出一个 JSON 字符串数组，如 [\"问题1\",\"问题2\"]，不要输出任何其他文字或 Markdown 代码块。",
+                """
+                        用户刚刚提问："%s"
+                        AI 的回答是："%s"
+                        请解读以上问答，站在用户角度，推荐用户最可能继续追问的 1 到 2 个问题。\
+                        严格只输出一个 JSON 字符串数组，如 ["问题1","问题2"]，不要输出任何其他文字或 Markdown 代码块。""",
                 content, truncatedAnswer);
         String raw = llmService.call("chat_followup", prompt, null);
         if (raw == null || raw.isBlank()) {

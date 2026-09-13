@@ -52,3 +52,4 @@ src/main/resources/application-dev.yaml
 certs/
 minio-data/
 frontend/public/pyodide/**
+evaluation/**

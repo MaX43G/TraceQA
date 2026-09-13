@@ -42,6 +42,11 @@
             {{ q }}
           </a-tag>
         </div>
+        <div v-if="traceUrl && !props.streaming" class="chat-msg__trace">
+          <a :href="traceUrl" target="_blank" rel="noopener noreferrer" class="chat-msg__trace-link">
+            <FundProjectionScreenOutlined /> 查看完整追踪 (Langfuse)
+          </a>
+        </div>
         <div class="chat-msg__actions">
           <a-space :size="4">
             <a-tooltip :title="speaking ? '停止朗读' : '朗读本条回答'">
@@ -91,7 +96,7 @@
  * <p>用户消息右侧气泡；AI 消息包含「思考折叠面板 + Markdown 打字机 +
  * 引用溯源角标 + 复制/删除操作」。</p>
  */
-import {CopyOutlined, DeleteOutlined, SoundOutlined, ThunderboltOutlined} from '@ant-design/icons-vue'
+import {CopyOutlined, DeleteOutlined, SoundOutlined, ThunderboltOutlined, FundProjectionScreenOutlined} from '@ant-design/icons-vue'
 import {message} from 'ant-design-vue'
 import MarkdownViewer from './MarkdownViewer.vue'
 import ThinkingTracePanel from './ThinkingTracePanel.vue'
@@ -167,6 +172,9 @@ const resolvedStats = computed<RetrievalStats | undefined>(() => {
   }
   return { graphHits, vectorHits, keywordHits, fusedCount, elapsedMs, sourceDocs }
 })
+
+/** Langfuse 追踪链接 */
+const traceUrl = computed<string>(() => (props.msg as any).traceUrl ?? '')
 
 /** 是否存在引用来源 */
 const hasReferences = computed<boolean>(() => (props.msg.references?.length ?? 0) > 0)
@@ -392,6 +400,24 @@ function toggleSpeak(): void {
   cursor: pointer;
   background: #e6f4ff;
   border: 1px solid #91caff;
+  color: #1677ff;
+}
+
+.chat-msg__trace {
+  margin-top: 6px;
+}
+
+.chat-msg__trace-link {
+  font-size: 12px;
+  color: #86909c;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.2s;
+}
+
+.chat-msg__trace-link:hover {
   color: #1677ff;
 }
 

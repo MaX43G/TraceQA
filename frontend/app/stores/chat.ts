@@ -35,6 +35,8 @@ export interface StreamMessage extends ChatMessageVO {
     }
     /** 猜你想问：AI 推荐的追问问题（仅本次展示，不持久化） */
     followup?: string[]
+    /** Langfuse 追踪链接（可选） */
+    traceUrl?: string
 }
 
 export const useChatStore = defineStore('chat', {

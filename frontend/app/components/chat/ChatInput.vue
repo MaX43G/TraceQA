@@ -1,9 +1,9 @@
 <template>
   <div class="chat-input">
-    <!-- 手动检索策略选择器 -->
+    <!-- 检索模式选择器 -->
     <div v-if="showStrategySelector" class="chat-input__strategy">
       <a-space :size="4" wrap>
-        <span class="chat-input__strategy-label">检索方式：</span>
+        <span class="chat-input__strategy-label">模式：</span>
         <a-tooltip title="自动模式：Agent 根据问题复杂度自主选择检索策略">
           <a-tag
               :color="isAutoMode ? 'blue' : undefined"
@@ -13,6 +13,29 @@
             自动
           </a-tag>
         </a-tooltip>
+        <a-tooltip title="手动模式：自由组合检索策略，精确控制检索行为">
+          <a-tag
+              :color="isManualMode ? 'green' : undefined"
+              style="cursor: pointer"
+              @click="setManualMode"
+          >
+            手动
+          </a-tag>
+        </a-tooltip>
+        <a-tooltip title="AI 决策：LLM 通过工具调用自主决定是否检索、使用哪个工具、调用多少次">
+          <a-tag
+              :color="isAiDecisionMode ? 'purple' : undefined"
+              style="cursor: pointer"
+              @click="setAiDecisionMode"
+          >
+            AI 决策
+          </a-tag>
+        </a-tooltip>
+      </a-space>
+
+      <!-- 手动模式子选项 -->
+      <a-space v-if="isManualMode" :size="4" wrap style="margin-top: 6px">
+        <span class="chat-input__strategy-label">检索方式：</span>
         <a-tooltip title="假设性文档：先让 AI 生成假设性回答，再用该回答检索，提升语义匹配">
           <a-tag
               :color="selectedStrategies.includes('hyde') ? 'blue' : undefined"
@@ -40,13 +63,13 @@
             关键词
           </a-tag>
         </a-tooltip>
-        <a-tooltip title="图谱检索：知识图谱实体关系检索">
+        <a-tooltip :title="graphModeTooltip">
           <a-tag
               :color="selectedStrategies.includes('graph') ? 'blue' : undefined"
               style="cursor: pointer"
-              @click="toggleStrategy('graph')"
+              @click="cycleGraphMode"
           >
-            图谱
+            图谱{{ graphModeLabel }}
           </a-tag>
         </a-tooltip>
       </a-space>
@@ -119,8 +142,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'send', content: string): void
-  (e: 'send-manual', content: string, strategies: string[]): void
-  (e: 'mode-change', isManual: boolean, strategies: string[]): void
+  (e: 'send-manual', content: string, strategies: string[], graphMode: string): void
+  (e: 'send-ai-decision', content: string): void
+  (e: 'mode-change', mode: 'auto' | 'manual' | 'ai-decision', strategies: string[], graphMode: string): void
 }>()
 
 const text = ref('')
@@ -131,12 +155,65 @@ const listening = ref(false)
 const showStrategySelector = ref(false)
 /** 当前选中的检索策略列表 */
 const selectedStrategies = ref<string[]>([])
+/** 当前模式：auto / manual / ai-decision */
+const currentMode = ref<'auto' | 'manual' | 'ai-decision'>('auto')
+/** 图谱子模式：both / local / global */
+const graphMode = ref<'both' | 'local' | 'global'>('both')
+
 /** 是否为自动模式 */
-const isAutoMode = computed(() => selectedStrategies.value.length === 0)
+const isAutoMode = computed(() => currentMode.value === 'auto')
+/** 是否为手动模式 */
+const isManualMode = computed(() => currentMode.value === 'manual')
+/** 是否为 AI 决策模式 */
+const isAiDecisionMode = computed(() => currentMode.value === 'ai-decision')
+
+/** 图谱子模式标签 */
+const graphModeLabel = computed(() => {
+  if (!selectedStrategies.value.includes('graph')) return ''
+  return graphMode.value === 'both' ? '' : `(${graphMode.value})`
+})
+/** 图谱子模式提示 */
+const graphModeTooltip = computed(() => {
+  const modes = ['知识图谱实体关系检索', '当前：', graphMode.value === 'both' ? 'local + global 双路并行' : graphMode.value === 'local' ? '仅实体关联(local)' : '仅主题聚合(global)', '，点击切换']
+  return modes.join('')
+})
 
 /** 切换自动模式 */
 function setAutoMode(): void {
+  currentMode.value = 'auto'
   selectedStrategies.value = []
+  emitModeChange()
+}
+
+/** 切换手动模式 */
+function setManualMode(): void {
+  currentMode.value = 'manual'
+  emitModeChange()
+}
+
+/** 切换 AI 决策模式 */
+function setAiDecisionMode(): void {
+  currentMode.value = 'ai-decision'
+  selectedStrategies.value = []
+  emitModeChange()
+}
+
+/** 循环图谱子模式：both → local → global → both */
+function cycleGraphMode(): void {
+  if (!selectedStrategies.value.includes('graph')) {
+    // 首次点击：选中图谱并设为 both
+    selectedStrategies.value.push('graph')
+    graphMode.value = 'both'
+  } else {
+    // 已选中：循环子模式
+    if (graphMode.value === 'both') {
+      graphMode.value = 'local'
+    } else if (graphMode.value === 'local') {
+      graphMode.value = 'global'
+    } else {
+      graphMode.value = 'both'
+    }
+  }
   emitModeChange()
 }
 
@@ -148,12 +225,13 @@ function toggleStrategy(strategy: string): void {
   } else {
     selectedStrategies.value.push(strategy)
   }
+  currentMode.value = 'manual'
   emitModeChange()
 }
 
 /** 通知父组件当前模式 */
 function emitModeChange(): void {
-  emit('mode-change', !isAutoMode.value, [...selectedStrategies.value])
+  emit('mode-change', currentMode.value, [...selectedStrategies.value], graphMode.value)
 }
 
 /** 获取检索策略字符串（用于传给后端） */
@@ -273,8 +351,10 @@ function submit(): void {
   resetKey.value++
   if (isAutoMode.value) {
     emit('send', content)
+  } else if (isAiDecisionMode.value) {
+    emit('send-ai-decision', content)
   } else {
-    emit('send-manual', content, [...selectedStrategies.value])
+    emit('send-manual', content, [...selectedStrategies.value], graphMode.value)
   }
 }
 

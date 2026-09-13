@@ -38,6 +38,11 @@ public class ManualStreamRequest {
     private String content;
 
     /**
+     * 图谱检索子模式：local / global / both（默认 both）
+     */
+    private String graphMode;
+
+    /**
      * 选择的检索策略列表（至少选择一种）
      * 可选值：hyde, vector, keyword, graph
      */
@@ -90,5 +95,19 @@ public class ManualStreamRequest {
 
     public boolean useGraph() {
         return strategies != null && strategies.contains("graph");
+    }
+
+    /**
+     * 图谱子模式，默认 both（local + global）
+     */
+    public String getGraphModeOrDefault() {
+        if (graphMode == null || graphMode.isBlank()) {
+            return "both";
+        }
+        String mode = graphMode.trim().toLowerCase();
+        return switch (mode) {
+            case "local", "global" -> mode;
+            default -> "both";
+        };
     }
 }

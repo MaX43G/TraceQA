@@ -7,6 +7,7 @@ import edu.zjut.traceqa.userservice.mapper.RoleMapper;
 import edu.zjut.traceqa.userservice.mapper.UserMapper;
 import edu.zjut.traceqa.userservice.service.AuthService;
 import jakarta.annotation.Resource;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,7 +49,7 @@ public class DataInitializer implements ApplicationRunner {
      */
     @Override
     @Transactional
-    public void run(ApplicationArguments args) {
+    public void run(@NonNull ApplicationArguments args) {
         safeInit(this::initRoles, "角色");
         safeInit(this::initUsers, "默认用户");
         log.info("用户服务初始化数据装载完成");

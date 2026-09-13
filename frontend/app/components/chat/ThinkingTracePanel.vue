@@ -98,6 +98,7 @@ const props = defineProps<{
 const FLOW_STAGES = [
   '意图识别',
   '检索策略调度',
+  'AI 决策循环',
   '查询重写与 HyDE',
   '图谱检索',
   '向量检索',
@@ -218,7 +219,15 @@ function formatKey(key: string): string {
     fusedSources: '融合来源',
     pathLabel: '检索路径',
     promptLength: '提示词长度',
-    systemPrompt: '系统提示词'
+    systemPrompt: '系统提示词',
+    rounds: '决策轮次',
+    decidedToRetrieve: '是否检索',
+    totalChunks: '收集片段数',
+    toolCallLog: '决策日志',
+    graphMode: '图谱模式',
+    tool: '工具名称',
+    input: '查询内容',
+    observationLength: '结果长度'
   }
   return map[key] || key
 }

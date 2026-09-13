@@ -83,7 +83,7 @@
       </div>
 
       <div class="chat-page__input">
-        <ChatInput ref="inputRef" :disabled="chat.generating" :generating="chat.generating" @send="handleSend" @send-manual="handleSendManual" @mode-change="handleModeChange"/>
+        <ChatInput ref="inputRef" :disabled="chat.generating" :generating="chat.generating" @send="handleSend" @send-manual="handleSendManual" @send-ai-decision="handleSendAiDecision" @mode-change="handleModeChange"/>
       </div>
     </main>
   </div>
@@ -101,7 +101,7 @@ import {message, Modal} from 'ant-design-vue'
 import {useChatStore} from '@/stores/chat'
 import {useModelStore} from '@/stores/model'
 import {useAuthStore} from '@/stores/auth'
-import {streamChat, streamChatManual, type RetrievalStats} from '@/composables/useChatStream'
+import {streamChat, streamChatManual, streamChatAiDecision, type RetrievalStats} from '@/composables/useChatStream'
 import {getAuthHeaders} from '@/utils/request'
 import SessionList from '@/components/chat/SessionList.vue'
 import ChatMessageItem from '@/components/chat/ChatMessageItem.vue'
@@ -125,10 +125,12 @@ const sidebarOpen = ref(false)
 /** 桌面端会话列表是否收起 */
 const desktopCollapsed = ref(false)
 
-/** 当前是否为手动检索模式（由 ChatInput 切换时同步更新） */
-const manualMode = ref(false)
+/** 当前检索模式（由 ChatInput 切换时同步更新） */
+const currentMode = ref<'auto' | 'manual' | 'ai-decision'>('auto')
 /** 手动模式下选中的检索策略 */
 const manualStrategies = ref<string[]>([])
+/** 图谱子模式 */
+const graphModeValue = ref('both')
 
 /** 快捷提问示例：分别触发「术语定义」「对比」「复杂聚合」三种检索工作流 */
 const quickQuestions = [
@@ -225,8 +227,10 @@ async function handleExport(): Promise<void> {
 
 /** 点击快捷提问 */
 async function askQuick(question: string): Promise<void> {
-  if (manualMode.value) {
-    await handleSendManual(question, manualStrategies.value)
+  if (currentMode.value === 'ai-decision') {
+    await handleSendAiDecision(question)
+  } else if (currentMode.value === 'manual') {
+    await handleSendManual(question, manualStrategies.value, graphModeValue.value)
   } else {
     await handleSend(question)
   }
@@ -234,17 +238,20 @@ async function askQuick(question: string): Promise<void> {
 
 /** 点击「猜你想问」推荐的问题继续提问 */
 async function handleFollowup(question: string): Promise<void> {
-  if (manualMode.value) {
-    await handleSendManual(question, manualStrategies.value)
+  if (currentMode.value === 'ai-decision') {
+    await handleSendAiDecision(question)
+  } else if (currentMode.value === 'manual') {
+    await handleSendManual(question, manualStrategies.value, graphModeValue.value)
   } else {
     await handleSend(question)
   }
 }
 
 /** ChatInput 模式切换回调 */
-function handleModeChange(isManual: boolean, strategies: string[]): void {
-  manualMode.value = isManual
+function handleModeChange(mode: 'auto' | 'manual' | 'ai-decision', strategies: string[], gm: string): void {
+  currentMode.value = mode
   manualStrategies.value = strategies
+  graphModeValue.value = gm
 }
 
 /** 调用后端「猜你想问」接口，获取并填充推荐问题（失败静默） */
@@ -348,10 +355,133 @@ async function handleSend(content: string): Promise<void> {
             }
           }
         },
-        onDone: async () => {
+        onDone: async (done) => {
           streamMsg.streaming = false
           streamMsg.content = streamMsg.buffer
           streamMsg.reasoningContent = streamMsg.reasoningBuffer
+          streamMsg.traceUrl = done?.traceUrl
+          chat.generating = false
+          followupPromise = loadFollowup(content, streamMsg)
+          await followupPromise
+        },
+        onError: (err) => {
+          streamMsg.streaming = false
+          streamMsg.content = streamMsg.buffer || err.msg || '服务异常'
+          message.error(err.msg || 'AI 服务暂时不可用')
+          chat.generating = false
+        },
+        onEnd: async () => {
+          chat.generating = false
+          inputRef.value?.clear()
+          if (followupPromise) {
+            await followupPromise
+          }
+          const followup = streamMsg.followup
+          const reasoningContent = streamMsg.reasoningBuffer
+          await chat.loadSessions()
+          if (chat.currentSessionId) {
+            await chat.openSession(chat.currentSessionId)
+          }
+          if (followup?.length || reasoningContent) {
+            const lastAssistant = [...chat.messages].reverse().find(m => m.role === 'ASSISTANT')
+            if (lastAssistant) {
+              if (followup?.length) {
+                (lastAssistant as any).followup = followup
+              }
+              if (reasoningContent) {
+                (lastAssistant as any).reasoningContent = reasoningContent
+              }
+            }
+          }
+        }
+      }
+  )
+}
+
+/** 发送消息（SSE 流式消费）- AI Decision 模式 */
+async function handleSendAiDecision(content: string): Promise<void> {
+  if (chat.generating) {
+    return
+  }
+  chat.generating = true
+
+  if (!chat.currentSessionId) {
+    await chat.newSession()
+  }
+  const sessionId = chat.currentSessionId
+
+  chat.messages.push({
+    id: -Date.now() - 1,
+    sessionId,
+    role: 'USER',
+    content,
+    thinkingTrace: [],
+    references: [],
+    latencyMs: 0,
+    createTime: new Date().toISOString()
+  } as ChatMessageVO)
+
+  const streamMsg = reactive({
+    id: -Date.now() - 2,
+    sessionId,
+    role: 'ASSISTANT',
+    content: '',
+    thinkingTrace: [] as ThinkingNodeVO[],
+    references: [] as ReferenceVO[],
+    latencyMs: 0,
+    createTime: new Date().toISOString(),
+    streaming: true,
+    buffer: '',
+    reasoningBuffer: '',
+    stats: undefined as RetrievalStats | undefined
+  }) as StreamMessage
+  chat.messages.push(streamMsg)
+
+  const serverModel = modelStore.activeServerModel
+  const modelConfig = modelStore.activeCustomConfig
+  let followupPromise: Promise<void> | undefined
+
+  await streamChatAiDecision(
+      {
+        sessionId,
+        knowledgeBaseId: null,
+        content,
+        ...(serverModel ? {serverModel} : {}),
+        ...(modelConfig ? {model: modelConfig.model, baseUrl: modelConfig.baseUrl, apiKey: modelConfig.apiKey} : {})
+      },
+      {
+        onThinking: (node) => {
+          mergeThinkingNode(streamMsg, node)
+        },
+        onDelta: (chunk) => {
+          streamMsg.buffer += chunk
+        },
+        onReasoning: (chunk) => {
+          streamMsg.reasoningBuffer += chunk
+        },
+        onReferences: (references) => {
+          streamMsg.references = references
+        },
+        onStats: (stats) => {
+          streamMsg.stats = stats
+          const fuseNode = streamMsg.thinkingTrace?.find(n => n.stage === '结果融合')
+          if (fuseNode) {
+            const fused = stats.sourceDocs ? Object.keys(stats.sourceDocs) : []
+            fuseNode.data = {
+              ...fuseNode.data,
+              graphCount: stats.graphHits ?? 0,
+              vectorCount: stats.vectorHits ?? 0,
+              keywordCount: stats.keywordHits ?? 0,
+              fusedCount: stats.fusedCount ?? 0,
+              fusedSources: fused
+            }
+          }
+        },
+        onDone: async (done) => {
+          streamMsg.streaming = false
+          streamMsg.content = streamMsg.buffer
+          streamMsg.reasoningContent = streamMsg.reasoningBuffer
+          streamMsg.traceUrl = done?.traceUrl
           chat.generating = false
           followupPromise = loadFollowup(content, streamMsg)
           await followupPromise
@@ -391,7 +521,7 @@ async function handleSend(content: string): Promise<void> {
 }
 
 /** 发送消息（SSE 流式消费）- 手动检索模式 */
-async function handleSendManual(content: string, strategies: string[]): Promise<void> {
+async function handleSendManual(content: string, strategies: string[], gm?: string): Promise<void> {
   if (chat.generating) {
     return
   }
@@ -439,6 +569,7 @@ async function handleSendManual(content: string, strategies: string[]): Promise<
         knowledgeBaseId: null,
         content,
         strategies,
+      graphMode: gm || 'both',
         ...(serverModel ? {serverModel} : {}),
         ...(modelConfig ? {model: modelConfig.model, baseUrl: modelConfig.baseUrl, apiKey: modelConfig.apiKey} : {})
       },
@@ -470,10 +601,11 @@ async function handleSendManual(content: string, strategies: string[]): Promise<
             }
           }
         },
-        onDone: async () => {
+        onDone: async (done) => {
           streamMsg.streaming = false
           streamMsg.content = streamMsg.buffer
           streamMsg.reasoningContent = streamMsg.reasoningBuffer
+          streamMsg.traceUrl = done?.traceUrl
           chat.generating = false
           followupPromise = loadFollowup(content, streamMsg)
           await followupPromise

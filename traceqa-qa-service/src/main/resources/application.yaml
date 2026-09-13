@@ -65,6 +65,13 @@ mybatis-plus:
 
 # 应用配置
 app:
+  # Langfuse 可观测性追踪
+  langfuse:
+    enabled: ${LANGFUSE_ENABLED:false}
+    public-key: ${LANGFUSE_PUBLIC_KEY:}
+    secret-key: ${LANGFUSE_SECRET_KEY:}
+    host: ${LANGFUSE_HOST:https://cloud.langfuse.com}
+    batch-size: ${LANGFUSE_BATCH_SIZE:10}
   # LLM 熔断降级
   circuit-breaker:
     failure-threshold: 3

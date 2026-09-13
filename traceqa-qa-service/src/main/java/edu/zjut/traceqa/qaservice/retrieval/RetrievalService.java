@@ -132,17 +132,31 @@ public class RetrievalService {
      * 图谱检索（local + global 并行），10 分钟缓存
      */
     public List<RetrievedChunk> queryGraph(String question, Consumer<String> progress) {
-        String key = "graph:" + sha256(question);
+        return queryGraph(question, "both", progress);
+    }
+
+    /**
+     * 图谱检索（支持子模式：local / global / both），10 分钟缓存
+     */
+    public List<RetrievedChunk> queryGraph(String question, String mode, Consumer<String> progress) {
+        String key = "graph:" + sha256(question) + ":" + mode;
         var cached = redisCacheService.get(key, new tools.jackson.core.type.TypeReference<List<RetrievedChunk>>() {
         });
         if (cached.isPresent()) {
             return cached.get();
         }
-        CompletableFuture<List<RetrievedChunk>> local = CompletableFuture.supplyAsync(() ->
-                queryPath(question, "local", "graph", progress));
-        CompletableFuture<List<RetrievedChunk>> global = CompletableFuture.supplyAsync(() ->
-                queryPath(question, "global", "graph", progress));
-        List<RetrievedChunk> result = mergeChunks(List.of(local.join(), global.join()));
+        List<RetrievedChunk> result;
+        if ("local".equals(mode)) {
+            result = queryPath(question, "local", "graph", progress);
+        } else if ("global".equals(mode)) {
+            result = queryPath(question, "global", "graph", progress);
+        } else {
+            CompletableFuture<List<RetrievedChunk>> local = CompletableFuture.supplyAsync(() ->
+                    queryPath(question, "local", "graph", progress));
+            CompletableFuture<List<RetrievedChunk>> global = CompletableFuture.supplyAsync(() ->
+                    queryPath(question, "global", "graph", progress));
+            result = mergeChunks(List.of(local.join(), global.join()));
+        }
         redisCacheService.put(key, result, Duration.ofMinutes(10));
         return result;
     }
