@@ -44,6 +44,11 @@ public class ManualRetrievalHandler {
 
     private static final int MAX_CONTEXT_CHUNKS = 8;
 
+    /**
+     * 锁对象
+     */
+    private final Object thinkingLock = new Object();
+
     @Resource
     private ChatService chatService;
     @Resource
@@ -416,7 +421,7 @@ public class ManualRetrievalHandler {
     }
 
     private void markThinkingFailed(List<ThinkingNodeVO> thinking) {
-        synchronized (thinking) {
+        synchronized (thinkingLock) {
             for (int i = thinking.size() - 1; i >= 0; i--) {
                 ThinkingNodeVO node = thinking.get(i);
                 if ("running".equals(node.getStatus())) {
@@ -448,14 +453,14 @@ public class ManualRetrievalHandler {
     private ThinkingNodeVO startThinking(List<ThinkingNodeVO> thinking, String stage, String agent, String message) {
         ThinkingNodeVO node = new ThinkingNodeVO(stage, agent, "running", message, null);
         node.setStartMillis(System.currentTimeMillis());
-        synchronized (thinking) {
+        synchronized (thinkingLock) {
             thinking.add(node);
         }
         return node;
     }
 
     private void finishThinking(List<ThinkingNodeVO> thinking, SseEmitter emitter, String stage, String summary) {
-        synchronized (thinking) {
+        synchronized (thinkingLock) {
             for (int i = thinking.size() - 1; i >= 0; i--) {
                 ThinkingNodeVO node = thinking.get(i);
                 if (stage.equals(node.getStage()) && "running".equals(node.getStatus())) {
