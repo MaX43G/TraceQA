@@ -112,7 +112,12 @@ export default defineNuxtConfig({
     // 前端代理解决浏览器跨域：/api 请求转发至后端服务
     routeRules: {
         '/api/**': {
-            proxy: `${API_PROXY}/api/**`
+            proxy: `${API_PROXY}/api/**`,
+            // 禁用代理缓冲，确保 SSE 实时推送
+            headers: {
+                'X-Accel-Buffering': 'no',
+                'Cache-Control': 'no-cache'
+            }
         },
         // LightRAG WebUI：经后端反向代理（管理员 Cookie 鉴权）转发，不暴露真实端口
         '/lightrag-webui/**': {

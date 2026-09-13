@@ -112,19 +112,22 @@ public class RetrievalService {
         if (cached.isPresent()) {
             return cached.get();
         }
-        CompletableFuture<String> rewriteFuture = CompletableFuture.supplyAsync(() ->
-                llmService.call("rewrite", history == null || history.isBlank()
-                        ? question : "对话历史：\n" + history + "\n当前问题：" + question, config));
-        CompletableFuture<String> hydeFuture = CompletableFuture.supplyAsync(() ->
-                llmService.call("hyde", question, config));
+        CompletableFuture<String> rewriteFuture = CompletableFuture.supplyAsync(() -> {
+            if (progress != null) progress.accept("正在重写查询...");
+            return llmService.call("rewrite", history == null || history.isBlank()
+                    ? question : "对话历史：\n" + history + "\n当前问题：" + question, config);
+        });
+        CompletableFuture<String> hydeFuture = CompletableFuture.supplyAsync(() -> {
+            if (progress != null) progress.accept("正在生成假设性文档...");
+            return llmService.call("hyde", question, config);
+        });
         String rewritten = rewriteFuture.join();
+        if (progress != null) progress.accept("重写完成: " + shortText(rewritten));
         String hyde = hydeFuture.join();
+        if (progress != null) progress.accept("HyDE 生成完成");
         List<String> subqueries = decomposeSubqueries(question);
         EnhancedQuery query = new EnhancedQuery(question, rewritten, hyde, subqueries);
         redisCacheService.put(key, query, Duration.ofMinutes(10));
-        if (progress != null) {
-            progress.accept("重写：" + shortText(rewritten));
-        }
         return query;
     }
 

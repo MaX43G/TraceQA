@@ -130,7 +130,7 @@ public class ManualRetrievalHandler {
         // HyDE 生成
         EnhancedQuery enhanced = new EnhancedQuery(content, null, null);
         if (useHyde) {
-            ThinkingNodeVO hydeNode = startThinking(thinking, "假设性文档生成", "hyde-agent", "正在生成假设性文档");
+            ThinkingNodeVO hydeNode = startThinking(thinking, "查询重写与 HyDE", "hyde-agent", "正在生成查询重写与假设性文档");
             ssePublisher.send(emitter, "thinking", hydeNode);
             enhanced = retrievalService.enhance(content, config,
                     progress -> pushProgress(emitter, hydeNode, cancelled, progress), null);
@@ -138,7 +138,7 @@ public class ManualRetrievalHandler {
             hydeNode.setData(Map.of(
                     "rewritten", enhanced.getRewritten() == null ? "" : enhanced.getRewritten(),
                     "hyde", enhanced.getHyde() == null ? "" : enhanced.getHyde()));
-            finishThinking(thinking, emitter, "假设性文档生成", detail);
+            finishThinking(thinking, emitter, "查询重写与 HyDE", detail);
         }
 
         // 并行执行选中的检索
