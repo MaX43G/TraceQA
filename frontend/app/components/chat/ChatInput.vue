@@ -22,15 +22,6 @@
             手动
           </a-tag>
         </a-tooltip>
-        <a-tooltip title="AI 决策：LLM 通过工具调用自主决定是否检索、使用哪个工具、调用多少次">
-          <a-tag
-              :color="isAiDecisionMode ? 'purple' : undefined"
-              style="cursor: pointer"
-              @click="setAiDecisionMode"
-          >
-            AI 决策
-          </a-tag>
-        </a-tooltip>
       </a-space>
 
       <!-- 手动模式子选项 -->
@@ -143,8 +134,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'send', content: string): void
   (e: 'send-manual', content: string, strategies: string[], graphMode: string): void
-  (e: 'send-ai-decision', content: string): void
-  (e: 'mode-change', mode: 'auto' | 'manual' | 'ai-decision', strategies: string[], graphMode: string): void
+  (e: 'mode-change', mode: 'auto' | 'manual', strategies: string[], graphMode: string): void
 }>()
 
 const text = ref('')
@@ -155,8 +145,8 @@ const listening = ref(false)
 const showStrategySelector = ref(false)
 /** 当前选中的检索策略列表 */
 const selectedStrategies = ref<string[]>([])
-/** 当前模式：auto / manual / ai-decision */
-const currentMode = ref<'auto' | 'manual' | 'ai-decision'>('auto')
+/** 当前模式：auto / manual */
+const currentMode = ref<'auto' | 'manual'>('auto')
 /** 图谱子模式：both / local / global */
 const graphMode = ref<'both' | 'local' | 'global'>('both')
 
@@ -164,8 +154,7 @@ const graphMode = ref<'both' | 'local' | 'global'>('both')
 const isAutoMode = computed(() => currentMode.value === 'auto')
 /** 是否为手动模式 */
 const isManualMode = computed(() => currentMode.value === 'manual')
-/** 是否为 AI 决策模式 */
-const isAiDecisionMode = computed(() => currentMode.value === 'ai-decision')
+
 
 /** 图谱子模式标签 */
 const graphModeLabel = computed(() => {
@@ -191,12 +180,7 @@ function setManualMode(): void {
   emitModeChange()
 }
 
-/** 切换 AI 决策模式 */
-function setAiDecisionMode(): void {
-  currentMode.value = 'ai-decision'
-  selectedStrategies.value = []
-  emitModeChange()
-}
+
 
 /** 循环图谱子模式：both → local → global → both */
 function cycleGraphMode(): void {
@@ -351,8 +335,6 @@ function submit(): void {
   resetKey.value++
   if (isAutoMode.value) {
     emit('send', content)
-  } else if (isAiDecisionMode.value) {
-    emit('send-ai-decision', content)
   } else {
     emit('send-manual', content, [...selectedStrategies.value], graphMode.value)
   }

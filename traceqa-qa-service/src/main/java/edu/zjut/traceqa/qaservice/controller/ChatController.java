@@ -9,7 +9,6 @@ import edu.zjut.traceqa.common.model.dto.SessionCreateRequest;
 import edu.zjut.traceqa.common.model.vo.ChatMessageVO;
 import edu.zjut.traceqa.common.model.vo.SessionVO;
 import edu.zjut.traceqa.common.util.JsonUtils;
-import edu.zjut.traceqa.qaservice.agent.AiDecisionHandler;
 import edu.zjut.traceqa.qaservice.agent.ManualRetrievalHandler;
 import edu.zjut.traceqa.qaservice.agent.RagAgentOrchestrator;
 import edu.zjut.traceqa.qaservice.sse.SsePublisher;
@@ -53,8 +52,6 @@ public class ChatController {
     private RagAgentOrchestrator orchestrator;
     @Resource
     private ManualRetrievalHandler manualHandler;
-    @Resource
-    private AiDecisionHandler aiDecisionHandler;
     @Resource(name = "ragExecutor")
     private Executor ragExecutor;
     @Resource
@@ -113,20 +110,7 @@ public class ChatController {
         return emitter;
     }
 
-    /**
-     * AI Decision 模式流式对话（SSE：thinking/delta/references/done/error 事件）
-     *
-     * <p>基于 ReAct 模式，LLM 通过工具调用自主决策检索策略。</p>
-     */
-    @Operation(summary = "AI Decision 模式流式对话（SSE）")
-    @PostMapping(value = "/stream-ai-decision", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamAiDecision(@Valid @RequestBody ChatStreamRequest request) {
-        Long userId = UserContext.getUserId();
-        AtomicBoolean cancelled = new AtomicBoolean(false);
-        SseEmitter emitter = createSseEmitter(cancelled);
-        ragExecutor.execute(() -> aiDecisionHandler.streamChat(userId, request, emitter, cancelled));
-        return emitter;
-    }
+
 
     /**
      * 猜你想问：AI 推荐追问问题

@@ -192,77 +192,7 @@ export async function streamChatManual(
     }
 }
 
-/** 发起 AI Decision 模式流式对话请求并消费事件 */
-export async function streamChatAiDecision(
-    body: {
-        sessionId?: number | null
-        knowledgeBaseId?: number | null
-        content: string
-        serverModel?: string
-        model?: string
-        baseUrl?: string
-        apiKey?: string
-    },
-    handlers: ChatStreamHandlers,
-    signal?: AbortSignal
-): Promise<void> {
-    let res: Response | undefined
-    try {
-        res = await fetch('/api/chat/stream-ai-decision', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', ...getAuthHeaders()},
-            body: JSON.stringify(body),
-            signal
-        })
-    } catch (err) {
-        handlers.onError?.({msg: '网络异常，请检查后端服务是否可用'})
-        handlers.onEnd?.()
-        return
-    }
 
-    const contentType = res.headers.get('content-type') || ''
-    if (!res || !res.ok || !res.body || !contentType.includes('text/event-stream')) {
-        let msg = `请求失败(${res?.status ?? '未知'})`
-        let code: number | undefined
-        try {
-            const json = await res?.json()
-            msg = json?.msg || msg
-            code = json?.code
-            handlers.onError?.({code, msg})
-        } catch {
-            handlers.onError?.({msg})
-        }
-        if (code === 40100 || code === 40101) {
-            handleAuthFailure(new ApiError(msg, code, '-'))
-        }
-        handlers.onEnd?.()
-        return
-    }
-
-    const reader = res.body.getReader()
-    const decoder = new TextDecoder('utf-8')
-    let buffer = ''
-
-    try {
-        while (true) {
-            const {done, value} = await reader.read()
-            if (done) break
-            buffer += decoder.decode(value, {stream: true})
-            let sepIndex: number
-            while ((sepIndex = buffer.indexOf('\n\n')) !== -1) {
-                const block = buffer.slice(0, sepIndex)
-                buffer = buffer.slice(sepIndex + 2)
-                dispatchBlock(block, handlers)
-            }
-        }
-    } catch (err) {
-        if ((err as Error).name !== 'AbortError') {
-            handlers.onError?.({msg: '流式连接中断'})
-        }
-    } finally {
-        handlers.onEnd?.()
-    }
-}
 
 /** 解析单个 SSE 事件块并分发 */
 function dispatchBlock(block: string, handlers: ChatStreamHandlers): void {
