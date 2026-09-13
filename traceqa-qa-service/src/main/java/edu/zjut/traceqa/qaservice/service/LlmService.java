@@ -3,10 +3,11 @@ package edu.zjut.traceqa.qaservice.service;
 import edu.zjut.traceqa.common.model.dto.LlmConfig;
 import edu.zjut.traceqa.common.model.po.SystemPrompt;
 import jakarta.annotation.PostConstruct;
-import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -21,15 +22,25 @@ public class LlmService {
 
     private static final Logger log = LoggerFactory.getLogger(LlmService.class);
 
-    @Resource
-    private ChatClient.Builder chatClientBuilder;
-    @Resource
-    private SystemPromptService systemPromptService;
-    @Resource
-    private CircuitBreakerService circuitBreakerService;
-    @Resource
-    private OpenAiCompatClient openAiCompatClient;
+    private final ChatClient.Builder chatClientBuilder;
+    private final SystemPromptService systemPromptService;
+    private final CircuitBreakerService circuitBreakerService;
+    private final OpenAiCompatClient openAiCompatClient;
+    private final SyncMcpToolCallbackProvider mcpToolCallbackProvider;
     private ChatClient chatClient;
+
+    @Autowired
+    public LlmService(ChatClient.Builder chatClientBuilder,
+                      SystemPromptService systemPromptService,
+                      CircuitBreakerService circuitBreakerService,
+                      OpenAiCompatClient openAiCompatClient,
+                      @Autowired(required = false) SyncMcpToolCallbackProvider mcpToolCallbackProvider) {
+        this.chatClientBuilder = chatClientBuilder;
+        this.systemPromptService = systemPromptService;
+        this.circuitBreakerService = circuitBreakerService;
+        this.openAiCompatClient = openAiCompatClient;
+        this.mcpToolCallbackProvider = mcpToolCallbackProvider;
+    }
 
     /**
      * 构建默认 ChatClient
@@ -124,6 +135,44 @@ public class LlmService {
                         .onErrorResume(_ -> Flux.empty());
             }
             return buildPrompt(systemPrompt).user(userContent).stream().content()
+                    .filter(c -> !c.isEmpty())
+                    .doOnError(_ -> circuitBreakerService.recordFailure())
+                    .doOnComplete(circuitBreakerService::recordSuccess)
+                    .onErrorResume(_ -> Flux.empty());
+        } catch (Exception e) {
+            log.debug("LLM 流式调用异常：{}", e.getMessage());
+            return Flux.empty();
+        }
+    }
+
+    /**
+     * 流式调用（带 MCP 工具支持）。
+     *
+     * <p>AI 可在生成过程中自主调用联网搜索等 MCP 工具。</p>
+     *
+     * @param scenario    提示词场景
+     * @param userContent 用户内容
+     * @return 内容增量流
+     */
+    public Flux<String> callStreamWithTools(String scenario, String userContent) {
+        if (!circuitBreakerService.allowRequest()) {
+            log.debug("LLM 熔断打开，拒绝流式请求");
+            return Flux.empty();
+        }
+        try {
+            String systemPrompt = resolveSystemPrompt(scenario);
+            var spec = buildPrompt(systemPrompt).user(userContent);
+
+            // 附加 MCP 工具（如果有）
+            if (mcpToolCallbackProvider != null) {
+                var tools = mcpToolCallbackProvider.getToolCallbacks();
+                if (tools.length > 0) {
+                    spec = spec.tools(java.util.Arrays.asList(tools));
+                    log.debug("已加载 {} 个 MCP 工具", tools.length);
+                }
+            }
+
+            return spec.stream().content()
                     .filter(c -> !c.isEmpty())
                     .doOnError(_ -> circuitBreakerService.recordFailure())
                     .doOnComplete(circuitBreakerService::recordSuccess)

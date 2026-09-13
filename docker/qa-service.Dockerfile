@@ -16,6 +16,11 @@ FROM eclipse-temurin:25-jre-alpine
 
 WORKDIR /app
 
+# 安装 Python3 和 uv（用于 MCP 联网搜索）
+RUN apk add --no-cache python3 py3-pip \
+    && pip3 install --break-system-packages --no-cache-dir uv \
+    && which uvx && uvx --version
+
 COPY --from=build /app/traceqa-qa-service/target/*.jar app.jar
 
 RUN rm -rf /opt/java/openjdk/lib/src.zip /opt/java/openjdk/demo \

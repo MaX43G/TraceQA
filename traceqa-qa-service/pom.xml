@@ -92,6 +92,12 @@
             <artifactId>spring-ai-starter-model-openai</artifactId>
         </dependency>
 
+        <!-- Spring AI MCP Client (streamable-http) -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-client</artifactId>
+        </dependency>
+
         <!-- Hutool（SHA-256 缓存键等） -->
         <dependency>
             <groupId>cn.hutool</groupId>

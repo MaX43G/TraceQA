@@ -466,9 +466,17 @@ public class RagAgentOrchestrator {
     private String[] streamAnswer(SseEmitter emitter, String prompt, LlmConfig config, AtomicBoolean cancelled) {
         StringBuilder acc = new StringBuilder();
         StringBuilder reasoningAcc = new StringBuilder();
-        String[] result = consumeWithReasoning(emitter, llmService.callStreamWithReasoning("summary", prompt, config), cancelled);
-        acc.append(result[0]);
-        reasoningAcc.append(result[1]);
+        
+        // 如果使用默认模型，调用带 MCP 工具的方法（支持联网搜索）
+        if (config == null || !config.isValid()) {
+            String content = consume(emitter, llmService.callStreamWithTools("summary", prompt), cancelled);
+            acc.append(content);
+        } else {
+            // 自定义模型不支持 reasoning_content
+            String content = consume(emitter, llmService.callStream("summary", prompt, config), cancelled);
+            acc.append(content);
+        }
+        
         if (acc.isEmpty()) {
             acc.append(consume(emitter, answerAgent.streamAnswer(prompt, config), cancelled));
         }

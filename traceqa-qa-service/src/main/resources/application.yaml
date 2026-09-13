@@ -50,6 +50,10 @@ spring:
       api-key: ${LLM_API_KEY:}
       chat:
         model: ${LLM_MODEL:THUDM/GLM-4-9B-0414}
+    mcp:
+      client:
+        stdio:
+          servers-configuration: classpath:mcp-servers.json
 
 # MyBatis-Plus
 mybatis-plus:

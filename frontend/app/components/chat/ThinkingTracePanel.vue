@@ -10,30 +10,72 @@
       </a-space>
     </div>
 
-    <!-- 状态图流转：横向流程图（按节点到达顺序显示） -->
-    <div v-if="nodes.length > 0" class="flow">
-      <template v-for="(node, i) in nodes" :key="node.stage">
-        <div class="flow-node" :class="getNodeClass(node)" :title="getNodeTitle(node)">
-          <div class="flow-node__dot">
-            <LoadingOutlined v-if="node.status === 'running'" spin/>
-            <CheckCircleFilled v-else-if="node.status === 'done'"/>
-            <CloseCircleFilled v-else-if="node.status === 'failed'"/>
-            <EllipsisOutlined v-else/>
-          </div>
-          <div class="flow-node__label">{{ node.stage }}</div>
-          <div v-if="node.costMs != null && node.status === 'done'" class="flow-node__cost">
-            {{ formatCost(node.costMs) }}
-          </div>
-          <div v-if="getNodeDetail(node)" class="flow-node__detail">{{ getNodeDetail(node) }}</div>
+    <!-- 工作流可视化 -->
+    <div v-if="nodes.length > 0" class="workflow">
+      <template v-for="(stage, idx) in workflowStages" :key="stage.key">
+        <!-- 连接线 -->
+        <div v-if="idx > 0" class="workflow-connector">
+          <div class="connector-line" :class="{ 'connector-line--active': isStageActive(stage) }"></div>
         </div>
-        <div v-if="i < nodes.length - 1" class="flow-arrow">→</div>
+        
+        <!-- 单节点阶段 -->
+        <div v-if="stage.type === 'single'" class="workflow-stage">
+          <div 
+            class="node" 
+            :class="getNodeClass(stage.node!)"
+            :title="getNodeTitle(stage.node!)"
+          >
+            <div class="node__icon">
+              <LoadingOutlined v-if="stage.node!.status === 'running'" spin/>
+              <CheckCircleFilled v-else-if="stage.node!.status === 'done'"/>
+              <CloseCircleFilled v-else-if="stage.node!.status === 'failed'"/>
+              <EllipsisOutlined v-else/>
+            </div>
+            <div class="node__content">
+              <div class="node__label">{{ stage.node!.stage }}</div>
+              <div v-if="stage.node!.costMs != null && stage.node!.status === 'done'" class="node__cost">
+                {{ formatCost(stage.node!.costMs) }}
+              </div>
+              <div v-if="getNodeDetail(stage.node!)" class="node__detail">{{ getNodeDetail(stage.node!) }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 并行节点阶段 -->
+        <div v-else class="workflow-stage workflow-stage--parallel">
+          <div class="parallel-label">并行执行</div>
+          <div class="parallel-nodes">
+            <div 
+              v-for="node in stage.nodes" 
+              :key="node.stage ?? 'unknown'"
+              class="node node--compact"
+              :class="getNodeClass(node)"
+              :title="getNodeTitle(node)"
+            >
+              <div class="node__icon">
+                <LoadingOutlined v-if="node.status === 'running'" spin/>
+                <CheckCircleFilled v-else-if="node.status === 'done'"/>
+                <CloseCircleFilled v-else-if="node.status === 'failed'"/>
+                <EllipsisOutlined v-else/>
+              </div>
+              <div class="node__content">
+                <div class="node__label">{{ node.stage }}</div>
+                <div v-if="node.costMs != null && node.status === 'done'" class="node__cost">
+                  {{ formatCost(node.costMs) }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </template>
     </div>
 
-    <!-- 空状态：等待节点到达 -->
-    <div v-else class="flow-empty">
-      <a-spin size="small"/>
-      <span class="flow-empty__text">正在初始化...</span>
+    <!-- 空状态 -->
+    <div v-else class="workflow-empty">
+      <div class="workflow-empty__icon">
+        <SyncOutlined spin />
+      </div>
+      <span class="workflow-empty__text">正在初始化...</span>
     </div>
 
     <!-- 节点详细数据（展开/折叠） -->
@@ -46,7 +88,7 @@
         {{ showData ? '收起详情' : '查看工作流详情' }}
       </a-button>
       <div v-if="showData" class="data-list">
-        <div v-for="node in nodesWithData" :key="node.stage" class="data-item">
+        <div v-for="node in nodesWithData" :key="node.stage ?? 'unknown'" class="data-item">
           <div class="data-item__header">
             <span class="data-item__stage">{{ node.stage }}</span>
             <a-tag v-if="node.costMs != null" size="small" color="green">{{ formatCost(node.costMs) }}</a-tag>
@@ -79,9 +121,9 @@
 /**
  * Agent 状态图流转可视化面板。
  *
- * <p>以「横向流程图」展示多 Agent 工作流的节点流转与状态：
- * 按节点到达顺序动态显示，支持实时计时与状态着色。
- * 同时支持查看各步骤的详细结构化数据（costMs、data 字段）。</p>
+ * <p>以「流程图」展示多 Agent 工作流的节点流转与状态：
+ * 支持并行节点显示（如图谱/向量/关键词检索同时执行），
+ * 按节点到达顺序动态显示，支持实时计时与状态着色。</p>
  */
 import {
   SyncOutlined,
@@ -100,10 +142,60 @@ const props = defineProps<{
   nodes: ThinkingNodeVO[]
 }>()
 
+/** 并行检索节点阶段名 */
+const PARALLEL_STAGES = new Set(['图谱检索', '向量检索', '关键词检索'])
+
+/** 工作流阶段定义 */
+interface WorkflowStage {
+  key: string
+  type: 'single' | 'parallel'
+  node?: ThinkingNodeVO
+  nodes?: ThinkingNodeVO[]
+}
+
+/** 将节点列表转换为工作流阶段（自动合并并行节点） */
+const workflowStages = computed<WorkflowStage[]>(() => {
+  const stages: WorkflowStage[] = []
+  const parallelBuffer: ThinkingNodeVO[] = []
+  
+  for (const node of props.nodes) {
+    const stageName = node.stage ?? 'unknown'
+    if (PARALLEL_STAGES.has(stageName)) {
+      parallelBuffer.push(node)
+    } else {
+      // 先处理并行缓冲区
+      if (parallelBuffer.length > 0) {
+        stages.push({
+          key: `parallel-${parallelBuffer.map(n => n.stage ?? 'unknown').join('-')}`,
+          type: 'parallel',
+          nodes: [...parallelBuffer]
+        })
+        parallelBuffer.length = 0
+      }
+      stages.push({
+        key: stageName,
+        type: 'single',
+        node
+      })
+    }
+  }
+  
+  // 处理剩余的并行缓冲区
+  if (parallelBuffer.length > 0) {
+    stages.push({
+      key: `parallel-${parallelBuffer.map(n => n.stage ?? 'unknown').join('-')}`,
+      type: 'parallel',
+      nodes: parallelBuffer
+    })
+  }
+  
+  return stages
+})
+
 /** 是否存在运行中的节点 */
 const anyRunning = computed<boolean>(() => props.nodes.some((n) => n.status === 'running'))
 
-/** 所有节点总耗时（并行节点取最晚结束时间，不重复累加） */
+/** 所有节点总耗时（并行节点取最晚结束时间） */
 const totalCostMs = computed<number>(() => {
   const nodes = props.nodes.filter(n => n.startMillis && n.costMs)
   if (!nodes.length) return 0
@@ -133,6 +225,17 @@ const showData = ref(false)
 const promptModalOpen = ref(false)
 const promptContent = ref('')
 
+/** 判断阶段是否处于活动状态 */
+function isStageActive(stage: WorkflowStage): boolean {
+  if (stage.type === 'single' && stage.node) {
+    return stage.node.status === 'running' || stage.node.status === 'done'
+  }
+  if (stage.type === 'parallel' && stage.nodes) {
+    return stage.nodes.some(n => n.status === 'running' || n.status === 'done')
+  }
+  return false
+}
+
 function openPrompt(prompt: string, systemPrompt?: string) {
   promptContent.value = systemPrompt
     ? `【System Prompt】\n${systemPrompt}\n\n【User Message】\n${prompt}`
@@ -144,17 +247,17 @@ function openPrompt(prompt: string, systemPrompt?: string) {
 function getNodeClass(node: ThinkingNodeVO): string {
   switch (node.status) {
     case 'done':
-      return 'is-done'
+      return 'node--done'
     case 'running':
-      return 'is-running'
+      return 'node--running'
     case 'failed':
-      return 'is-failed'
+      return 'node--failed'
     default:
-      return 'is-pending'
+      return 'node--pending'
   }
 }
 
-/** 节点详情（进行中显示 message，完成显示 detail） */
+/** 节点详情 */
 function getNodeDetail(node: ThinkingNodeVO): string {
   if (node.status === 'running') {
     return node.message || ''
@@ -208,12 +311,13 @@ function formatKey(key: string): string {
     tool: '工具名称',
     input: '查询内容',
     observationLength: '结果长度',
-    selected: '已选策略'
+    selected: '已选策略',
+    engine: '搜索引擎'
   }
   return map[key] || key
 }
 
-/** 格式化 data value 为可读文本（完整展示，不截断） */
+/** 格式化 data value 为可读文本 */
 function formatValue(value: unknown): string {
   if (value == null) return '-'
   if (typeof value === 'boolean') return value ? '是' : '否'
@@ -232,162 +336,292 @@ function formatValue(value: unknown): string {
 
 <style scoped>
 .thinking-panel {
-  background: #fafafa;
-  border-radius: 8px;
-  padding: 8px 12px 12px;
-  margin-bottom: 6px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #f0f2f5 100%);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  border: 1px solid #e8e8e8;
 }
 
 .thinking-panel__header {
   color: #4e5969;
   font-size: 13px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
-.flow {
+/* 工作流容器 */
+.workflow {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 4px;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px 0;
 }
 
-.flow-empty {
+/* 连接线 */
+.workflow-connector {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px;
-  color: #86909c;
-  font-size: 12px;
+  justify-content: center;
+  height: 24px;
 }
 
-.flow-empty__text {
-  color: #86909c;
+.connector-line {
+  width: 2px;
+  height: 100%;
+  background: #d9d9d9;
+  transition: background 0.3s ease;
 }
 
-.flow-node {
+.connector-line--active {
+  background: linear-gradient(180deg, #1677ff 0%, #52c41a 100%);
+  box-shadow: 0 0 8px rgba(22, 119, 255, 0.4);
+}
+
+/* 阶段容器 */
+.workflow-stage {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 72px;
-  max-width: 110px;
-  padding: 8px 6px;
-  border-radius: 8px;
-  border: 1px solid #e5e6eb;
-  background: #fff;
-  text-align: center;
-  transition: all 0.2s;
 }
 
-.flow-node__dot {
-  font-size: 18px;
-  line-height: 1;
+.workflow-stage--parallel {
+  position: relative;
+}
+
+.parallel-label {
+  font-size: 10px;
+  color: #86909c;
+  background: #f0f0f0;
+  padding: 2px 8px;
+  border-radius: 10px;
   margin-bottom: 6px;
 }
 
-.flow-node__label {
+.parallel-nodes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* 节点样式 */
+.node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 100px;
+  max-width: 140px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff;
+  border: 2px solid #e8e8e8;
+  text-align: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: default;
+  position: relative;
+  overflow: hidden;
+}
+
+.node::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #d9d9d9;
+  transition: background 0.3s ease;
+}
+
+.node--compact {
+  min-width: 80px;
+  max-width: 100px;
+  padding: 8px 10px;
+}
+
+.node__icon {
+  font-size: 20px;
+  line-height: 1;
+  margin-bottom: 6px;
+  transition: transform 0.3s ease;
+}
+
+.node:hover .node__icon {
+  transform: scale(1.1);
+}
+
+.node__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.node__label {
   font-size: 12px;
   color: #4e5969;
   line-height: 1.3;
   word-break: break-word;
-}
-
-.flow-node__cost {
-  font-size: 10px;
-  color: #52c41a;
-  margin-top: 2px;
   font-weight: 500;
 }
 
-.flow-node__detail {
+.node__cost {
+  font-size: 11px;
+  color: #52c41a;
+  margin-top: 4px;
+  font-weight: 600;
+  background: #f6ffed;
+  padding: 2px 6px;
+  border-radius: 8px;
+}
+
+.node__detail {
   font-size: 11px;
   color: #86909c;
   margin-top: 4px;
   line-height: 1.3;
   word-break: break-all;
-  max-width: 100px;
+  max-width: 120px;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
 
-.flow-arrow {
-  align-self: center;
-  color: #c9cdd4;
-  font-size: 14px;
-  padding-top: 16px;
+/* 节点状态样式 */
+.node--done {
+  border-color: #52c41a;
+  box-shadow: 0 2px 8px rgba(82, 196, 26, 0.15);
 }
 
-/* 状态样式 */
+.node--done::before {
+  background: linear-gradient(90deg, #52c41a, #73d13d);
+}
 
-.flow-node.is-done .flow-node__dot {
+.node--done .node__icon {
   color: #52c41a;
 }
 
-.flow-node.is-running .flow-node__dot {
+.node--running {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 4px rgba(22, 119, 255, 0.1);
+  animation: node-pulse 2s ease-in-out infinite;
+}
+
+.node--running::before {
+  background: linear-gradient(90deg, #1677ff, #4096ff);
+}
+
+.node--running .node__icon {
   color: #1677ff;
 }
 
-.flow-node.is-running .flow-node__label {
+.node--running .node__label {
   color: #1677ff;
   font-weight: 600;
 }
 
-.flow-node.is-failed .flow-node__dot {
+.node--failed {
+  border-color: #ff4d4f;
+  box-shadow: 0 2px 8px rgba(255, 77, 79, 0.15);
+}
+
+.node--failed::before {
+  background: linear-gradient(90deg, #ff4d4f, #ff7875);
+}
+
+.node--failed .node__icon {
   color: #ff4d4f;
 }
 
-.flow-node.is-pending .flow-node__dot {
-  color: #c9cdd4;
+.node--pending {
+  border-color: #d9d9d9;
+  opacity: 0.6;
+}
+
+.node--pending .node__icon {
+  color: #bfbfbf;
+}
+
+/* 脉冲动画 */
+@keyframes node-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 4px rgba(22, 119, 255, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(22, 119, 255, 0.05);
+  }
+}
+
+/* 空状态 */
+.workflow-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  gap: 12px;
+}
+
+.workflow-empty__icon {
+  font-size: 24px;
+  color: #1677ff;
+}
+
+.workflow-empty__text {
+  font-size: 13px;
+  color: #86909c;
 }
 
 /* 数据详情区 */
-
 .data-section {
-  margin-top: 8px;
-  border-top: 1px solid #e5e6eb;
-  padding-top: 6px;
+  margin-top: 12px;
+  border-top: 1px solid #e8e8e8;
+  padding-top: 8px;
 }
 
 .data-list {
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .data-item {
   background: #fff;
-  border: 1px solid #e5e6eb;
-  border-radius: 6px;
-  padding: 8px 10px;
-  margin-bottom: 6px;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  transition: box-shadow 0.2s ease;
+}
+
+.data-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .data-item__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .data-item__stage {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: #1d2129;
 }
 
 .data-item__body {
-  font-size: 11px;
+  font-size: 12px;
   color: #4e5969;
 }
 
 .data-kv {
   display: flex;
-  margin-bottom: 2px;
-  line-height: 1.5;
+  margin-bottom: 4px;
+  line-height: 1.6;
 }
 
 .data-kv__key {
   color: #86909c;
-  min-width: 70px;
+  min-width: 80px;
   flex-shrink: 0;
 }
 
