@@ -5,29 +5,35 @@
         <SyncOutlined v-if="anyRunning" spin style="color: #1677ff"/>
         <BulbOutlined v-else style="color: #faad14"/>
         <span>Agent 工作流</span>
-        <a-tag color="blue">{{ nodes.length }} 个节点</a-tag>
-        <a-tag v-if="totalCostMs > 0" color="green">{{ totalCostMs }}ms</a-tag>
+        <a-tag v-if="nodes.length > 0" color="blue">{{ nodes.length }} 个节点</a-tag>
+        <a-tag v-if="totalCostMs > 0" color="green">{{ formatTotalCost }}</a-tag>
       </a-space>
     </div>
 
-    <!-- 状态图流转：横向流程图 -->
-    <div class="flow">
-      <template v-for="(stage, i) in displayedStages" :key="stage">
-        <div class="flow-node" :class="nodeClass(stage)" :title="titleOf(stage)">
+    <!-- 状态图流转：横向流程图（按节点到达顺序显示） -->
+    <div v-if="nodes.length > 0" class="flow">
+      <template v-for="(node, i) in nodes" :key="node.stage">
+        <div class="flow-node" :class="getNodeClass(node)" :title="getNodeTitle(node)">
           <div class="flow-node__dot">
-            <LoadingOutlined v-if="isStatus(stage, 'running')" spin/>
-            <CheckCircleFilled v-else-if="isStatus(stage, 'done')"/>
-            <CloseCircleFilled v-else-if="isStatus(stage, 'failed')"/>
+            <LoadingOutlined v-if="node.status === 'running'" spin/>
+            <CheckCircleFilled v-else-if="node.status === 'done'"/>
+            <CloseCircleFilled v-else-if="node.status === 'failed'"/>
             <EllipsisOutlined v-else/>
           </div>
-          <div class="flow-node__label">{{ stage }}</div>
-          <div v-if="nodeOf(stage)?.costMs != null && isStatus(stage, 'done')" class="flow-node__cost">
-            {{ nodeOf(stage)!.costMs }}ms
+          <div class="flow-node__label">{{ node.stage }}</div>
+          <div v-if="node.costMs != null && node.status === 'done'" class="flow-node__cost">
+            {{ formatCost(node.costMs) }}
           </div>
-          <div v-if="detailOf(stage)" class="flow-node__detail">{{ detailOf(stage) }}</div>
+          <div v-if="getNodeDetail(node)" class="flow-node__detail">{{ getNodeDetail(node) }}</div>
         </div>
-        <div v-if="i < displayedStages.length - 1" class="flow-arrow">→</div>
+        <div v-if="i < nodes.length - 1" class="flow-arrow">→</div>
       </template>
+    </div>
+
+    <!-- 空状态：等待节点到达 -->
+    <div v-else class="flow-empty">
+      <a-spin size="small"/>
+      <span class="flow-empty__text">正在初始化...</span>
     </div>
 
     <!-- 节点详细数据（展开/折叠） -->
@@ -43,7 +49,7 @@
         <div v-for="node in nodesWithData" :key="node.stage" class="data-item">
           <div class="data-item__header">
             <span class="data-item__stage">{{ node.stage }}</span>
-            <a-tag v-if="node.costMs != null" size="small" color="green">{{ node.costMs }}ms</a-tag>
+            <a-tag v-if="node.costMs != null" size="small" color="green">{{ formatCost(node.costMs) }}</a-tag>
           </div>
           <div class="data-item__body">
             <template v-for="(value, key) in node.data" :key="String(key)">
@@ -74,7 +80,7 @@
  * Agent 状态图流转可视化面板。
  *
  * <p>以「横向流程图」展示多 Agent 工作流的节点流转与状态：
- * 已执行节点按实际状态着色（完成/进行中/失败），未经过的节点显示为待执行。
+ * 按节点到达顺序动态显示，支持实时计时与状态着色。
  * 同时支持查看各步骤的详细结构化数据（costMs、data 字段）。</p>
  */
 import {
@@ -90,45 +96,29 @@ import {
 import type {ThinkingNodeVO} from '@/utils/api-types'
 
 const props = defineProps<{
-  /** 思考节点列表 */
+  /** 思考节点列表（按到达顺序） */
   nodes: ThinkingNodeVO[]
 }>()
-
-/** 完整 Agent 工作流模板（按序流转；阶段名与后端 orchestrator 保持一致） */
-const FLOW_STAGES = [
-  '意图识别',
-  '检索策略调度',
-  'AI 决策循环',
-  '查询重写与 HyDE',
-  '图谱检索',
-  '向量检索',
-  '关键词检索',
-  '结果融合',
-  '二次检索补全',
-  '结果精排',
-  '总结生成',
-  '直接应答',
-  '手动检索'
-]
-
-/** 可选阶段：未启用（后端未下发对应节点）时不展示，避免流程图出现永不执行的步骤 */
-const OPTIONAL_STAGES = new Set(['二次检索补全', '结果精排'])
-
-/** 实际展示的阶段列表 */
-const displayedStages = computed<string[]>(() =>
-    FLOW_STAGES.filter((s) => !OPTIONAL_STAGES.has(s) || nodeOf(s) !== undefined)
-)
 
 /** 是否存在运行中的节点 */
 const anyRunning = computed<boolean>(() => props.nodes.some((n) => n.status === 'running'))
 
-/** 所有节点总耗时（并行节点取最晚结束时间，不重复累加）*/
+/** 所有节点总耗时（并行节点取最晚结束时间，不重复累加） */
 const totalCostMs = computed<number>(() => {
-    const nodes = props.nodes.filter(n => n.startMillis && n.costMs)
-    if (!nodes.length) return 0
-    const earliest = Math.min(...nodes.map(n => n.startMillis!))
-    const latest = Math.max(...nodes.map(n => n.startMillis! + n.costMs!))
-    return latest - earliest
+  const nodes = props.nodes.filter(n => n.startMillis && n.costMs)
+  if (!nodes.length) return 0
+  const earliest = Math.min(...nodes.map(n => n.startMillis!))
+  const latest = Math.max(...nodes.map(n => n.startMillis! + n.costMs!))
+  return latest - earliest
+})
+
+/** 格式化总耗时 */
+const formatTotalCost = computed<string>(() => {
+  const ms = totalCostMs.value
+  if (ms >= 1000) {
+    return `${(ms / 1000).toFixed(1)}s`
+  }
+  return `${ms}ms`
 })
 
 /** 是否有节点携带 data 字段 */
@@ -136,17 +126,12 @@ const hasAnyData = computed<boolean>(() => props.nodes.some((n) => n.data && Obj
 
 /** 有 data 的节点列表 */
 const nodesWithData = computed<ThinkingNodeVO[]>(() =>
-    props.nodes.filter((n) => n.data && Object.keys(n.data).length > 0)
+  props.nodes.filter((n) => n.data && Object.keys(n.data).length > 0)
 )
 
 const showData = ref(false)
 const promptModalOpen = ref(false)
 const promptContent = ref('')
-
-/** 获取某阶段的节点 */
-function nodeOf(stage: string): ThinkingNodeVO | undefined {
-  return props.nodes.find((n) => n.stage === stage)
-}
 
 function openPrompt(prompt: string, systemPrompt?: string) {
   promptContent.value = systemPrompt
@@ -155,17 +140,8 @@ function openPrompt(prompt: string, systemPrompt?: string) {
   promptModalOpen.value = true
 }
 
-/** 判断某阶段是否处于指定状态 */
-function isStatus(stage: string, status: string): boolean {
-  return nodeOf(stage)?.status === status
-}
-
 /** 节点样式类 */
-function nodeClass(stage: string): string {
-  const node = nodeOf(stage)
-  if (!node) {
-    return 'is-pending'
-  }
+function getNodeClass(node: ThinkingNodeVO): string {
   switch (node.status) {
     case 'done':
       return 'is-done'
@@ -179,11 +155,7 @@ function nodeClass(stage: string): string {
 }
 
 /** 节点详情（进行中显示 message，完成显示 detail） */
-function detailOf(stage: string): string {
-  const node = nodeOf(stage)
-  if (!node) {
-    return ''
-  }
+function getNodeDetail(node: ThinkingNodeVO): string {
   if (node.status === 'running') {
     return node.message || ''
   }
@@ -191,9 +163,16 @@ function detailOf(stage: string): string {
 }
 
 /** 悬浮提示 */
-function titleOf(stage: string): string {
-  const node = nodeOf(stage)
-  return node ? `${stage}：${node.status || '未执行'}` : `${stage}：未执行`
+function getNodeTitle(node: ThinkingNodeVO): string {
+  return `${node.stage}：${node.status || '未执行'}`
+}
+
+/** 格式化耗时 */
+function formatCost(ms: number): string {
+  if (ms >= 1000) {
+    return `${(ms / 1000).toFixed(1)}s`
+  }
+  return `${ms}ms`
 }
 
 /** 格式化 data key 为可读文本 */
@@ -228,7 +207,8 @@ function formatKey(key: string): string {
     graphMode: '图谱模式',
     tool: '工具名称',
     input: '查询内容',
-    observationLength: '结果长度'
+    observationLength: '结果长度',
+    selected: '已选策略'
   }
   return map[key] || key
 }
@@ -269,6 +249,19 @@ function formatValue(value: unknown): string {
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 4px;
+}
+
+.flow-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: #86909c;
+  font-size: 12px;
+}
+
+.flow-empty__text {
+  color: #86909c;
 }
 
 .flow-node {
@@ -404,16 +397,6 @@ function formatValue(value: unknown): string {
   white-space: pre-wrap;
   max-height: 400px;
   overflow-y: auto;
-}
-
-@keyframes flow-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.12);
-  }
-  50% {
-    box-shadow: 0 0 0 6px rgba(22, 119, 255, 0.2);
-  }
 }
 
 .prompt-content {

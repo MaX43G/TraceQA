@@ -20,8 +20,8 @@ export interface ChatStreamHandlers {
     onReferences?: (references: ReferenceVO[]) => void
     /** 检索分析（三路命中数 / 来源文档分布 / 耗时） */
     onStats?: (stats: RetrievalStats) => void
-    /** 结束（携带会话/消息 ID + Langfuse 追踪链接） */
-    onDone?: (payload: { sessionId?: number; messageId?: number; title?: string; traceUrl?: string }) => void
+    /** 结束（携带会话/消息 ID + Langfuse 追踪链接 + 总耗时） */
+    onDone?: (payload: DonePayload) => void
     /** 服务端错误 */
     onError?: (error: { code?: number; msg?: string }) => void
     /** 流结束（无论成功失败均触发） */
@@ -34,8 +34,19 @@ export interface RetrievalStats {
     vectorHits?: number
     keywordHits?: number
     fusedCount?: number
+    /** 检索阶段耗时（毫秒） */
     elapsedMs?: number
     sourceDocs?: Record<string, number>
+}
+
+/** 完成事件数据（来自后端 done 事件） */
+export interface DonePayload {
+    sessionId?: number
+    messageId?: number
+    title?: string
+    traceUrl?: string
+    /** 整个请求的总耗时（毫秒） */
+    totalLatencyMs?: number
 }
 
 /** 发起流式对话请求并消费事件 */
@@ -245,7 +256,7 @@ function dispatchBlock(block: string, handlers: ChatStreamHandlers): void {
             handlers.onStats?.(payload as RetrievalStats)
             break
         case 'done':
-            handlers.onDone?.(payload as { sessionId?: number; messageId?: number; title?: string; traceUrl?: string })
+            handlers.onDone?.(payload as DonePayload)
             break
         case 'error':
             handlers.onError?.(payload as { code?: number; msg?: string })

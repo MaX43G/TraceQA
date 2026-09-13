@@ -35,6 +35,8 @@ export interface StreamMessage extends ChatMessageVO {
     followup?: string[]
     /** Langfuse 追踪链接（可选） */
     traceUrl?: string
+    /** 整个请求的总耗时（毫秒，来自后端 done 事件） */
+    totalLatencyMs?: number
 }
 
 export const useChatStore = defineStore('chat', {

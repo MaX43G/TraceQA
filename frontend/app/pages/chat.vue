@@ -348,9 +348,10 @@ async function handleSend(content: string): Promise<void> {
             }
           }
         },
-        onDone: async () => {
+        onDone: async (donePayload) => {
           streamMsg.streaming = false
           streamMsg.content = streamMsg.buffer
+          streamMsg.totalLatencyMs = donePayload.totalLatencyMs
           chat.generating = false
           followupPromise = loadFollowup(content, streamMsg)
           await followupPromise
@@ -463,9 +464,10 @@ async function handleSendManual(content: string, strategies: string[]): Promise<
             }
           }
         },
-        onDone: async () => {
+        onDone: async (donePayload) => {
           streamMsg.streaming = false
           streamMsg.content = streamMsg.buffer
+          streamMsg.totalLatencyMs = donePayload.totalLatencyMs
           chat.generating = false
           followupPromise = loadFollowup(content, streamMsg)
           await followupPromise

@@ -389,33 +389,41 @@ public class ManualRetrievalHandler {
                                   List<ReferenceVO> references, String answer,
                                   String reasoningContent, long start, SseEmitter emitter) {
         long latency = System.currentTimeMillis() - start;
+        Map<String, Object> doneData = new LinkedHashMap<>();
+        doneData.put("sessionId", session.getId());
+        doneData.put("title", session.getTitle());
+        doneData.put("totalLatencyMs", latency);
         if (answer == null || answer.isBlank()) {
             ragMetrics.recordQueryLatency(latency, "unknown");
-            ssePublisher.send(emitter, "done", Map.of("sessionId", session.getId(), "title", session.getTitle()));
+            ssePublisher.send(emitter, "done", doneData);
             return;
         }
         try {
             ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer, thinking, references, reasoningContent, latency);
-            ssePublisher.send(emitter, "done", Map.of(
-                    "sessionId", session.getId(), "messageId", assistant.getId(), "title", session.getTitle()));
+            doneData.put("messageId", assistant.getId());
+            ssePublisher.send(emitter, "done", doneData);
             ragMetrics.recordQueryLatency(latency, "success");
         } catch (Exception e) {
             log.warn("持久化消息失败：{}", e.getMessage());
             try {
                 ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer, List.of(), references, reasoningContent, latency);
-                ssePublisher.send(emitter, "done", Map.of(
-                        "sessionId", session.getId(), "messageId", assistant.getId(), "title", session.getTitle()));
+                doneData.put("messageId", assistant.getId());
+                ssePublisher.send(emitter, "done", doneData);
             } catch (Exception ex) {
-                ssePublisher.send(emitter, "done", Map.of("sessionId", session.getId(), "title", session.getTitle()));
+                ssePublisher.send(emitter, "done", doneData);
             }
         }
     }
 
     private void markThinkingFailed(List<ThinkingNodeVO> thinking) {
         synchronized (thinking) {
-            for (ThinkingNodeVO node : thinking) {
+            for (int i = thinking.size() - 1; i >= 0; i--) {
+                ThinkingNodeVO node = thinking.get(i);
                 if ("running".equals(node.getStatus())) {
                     node.setStatus("failed");
+                    node.setDetail("执行失败，已降级");
+                    node.setCostMs(System.currentTimeMillis() - node.getStartMillis());
+                    break;
                 }
             }
         }
@@ -439,6 +447,7 @@ public class ManualRetrievalHandler {
 
     private ThinkingNodeVO startThinking(List<ThinkingNodeVO> thinking, String stage, String agent, String message) {
         ThinkingNodeVO node = new ThinkingNodeVO(stage, agent, "running", message, null);
+        node.setStartMillis(System.currentTimeMillis());
         synchronized (thinking) {
             thinking.add(node);
         }
@@ -452,11 +461,12 @@ public class ManualRetrievalHandler {
                 if (stage.equals(node.getStage()) && "running".equals(node.getStatus())) {
                     node.setStatus("done");
                     node.setMessage(summary);
-                    break;
+                    node.setCostMs(System.currentTimeMillis() - node.getStartMillis());
+                    ssePublisher.send(emitter, "thinking", node);
+                    return;
                 }
             }
         }
-        ssePublisher.send(emitter, "thinking", new ThinkingNodeVO(stage, null, "done", summary, null));
     }
 
     private void pushProgress(SseEmitter emitter, ThinkingNodeVO node, AtomicBoolean cancelled, String progress) {

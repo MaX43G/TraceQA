@@ -26,6 +26,20 @@
       </div>
     </div>
 
+    <!-- 耗时统计 -->
+    <div class="stats-panel__timing">
+      <div v-if="stats.elapsedMs != null && stats.elapsedMs > 0" class="timing-item">
+        <ClockCircleOutlined class="timing-icon" />
+        <span class="timing-label">检索耗时</span>
+        <span class="timing-value">{{ formatCost(stats.elapsedMs) }}</span>
+      </div>
+      <div v-if="totalLatencyMs != null && totalLatencyMs > 0" class="timing-item">
+        <ThunderboltOutlined class="timing-icon" />
+        <span class="timing-label">总耗时</span>
+        <span class="timing-value timing-value--highlight">{{ formatCost(totalLatencyMs) }}</span>
+      </div>
+    </div>
+
     <!-- 三路命中分布 -->
     <div class="stats-panel__chart">
       <VChart :option="pathDonutOption" height="150px" />
@@ -46,12 +60,14 @@
 /**
  * 检索可解释性面板：展示三路命中数、来源文档分布与耗时。
  */
-import { PieChartOutlined } from '@ant-design/icons-vue'
+import { PieChartOutlined, ClockCircleOutlined, ThunderboltOutlined } from '@ant-design/icons-vue'
 import VChart from '@/components/common/VChart.vue'
 import type { RetrievalStats } from '@/composables/useChatStream'
 
 const props = defineProps<{
   stats: RetrievalStats
+  /** 整个请求的总耗时（毫秒） */
+  totalLatencyMs?: number
 }>()
 
 /** 三路命中分布环形图 */
@@ -94,6 +110,14 @@ function srcWidth(count: number): string {
   const pct = Math.max(18, Math.round((count / maxCount.value) * 100))
   return `${pct}%`
 }
+
+/** 格式化耗时 */
+function formatCost(ms: number): string {
+  if (ms >= 1000) {
+    return `${(ms / 1000).toFixed(1)}s`
+  }
+  return `${ms}ms`
+}
 </script>
 
 <style scoped>
@@ -123,6 +147,37 @@ function srcWidth(count: number): string {
 .stat-item__label {
   font-size: 12px;
   color: #86909c;
+}
+.stats-panel__timing {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #eef0f6;
+}
+.timing-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.timing-icon {
+  color: #86909c;
+  font-size: 12px;
+}
+.timing-label {
+  font-size: 12px;
+  color: #86909c;
+}
+.timing-value {
+  font-size: 12px;
+  color: #4e5969;
+  font-weight: 500;
+}
+.timing-value--highlight {
+  color: #1677ff;
+  font-weight: 600;
 }
 .stats-panel__chart {
   margin-top: 6px;

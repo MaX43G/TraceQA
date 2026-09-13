@@ -17,7 +17,7 @@
       </template>
       <template v-else>
         <ThinkingTracePanel v-if="hasThinking" :nodes="msg.thinkingTrace ?? []"/>
-        <RetrievalStatsPanel v-if="resolvedStats" :stats="resolvedStats"/>
+        <RetrievalStatsPanel v-if="resolvedStats" :stats="resolvedStats" :total-latency-ms="msg.totalLatencyMs"/>
         <div v-if="reasoningContent" class="chat-msg__reasoning">
           <a-collapse ghost>
             <a-collapse-panel key="reasoning" :show-arrow="true">
@@ -114,6 +114,7 @@ const props = defineProps<{
     reasoningBuffer?: string
     stats?: RetrievalStats
     followup?: string[]
+    totalLatencyMs?: number
   }
   /** 是否处于生成中 */
   streaming?: boolean

@@ -516,21 +516,21 @@ public class RagAgentOrchestrator {
                                   List<ReferenceVO> references, String answer,
                                   String reasoningContent, long start, SseEmitter emitter) {
         long latency = System.currentTimeMillis() - start;
+        Map<String, Object> doneData = new LinkedHashMap<>();
+        doneData.put("sessionId", session.getId());
+        doneData.put("title", session.getTitle());
+        doneData.put("totalLatencyMs", latency);
         if (answer == null || answer.isBlank()) {
             ragMetrics.recordQueryLatency(latency, "unknown");
             log.info("回答为空（可能被中断），不保存 AI 消息：session={}", session.getId());
-            ssePublisher.send(emitter, "done", Map.of(
-                    "sessionId", session.getId(),
-                    "title", session.getTitle()));
+            ssePublisher.send(emitter, "done", doneData);
             return;
         }
         try {
             ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer,
                     thinking, references, reasoningContent, latency);
-            ssePublisher.send(emitter, "done", Map.of(
-                    "sessionId", session.getId(),
-                    "messageId", assistant.getId(),
-                    "title", session.getTitle()));
+            doneData.put("messageId", assistant.getId());
+            ssePublisher.send(emitter, "done", doneData);
             ragMetrics.recordQueryLatency(latency, "success");
             log.info("问答完成：session={}, latency={}ms", session.getId(), latency);
         } catch (Exception e) {
@@ -538,16 +538,12 @@ public class RagAgentOrchestrator {
             try {
                 ChatMessage assistant = chatService.saveAssistantMessage(session.getId(), answer,
                         List.of(), references, reasoningContent, latency);
-                ssePublisher.send(emitter, "done", Map.of(
-                        "sessionId", session.getId(),
-                        "messageId", assistant.getId(),
-                        "title", session.getTitle()));
+                doneData.put("messageId", assistant.getId());
+                ssePublisher.send(emitter, "done", doneData);
                 log.info("问答完成（降级保存，thinking trace 已丢弃）：session={}", session.getId());
             } catch (Exception ex) {
                 log.error("降级保存也失败：{}", ex.getMessage());
-                ssePublisher.send(emitter, "done", Map.of(
-                        "sessionId", session.getId(),
-                        "title", session.getTitle()));
+                ssePublisher.send(emitter, "done", doneData);
             }
         }
     }
