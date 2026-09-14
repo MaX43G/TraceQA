@@ -24,6 +24,7 @@
             class="node" 
             :class="getNodeClass(stage.node!)"
             :title="getNodeTitle(stage.node!)"
+            @click="selectNode(stage.node!)"
           >
             <div class="node__icon">
               <LoadingOutlined v-if="stage.node!.status === 'running'" spin/>
@@ -51,6 +52,7 @@
               class="node node--compact"
               :class="getNodeClass(node)"
               :title="getNodeTitle(node)"
+              @click="selectNode(node)"
             >
               <div class="node__icon">
                 <LoadingOutlined v-if="node.status === 'running'" spin/>
@@ -70,8 +72,46 @@
       </template>
     </div>
 
+    <!-- 节点详情弹窗 -->
+    <a-modal v-model:open="nodeModalOpen" :title="selectedNode?.stage || '节点详情'" :footer="null" width="600px" destroy-on-close>
+      <template #extra>
+        <a-tag v-if="selectedNode" :color="getStatusColor(selectedNode.status)">{{ getStatusText(selectedNode.status) }}</a-tag>
+      </template>
+      <div v-if="selectedNode" class="node-detail-modal">
+        <div v-if="selectedNode.costMs != null" class="detail-row">
+          <span class="detail-label">耗时</span>
+          <span class="detail-value">{{ formatCost(selectedNode.costMs) }}</span>
+        </div>
+        <div v-if="selectedNode.message" class="detail-row">
+          <span class="detail-label">消息</span>
+          <span class="detail-value">{{ selectedNode.message }}</span>
+        </div>
+        <div v-if="selectedNode.detail" class="detail-row">
+          <span class="detail-label">详情</span>
+          <span class="detail-value">{{ selectedNode.detail }}</span>
+        </div>
+        <template v-if="selectedNode.data && Object.keys(selectedNode.data).length > 0">
+          <a-divider style="margin: 12px 0"/>
+          <div class="detail-section-title">详细数据</div>
+          <div v-for="(value, key) in selectedNode.data" :key="String(key)" class="detail-row">
+            <span class="detail-label">{{ formatKey(String(key)) }}</span>
+            <span class="detail-value detail-value--data">
+              <template v-if="String(key) === 'prompt'">
+                <a-button type="link" size="small" @click="openPrompt(value as string, selectedNode.data?.systemPrompt as string | undefined)">
+                  查看完整提示词 ({{ (value as string).length }} 字符)
+                </a-button>
+              </template>
+              <template v-else-if="String(key) !== 'systemPrompt'">
+                {{ formatValue(value) }}
+              </template>
+            </span>
+          </div>
+        </template>
+      </div>
+    </a-modal>
+
     <!-- 空状态 -->
-    <div v-else class="workflow-empty">
+    <div v-if="nodes.length === 0" class="workflow-empty">
       <div class="workflow-empty__icon">
         <SyncOutlined spin />
       </div>
@@ -133,7 +173,8 @@ import {
   CloseCircleFilled,
   EllipsisOutlined,
   DownOutlined,
-  UpOutlined
+  UpOutlined,
+  CloseOutlined
 } from '@ant-design/icons-vue'
 import type {ThinkingNodeVO} from '@/utils/api-types'
 
@@ -224,6 +265,14 @@ const nodesWithData = computed<ThinkingNodeVO[]>(() =>
 const showData = ref(false)
 const promptModalOpen = ref(false)
 const promptContent = ref('')
+const selectedNode = ref<ThinkingNodeVO | null>(null)
+const nodeModalOpen = ref(false)
+
+/** 点击节点显示详情 */
+function selectNode(node: ThinkingNodeVO) {
+  selectedNode.value = node
+  nodeModalOpen.value = true
+}
 
 /** 判断阶段是否处于活动状态 */
 function isStageActive(stage: WorkflowStage): boolean {
@@ -268,6 +317,26 @@ function getNodeDetail(node: ThinkingNodeVO): string {
 /** 悬浮提示 */
 function getNodeTitle(node: ThinkingNodeVO): string {
   return `${node.stage}：${node.status || '未执行'}`
+}
+
+/** 状态颜色 */
+function getStatusColor(status?: string): string {
+  switch (status) {
+    case 'done': return 'green'
+    case 'running': return 'blue'
+    case 'failed': return 'red'
+    default: return 'default'
+  }
+}
+
+/** 状态文本 */
+function getStatusText(status?: string): string {
+  switch (status) {
+    case 'done': return '完成'
+    case 'running': return '执行中'
+    case 'failed': return '失败'
+    default: return '等待中'
+  }
 }
 
 /** 格式化耗时 */
@@ -545,6 +614,12 @@ function formatValue(value: unknown): string {
   color: #bfbfbf;
 }
 
+/* 悬停效果 */
+.node:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
 /* 脉冲动画 */
 @keyframes node-pulse {
   0%, 100% {
@@ -635,6 +710,45 @@ function formatValue(value: unknown): string {
   white-space: pre-wrap;
   max-height: 400px;
   overflow-y: auto;
+}
+
+/* 节点详情弹窗 */
+.node-detail-modal {
+  font-size: 13px;
+}
+
+.detail-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d2129;
+  margin-bottom: 8px;
+}
+
+.detail-row {
+  display: flex;
+  margin-bottom: 6px;
+  line-height: 1.5;
+}
+
+.detail-label {
+  color: #86909c;
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.detail-value {
+  color: #1d2129;
+  word-break: break-all;
+}
+
+.detail-value--data {
+  max-height: 150px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  background: #f7f8fa;
+  padding: 4px 8px;
+  border-radius: 4px;
+  width: 100%;
 }
 
 .prompt-content {
