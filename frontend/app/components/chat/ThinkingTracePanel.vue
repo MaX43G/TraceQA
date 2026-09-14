@@ -352,27 +352,30 @@ function formatValue(value: unknown): string {
 /* 工作流容器 */
 .workflow {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 0;
   padding: 8px 0;
+  overflow-x: auto;
+  align-items: center;
 }
 
 /* 连接线 */
 .workflow-connector {
   display: flex;
-  justify-content: center;
-  height: 24px;
+  align-items: center;
+  width: 24px;
+  flex-shrink: 0;
 }
 
 .connector-line {
-  width: 2px;
-  height: 100%;
+  height: 2px;
+  width: 100%;
   background: #d9d9d9;
   transition: background 0.3s ease;
 }
 
 .connector-line--active {
-  background: linear-gradient(180deg, #1677ff 0%, #52c41a 100%);
+  background: linear-gradient(90deg, #1677ff 0%, #52c41a 100%);
   box-shadow: 0 0 8px rgba(22, 119, 255, 0.4);
 }
 
@@ -381,6 +384,7 @@ function formatValue(value: unknown): string {
   display: flex;
   flex-direction: column;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .workflow-stage--parallel {
@@ -398,9 +402,9 @@ function formatValue(value: unknown): string {
 
 .parallel-nodes {
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
+  align-items: center;
 }
 
 /* 节点样式 */
