@@ -12,7 +12,7 @@ COPY . .
 RUN --mount=type=cache,target=/root/.m2/repository mvn -T 1C -pl traceqa-qa-service -am package -DskipTests -B
 
 # ---- 运行阶段 ----
-FROM eclipse-temurin:25-jre-alpine
+FROM eclipse-temurin:25-jre
 
 WORKDIR /app
 
