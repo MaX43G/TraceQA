@@ -73,9 +73,10 @@
     </div>
 
     <!-- 节点详情弹窗 -->
-    <a-modal v-model:open="nodeModalOpen" :title="selectedNode?.stage || '节点详情'" :footer="null" width="600px" destroy-on-close>
-      <template #extra>
-        <a-tag v-if="selectedNode" :color="getStatusColor(selectedNode.status)">{{ getStatusText(selectedNode.status) }}</a-tag>
+    <a-modal v-model:open="nodeModalOpen" :footer="null" width="600px" destroy-on-close>
+      <template #title>
+        <span>{{ selectedNode?.stage || '节点详情' }}</span>
+        <a-tag v-if="selectedNode" :color="getStatusColor(selectedNode.status)" style="margin-left: 8px;">{{ getStatusText(selectedNode.status) }}</a-tag>
       </template>
       <div v-if="selectedNode" class="node-detail-modal">
         <div v-if="selectedNode.costMs != null" class="detail-row">
@@ -118,37 +119,7 @@
       <span class="workflow-empty__text">正在初始化...</span>
     </div>
 
-    <!-- 节点详细数据（展开/折叠） -->
-    <div v-if="hasAnyData" class="data-section">
-      <a-button type="link" size="small" @click="showData = !showData">
-        <template #icon>
-          <DownOutlined v-if="!showData"/>
-          <UpOutlined v-else/>
-        </template>
-        {{ showData ? '收起详情' : '查看工作流详情' }}
-      </a-button>
-      <div v-if="showData" class="data-list">
-        <div v-for="node in nodesWithData" :key="node.stage ?? 'unknown'" class="data-item">
-          <div class="data-item__header">
-            <span class="data-item__stage">{{ node.stage }}</span>
-            <a-tag v-if="node.costMs != null" size="small" color="green">{{ formatCost(node.costMs) }}</a-tag>
-          </div>
-          <div class="data-item__body">
-            <template v-for="(value, key) in node.data" :key="String(key)">
-              <div v-if="String(key) === 'prompt'" class="data-kv">
-                <a-button type="link" size="small" @click="openPrompt(value as string, node.data?.systemPrompt as string | undefined)">
-                  查看完整提示词 ({{ (value as string).length }} 字符)
-                </a-button>
-              </div>
-              <div v-else-if="String(key) !== 'systemPrompt'" class="data-kv">
-                <span class="data-kv__key">{{ formatKey(String(key)) }}：</span>
-                <span class="data-kv__value">{{ formatValue(value) }}</span>
-              </div>
-            </template>
-          </div>
-        </div>
-      </div>
-    </div>
+
 
     <!-- 完整提示词弹窗 -->
     <a-modal v-model:open="promptModalOpen" title="完整提示词" :footer="null" width="720px" destroy-on-close>
@@ -171,10 +142,7 @@ import {
   LoadingOutlined,
   CheckCircleFilled,
   CloseCircleFilled,
-  EllipsisOutlined,
-  DownOutlined,
-  UpOutlined,
-  CloseOutlined
+  EllipsisOutlined
 } from '@ant-design/icons-vue'
 import type {ThinkingNodeVO} from '@/utils/api-types'
 
@@ -254,15 +222,7 @@ const formatTotalCost = computed<string>(() => {
   return `${ms}ms`
 })
 
-/** 是否有节点携带 data 字段 */
-const hasAnyData = computed<boolean>(() => props.nodes.some((n) => n.data && Object.keys(n.data).length > 0))
 
-/** 有 data 的节点列表 */
-const nodesWithData = computed<ThinkingNodeVO[]>(() =>
-  props.nodes.filter((n) => n.data && Object.keys(n.data).length > 0)
-)
-
-const showData = ref(false)
 const promptModalOpen = ref(false)
 const promptContent = ref('')
 const selectedNode = ref<ThinkingNodeVO | null>(null)
@@ -555,6 +515,7 @@ function formatValue(value: unknown): string {
   max-width: 120px;
   overflow: hidden;
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
@@ -650,67 +611,7 @@ function formatValue(value: unknown): string {
   color: #86909c;
 }
 
-/* 数据详情区 */
-.data-section {
-  margin-top: 12px;
-  border-top: 1px solid #e8e8e8;
-  padding-top: 8px;
-}
 
-.data-list {
-  margin-top: 8px;
-}
-
-.data-item {
-  background: #fff;
-  border: 1px solid #e8e8e8;
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  transition: box-shadow 0.2s ease;
-}
-
-.data-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.data-item__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.data-item__stage {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1d2129;
-}
-
-.data-item__body {
-  font-size: 12px;
-  color: #4e5969;
-}
-
-.data-kv {
-  display: flex;
-  margin-bottom: 4px;
-  line-height: 1.6;
-}
-
-.data-kv__key {
-  color: #86909c;
-  min-width: 80px;
-  flex-shrink: 0;
-}
-
-.data-kv__value {
-  color: #1d2129;
-  word-break: break-all;
-  white-space: pre-wrap;
-  max-height: 400px;
-  overflow-y: auto;
-}
 
 /* 节点详情弹窗 */
 .node-detail-modal {
