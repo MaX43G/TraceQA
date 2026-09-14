@@ -97,6 +97,11 @@
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-mcp-client</artifactId>
         </dependency>
+        <!-- MCP Jackson 3 JSON 支持 -->
+        <dependency>
+            <groupId>io.modelcontextprotocol.sdk</groupId>
+            <artifactId>modelcontextprotocol-json-jackson3</artifactId>
+        </dependency>
 
         <!-- Hutool（SHA-256 缓存键等） -->
         <dependency>
