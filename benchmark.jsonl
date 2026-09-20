@@ -1,0 +1,241 @@
+{"user_input":"某超市研究销售纪录数据后发现，买啤酒的人很大概率也会购买尿布，这种属于数据挖掘的哪类问题？A.关联规则挖掘 B.二分类 C.NLP D.聚类","reference":"A. 关联规则挖掘。“啤酒与尿布”是典型的购物篮分析案例，是关联规则挖掘的典型应用之一，主要用于发现商品之间的关联关系。","metadata":{"scenario":"关联规则挖掘","difficulty":"easy"}}
+{"user_input":"以下哪个统计量不是用于描述数据的“集中趋势”？A.平均数 B.中位数 C.样本方差 D.众数","reference":"C.样本方差。集中趋势描述数据中心位置，包括平均数、中位数、众数等；样本方差描述数据的离散程度。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"主成分分析是一种有监督的降维方法吗？为什么？","reference":"不是。主成分分析是一种无监督的降维方法。PCA只使用输入特征x，不使用标签y；它通过寻找一组新的坐标系使投影后方差尽可能大，或最小化重构误差，整个过程只依赖x的协方差矩阵或相关系数矩阵，与标签无关。","metadata":{"scenario":"降维","difficulty":"easy"}}
+{"user_input":"在数学上R^n和R是存在双射的，那为什么做数据降维的时候不使用他们之间的双射呢？这样还可以实现数据无损压缩不是吗？","reference":"虽然R^n与R存在双射，但我们在降维时往往还会进一步要求数据的低维表示保留距离、邻域、方差、线性结构等任务相关的信息。而数学上存在的双射往往难以保证保留这些结构，也难以实现有实际意义的无损压缩。","metadata":{"scenario":"降维","difficulty":"medium"}}
+{"user_input":"在内积空间上，余弦相似度（也就是两个向量夹角的余弦）可以被定义为数学上严格的“距离”吗？","reference":"不能直接定义为严格距离。距离必须满足非负性、对称性和三角不等式；而余弦相似度可能为负，不满足非负性，因此不能直接定义为数学上严格的“距离”。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"“训练误差越小，模型泛化能力一定越强”这句话正确吗？","reference":"不正确。模型选择目标是泛化误差最小。训练误差小只说明对训练集拟合较好，可能过拟合；需同时看验证/测试误差以及训练误差与验证误差的差距。","metadata":{"scenario":"模型评估","difficulty":"medium"}}
+{"user_input":"模型训练误差很小、测试误差很大，通常发生了什么？","reference":"这通常是发生了过拟合。模型学到训练数据中的噪声、异常点和偶然模式，遇到新数据时表现很差。","metadata":{"scenario":"模型评估","difficulty":"medium"}}
+{"user_input":"决策树的ID3算法选择划分属性的准则是什么？A.基尼指数最小 B.信息增益最大 C.增益率最大 D.均方误差最小","reference":"B. 信息增益最大。ID3算法以信息增益作为属性划分准则，选择信息增益最大的属性进行划分。","metadata":{"scenario":"决策树","difficulty":"easy"}}
+{"user_input":"“决策树深度越大，训练误差一定越小，测试误差也一定越小”这句话对吗？","reference":"不对。决策树深度越大，训练误差通常会减小，但测试误差不一定减小，过深的决策树可能导致过拟合，使泛化性能下降。","metadata":{"scenario":"决策树","difficulty":"easy"}}
+{"user_input":"简要说明K-means算法的基本步骤。","reference":"K-means基本步骤：1）初始化K个聚类中心；2）将每个数据点分配给最近的聚类中心；3）更新聚类中心为分配给该簇的所有数据点的均值；4）重复步骤2和3直到收敛或达到最大迭代次数。","metadata":{"scenario":"聚类：K-means","difficulty":"easy"}}
+{"user_input":"什么是数据挖掘？","reference":"数据挖掘是从大量的、不完全的、有噪声的、模糊的、随机的数据中提取隐含在其中的、人们事先不知道的、但又是潜在有用的信息和知识的过程。","metadata":{"scenario":"绪论：背景、应用、挑战","difficulty":"easy"}}
+{"user_input":"数据挖掘面临哪些挑战？","reference":"数据挖掘面临的挑战包括数据量大、数据质量差、数据类型多样、隐私保护问题、模型可解释性等。","metadata":{"scenario":"绪论：背景、应用、挑战","difficulty":"easy"}}
+{"user_input":"数据挖掘的主要任务有哪些？","reference":"常见任务包括分类、回归、聚类、关联规则挖掘等。","metadata":{"scenario":"绪论：背景、应用、挑战","difficulty":"easy"}}
+{"user_input":"什么是分类？","reference":"分类是把原本无标签的样本分配到预先定义好的类别。","metadata":{"scenario":"分类","difficulty":"easy"}}
+{"user_input":"什么是聚类？","reference":"聚类是无监督学习，给定无标签数据集，把样本分组为簇，使得同一个簇内样本之间的相似度大于不同簇样本之间的相似度。","metadata":{"scenario":"聚类","difficulty":"easy"}}
+{"user_input":"监督学习和无监督学习有什么区别？","reference":"监督学习使用带标签数据训练模型，如分类、回归；无监督学习不使用标签，直接基于样本特征或样本关系进行分组或发现结构，如聚类。","metadata":{"scenario":"绪论:背景、应用、挑战","difficulty":"easy"}}
+{"user_input":"属性主要分为哪几种类型？","reference":"属性主要分为连续属性，取连续值，如房屋面积、价格；等级属性，取离散值但有大小，如高、中、低；类别属性，取离散值且没有大小，如性别、颜色。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"等距划分和等频划分有什么区别？","reference":"等距划分是每个区间的取值范围一样大；等频划分是每个区间包含的样本数一样多。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"什么是one-hot编码？","reference":"one-hot编码是把类别属性转换为多个二值属性的编码方式，编码长度等于该属性不同取值的个数。例如性别可用[1,0]表示男，[0,1]表示女。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"中位数如何计算？","reference":"对n个观测值排序后，若n为奇数，取第(n+1)/2位的值；若n为偶数，取中间两个位置对应值的平均值。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"众数适用于什么属性？","reference":"众数是一个集合中出现次数最多的值。它适用于离散属性，包括等级属性和类别属性；众数可能有多个。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"方差的作用是什么？","reference":"方差用于描述数据的离散趋势，反映数据集中其他值远离其中心值的程度。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"热力图在数据探索中有什么作用？","reference":"热力图常用于可视化相关系数矩阵或协方差矩阵，帮助发现特征之间的相关性，从而判断是否存在冗余特征。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"如何衡量对象之间的紧密性？","reference":"对象之间的紧密性可用相似度或相异度衡量。相似度越大表示越紧密；相异度常用距离衡量，距离越小表示越紧密。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"如何处理缺失值？","reference":"缺失值处理可删除存在缺失值的记录，但可能损失其他信息；也可以继进行填充，常用填充方法包括全局常量填充、均值或中位数填充等。","metadata":{"scenario":"数据清洗","difficulty":"easy"}}
+{"user_input":"什么是维度灾难？","reference":"维度灾难指样本空间大小随着维度增大呈大幅度增长，导致数据稀疏问题。","metadata":{"scenario":"降维","difficulty":"easy"}}
+{"user_input":"特征选择和特征提取有什么区别？","reference":"特征选择是从给定特征集中选择部分最有用的特征；特征提取是基于当前数据集产生新的特征。","metadata":{"scenario":"降维","difficulty":"easy"}}
+{"user_input":"什么是泛化误差？","reference":"泛化误差是模型在“未来”样本上的误差，反映模型的泛化能力。","metadata":{"scenario":"模型评估","difficulty":"easy"}}
+{"user_input":"为什么不能以训练误差最小作为模型选择标准？","reference":"因为训练误差小不代表泛化误差小。模型可能记住训练集噪声而发生过拟合。应以验集证误差为主要选择依据，并兼顾模型复杂度。","metadata":{"scenario":"模型评估","difficulty":"medium"}}
+{"user_input":"什么是过拟合？","reference":"过拟合指模型过度拟合训练数据中的噪声、异常值乃至偶然模式，导致训练误差极低甚至为零，但泛化性能显著下降。","metadata":{"scenario":"模型评估","difficulty":"easy"}}
+{"user_input":"什么是欠拟合？","reference":"欠拟合指模型对重要信息描述不到位，训练误差和验证误差都较大且接近，模型太简单，不能有效拟合数据规律。","metadata":{"scenario":"模型评估","difficulty":"easy"}}
+{"user_input":"查准率如何计算？","reference":"查准率P=TP/(TP+FP)，表示预测为正例的样本中真正例的比例。","metadata":{"scenario":"性能度量","difficulty":"easy"}}
+{"user_input":"查全率如何计算？","reference":"查全率又叫召回率，R=TP/(TP+FN)，表示真实正例中被预测出来的比例。","metadata":{"scenario":"性能度量","difficulty":"easy"}}
+{"user_input":"F1值如何计算？","reference":"F1是查准率P和查全率R的调和平均，F1=2*P*R/(P+R)。它综合考虑查准率和查全率。","metadata":{"scenario":"性能度量","difficulty":"easy"}}
+{"user_input":"宏平均和微平均有什么区别？","reference":"宏平均先对每个类分别计算查准率、查全率等，再求平均；微平均先汇总所有类的TP、FP、FN等，再计算总体指标。","metadata":{"scenario":"性能度量","difficulty":"medium"}}
+{"user_input":"决策树模型由哪些部分组成？","reference":"决策树基于树结构进行决策：每个内部结点对应于某个属性上的测试；每个分支对应于该测试的一种可能结果；每个叶结点对应于一个预测结果。","metadata":{"scenario":"决策树","difficulty":"easy"}}
+{"user_input":"决策树递归构建的停止条件有哪些？","reference":"停止条件包括：当前结点包含的样本全属于同一类别；当前属性集为空或当前结点包含的样本在可用属性集中所有属性的取值相同；当前结点包含的样本集合为空。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"什么是信息熵？","reference":"信息熵是度量样本集合纯度最常用的指标。假定当前样本集合D中第k类样本所占比例为pk，则$Ent(D)=-\\sum_{k=1}^n(pk log2 pk)$。Ent(D)越小，纯度越高。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"什么是信息增益？","reference":"信息增益Gain(D,a)=Ent(D)-sum(|Dv|/|D|*Ent(Dv))，表示以属性a对数据集D进行划分所获得的纯度提升。信息增益越大，表示使用该属性划分获得的纯度提升越大。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"ID3、C4.5、CART分别使用什么划分准则？","reference":"ID3用信息增益最大；C4.5用增益率并采用启发式选择；CART分类用基尼指数最小，回归用平方误差等准则。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"什么是增益率？","reference":"增益率Gain-ratio(D,a)=Gain(D,a)/IV(a)，其中IV(a)为属性a的固有值。C4.5算法使用增益率，以缓解信息增益对可取值数目较多属性的偏好。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"C4.5算法选择划分属性的策略是什么？","reference":"C4.5使用增益率，但直接用增益率可能偏好取值个数少的属性。启发式做法：先从候选划分属性中找出信息增益高于平均水平的，再从中选取增益率最高的。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"什么是基尼指数？","reference":"基尼指数Gini(D)=1-sum(pk^2)，越小表示数据集D的纯度越高。属性a的基尼指数为划分后各子集基尼指数的加权和，CART选择使划分后基尼指数最小的属性。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"CART决策树使用什么划分准则？","reference":"CART用于分类和回归任务。分类时通常使用基尼指数，选择使划分后基尼指数最小的属性；回归时使用平方误差等准则。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"决策树剪枝有什么作用？","reference":"剪枝是决策树对付过拟合的主要手段。通过主动去掉一些分支来降低过拟合风险，剪枝前后通常比较验证集准确率来决定是否剪枝。","metadata":{"scenario":"决策树：剪枝","difficulty":"easy"}}
+{"user_input":"预剪枝和后剪枝有什么区别？","reference":"预剪枝在树生长过程中判断是否划分，训练时间开销降低，但欠拟合风险增加；后剪枝先生成完整树再自底向上剪枝，训练时间开销增加，过拟合风险降低，欠拟合风险基本不变，泛化性能通常优于预剪枝。","metadata":{"scenario":"决策树：剪枝","difficulty":"medium"}}
+{"user_input":"决策树如何处理连续属性？","reference":"基本思路是连续属性离散化，常见做法是二分法：把n个属性值排序，取相邻两个属性值的中间值作为候选划分点，每个候选划分点对应一个二值划分条件。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"决策树如何转换为规则集？","reference":"一棵决策树可以转换为一个规则集，每个从根结点到叶结点的路径对应于一条IF-THEN分类规则。转换过程中通常会进行前件合并、泛化等操作。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"贝叶斯定理的公式是什么？","reference":"贝叶斯定理：P(c|x)=P(c)P(x|c)/P(x)。其中P(c)为先验概率，P(x|c)为类条件概率或似然，P(x)为证据因子。","metadata":{"scenario":"贝叶斯分类","difficulty":"easy"}}
+{"user_input":"判别式模型和生成式模型有什么区别？","reference":"判别式模型直接对后验概率P(c|x)建模，代表有决策树、神经网络、SVM；生成式模型先对联合概率分布P(x,c)建模，再由贝叶斯定理获得P(c|x)，代表有贝叶斯分类器。","metadata":{"scenario":"贝叶斯分类","difficulty":"medium"}}
+{"user_input":"朴素贝叶斯分类器的“朴素”之处是什么？","reference":"朴素贝叶斯假定对于给定的类别，属性之间相互独立，即类条件独立。这样联合概率可以分解为各属性条件概率的乘积，避免直接估计高维联合概率的样本稀疏问题。","metadata":{"scenario":"贝叶斯分类","difficulty":"easy"}}
+{"user_input":"Boosting的基本思想是什么？","reference":"Boosting按顺序训练基分类器，后面的分类器更多关注之前分类不准确的样本，基于样本权重进行抽样；每个分类器有权重，预测时根据分类器权重参与投票或求均值。","metadata":{"scenario":"组合分类","difficulty":"medium"}}
+{"user_input":"聚类结果评估中的轮廓系数是什么？","reference":"轮廓系数是一种内部度量，综合考虑簇内紧凑度和簇间分离度。样本的轮廓系数越大，平均轮廓系数越大，聚类效果越好。","metadata":{"scenario":"聚类：评估","difficulty":"medium"}}
+{"user_input":"K-means的目标函数是什么？","reference":"K-means的目标函数是最小化每个样本点到其所属簇中心的欧式距离平方之和，即J=min sum_k sum_{x_i in C_k} ||x_i-mu_k||^2。","metadata":{"scenario":"聚类：K-means","difficulty":"medium"}}
+{"user_input":"K-means为什么对初始化敏感？","reference":"K-means通过迭代算法只能得到目标函数的局部最优，不同初始化可能得到不同结果。改进措施包括随机选择k个训练样本作为初始中心点，或多次随机初始化运行并选择目标函数值最小的结果。","metadata":{"scenario":"聚类：K-means","difficulty":"medium"}}
+{"user_input":"K-means中如何选择k值？","reference":"常用方法有轮廓系数法和肘点法。轮廓系数法选择平均轮廓系数最大对应的k；肘点法选择目标函数下降趋势变缓的拐点对应的k。","metadata":{"scenario":"聚类：K-means","difficulty":"medium"}}
+{"user_input":"层次聚类的基本思想是什么？","reference":"层次聚类得到树状结构表示的一系列相互嵌套簇。主要方法有自下而上凝聚和自上而下分裂。AGNES是自下而上凝聚层次聚类：每个样本各自为一个簇，不断合并两个最近的簇，直到只剩下一个簇。","metadata":{"scenario":"聚类：层次聚类","difficulty":"medium"}}
+{"user_input":"层次聚类中单连接、全连接和平均连接有什么区别？","reference":"单连接取两个不同簇的样本之间距离的最小值；全连接取最大值；平均连接取属于两个不同簇的样本之间距离的平均值。单连接对噪声敏感，全连接可能把同簇样本分开，平均连接相对中和。","metadata":{"scenario":"聚类：层次聚类","difficulty":"medium"}}
+{"user_input":"DBSCAN中核心点、边界点和噪声点如何定义？","reference":"核心点：其邻域内样本点数量不少于MinPts；边界点：处于核心点的邻域内，但本身邻域内样本点个数少于MinPts；噪声点：邻域内样本点个数少于MinPts，且不处于核心点的邻域内。","metadata":{"scenario":"聚类：密度聚类","difficulty":"medium"}}
+{"user_input":"DBSCAN中密度可达和密度相连有什么区别？","reference":"密度可达具有传递性：若存在样本序列，相邻样本直接密度可达，则称密度可达。密度相连：若存在核心对象o，使点p和点q均由o密度可达，则称p和q密度相连。密度相连满足对称性。","metadata":{"scenario":"聚类：密度聚类","difficulty":"hard"}}
+{"user_input":"Apriori原理是什么？","reference":"Apriori原理：如果一个项集是频繁的，那么它的所有非空子集也是频繁的。因为支持度具有反单调性：X包含于Y，则s(X)>=s(Y)。反之，若一个项集不频繁，则所有包含它的超集也不频繁。","metadata":{"scenario":"关联规则挖掘","difficulty":"medium"}}
+{"user_input":"关联规则中的支持度如何定义？","reference":"支持度Support(X->Y)=P(X,Y)，即同时包含X和Y的交易占总交易数的百分比。","metadata":{"scenario":"关联规则挖掘","difficulty":"easy"}}
+{"user_input":"关联规则中的置信度如何定义？","reference":"置信度Confidence(X->Y)=P(Y|X)，即包含X的交易中有多少也包含了Y，等于同时包含X和Y的交易数占所有包含X的交易数的百分比。","metadata":{"scenario":"关联规则挖掘","difficulty":"easy"}}
+{"user_input":"关联规则挖掘的两步法是什么？","reference":"两步法：1）频繁项集挖掘：得到支持度不小于MinSup的所有itemsets；2）规则生成：从每个频繁项集生成置信度不小于MinConf的规则。先依据支持度过滤，后根据置信度进一步筛选。","metadata":{"scenario":"关联规则挖掘","difficulty":"medium"}}
+{"user_input":"Apriori算法如何构建候选k+1项集？","reference":"Apriori从频繁k项集Lk构建候选k+1项集：合并Lk中具有相同k-1个前缀的两个k项集，然后剔除包含不频繁k项集子集的项，得到候选Ck+1。","metadata":{"scenario":"关联规则挖掘","difficulty":"hard"}}
+{"user_input":"关联规则生成中如何利用置信度剪枝？","reference":"对于来自同一频繁项集的规则，如果两个规则的前件只差一个元素，则可将它们的后件合并生成更大的候选规则；若候选规则的子集规则置信度小于阈值，则删除该候选规则。","metadata":{"scenario":"关联规则挖掘","difficulty":"hard"}}
+{"user_input":"分类任务的整体流程包括哪些步骤？","reference":"分类任务整体流程：先分割测试集和训练集；在训练集上进行数据探索、预处理和特征工程、模型训练和改进；对测试集进行同样预处理后，用训练好的模型预测并评估；最后模型部署、监测和维护。","metadata":{"scenario":"分类案例","difficulty":"medium"}}
+{"user_input":"为什么测试集预处理必须使用训练集的统计信息？","reference":"测试集处理应与训练集处理方法一致，包括使用训练集的统计信息，如最小值、最大值、均值、标准差。测试集信息不能在预处理和模型训练时泄露。","metadata":{"scenario":"分类案例","difficulty":"medium"}}
+{"user_input":"信用违约预测案例中为什么用precision、recall和F1而不是accuracy？","reference":"该数据集只有两个类别且类别大小差别很大，即使每次都预测为不违约，accuracy也超过98%。因此accuracy不合适，应采用混淆矩阵、precision、recall以及F1-score。","metadata":{"scenario":"分类案例","difficulty":"medium"}}
+{"user_input":"电信用户聚类案例中PCA的作用是什么？","reference":"电信用户聚类案例先对数据标准化，再用PCA降维。PCA用于降低维度、便于可视化和后续聚类，同时可查看主成分在原始变量上的权重，理解各主成分主要由哪些变量贡献。","metadata":{"scenario":"聚类案例","difficulty":"medium"}}
+{"user_input":"购物车模型如何拓展到文本分析？","reference":"购物车模型是抽象模型，用于发现“交易记录”和“item”之间的关联关系。文本分析中可定义“交易记录”为文本，“item”为文本中的词，关联规则对应经常一起出现的词，可用于话题检测。","metadata":{"scenario":"关联规则挖掘","difficulty":"medium"}}
+{"user_input":"数据挖掘基本流程包括哪些环节？","reference":"数据挖掘基本流程包括：数据获取和预处理、特征工程、建模/算法、评估/可视化，并可根据评估结果迭代调整，最后部署。具体包括收集、存储、清洗、整合、特征选择、特征提取、选择模型、设置参数、有效性分析、扩展性、鲁棒性、结果可视化等。","metadata":{"scenario":"绪论：基本流程","difficulty":"medium"}}
+{"user_input":"数据挖掘的主要目标是什么？A.从数据中提取潜在有用的信息和知识 B.只做数据库增删改查 C.只做网络爬虫 D.只做数据可视化","reference":"A。数据挖掘是从大量、不完全、有噪声、模糊、随机数据中提取隐含、事先不知道但潜在有用的信息和知识。","metadata":{"scenario":"绪论：背景、应用、挑战","difficulty":"easy"}}
+{"user_input":"“数据挖掘就是执行SQL查询”这句话对吗？","reference":"不对。SQL查询通常是确定性的数据检索，而数据挖掘强调从数据中发现隐含模式、关联、类别或结构。","metadata":{"scenario":"绪论：基本概念","difficulty":"easy"}}
+{"user_input":"以下哪项不是常见的数据挖掘任务？A.分类 B.聚类 C.关联规则挖掘 D.编译优化","reference":"D。分类、聚类、关联规则挖掘都是常见数据挖掘任务；编译优化属于编译原理领域。","metadata":{"scenario":"绪论：主要任务","difficulty":"easy"}}
+{"user_input":"“监督学习一定需要标签”这句话对吗？","reference":"对。监督学习使用带标签样本训练模型，如分类和回归；无监督学习不使用标签。","metadata":{"scenario":"绪论：基本概念","difficulty":"easy"}}
+{"user_input":"以下哪个属于无监督学习任务？A.回归 B.分类 C.聚类 D.情感分类","reference":"C。聚类不使用标签，属于无监督学习；回归、分类、情感分类通常属于监督学习。","metadata":{"scenario":"绪论：基本概念","difficulty":"easy"}}
+{"user_input":"“回归任务的输出通常是连续值”这句话对吗？","reference":"对。回归用于预测连续值，例如房价、温度、销售额等。","metadata":{"scenario":"分类：基本概念","difficulty":"easy"}}
+{"user_input":"购物篮分析通常属于哪类数据挖掘任务？A.关联规则挖掘 B.二分类 C.回归 D.降维","reference":"A。购物篮分析用于发现商品之间的共现关系，是关联规则挖掘的典型应用。","metadata":{"scenario":"关联规则挖掘","difficulty":"easy"}}
+{"user_input":"“数据挖掘流程必须一次性线性完成，不能迭代”这句话对吗？","reference":"不对。数据挖掘通常包括数据获取、预处理、特征工程、建模、评估等环节，并需要根据评估结果反复迭代。","metadata":{"scenario":"绪论：基本流程","difficulty":"easy"}}
+{"user_input":"数据挖掘基本流程的第一步通常是什么？A.模型部署 B.数据获取和预处理 C.规则生成 D.剪枝","reference":"B。通常先获取数据并进行预处理，然后才进行特征工程、建模和评估。","metadata":{"scenario":"绪论：基本流程","difficulty":"easy"}}
+{"user_input":"“数据质量差会影响数据挖掘结果”这句话对吗？","reference":"对。缺失值、噪声、异常值、不一致数据都会影响模型训练和挖掘结论。","metadata":{"scenario":"绪论：挑战","difficulty":"easy"}}
+{"user_input":"以下哪项属于数据挖掘面临的挑战？A.隐私保护 B.数据量大 C.模型可解释性 D.以上都是","reference":"D。数据量大、隐私保护、模型可解释性等都是数据挖掘面临的挑战。","metadata":{"scenario":"绪论：挑战","difficulty":"easy"}}
+{"user_input":"“原始数据本身就直接等于价值”这句话对吗？","reference":"不对。原始数据只有经过清洗、整合、分析和挖掘，才能转化为有用的信息和知识。","metadata":{"scenario":"绪论：背景","difficulty":"easy"}}
+{"user_input":"数据挖掘中的“对象”还可以称为什么？A.特征 B.实例 C.属性 D.标签","reference":"B。对象又叫样本、实例，英文常为instance或example。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"数据挖掘中的“属性”还可以称为什么？A.样本 B.特征 C.记录 D.类别","reference":"B。属性又叫特征，英文常为feature。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"“连续属性通常可以取连续值”这句话对吗？","reference":"对。连续属性如房屋面积、价格、温度等，取值通常是连续的。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"性别属于哪种属性？A.连续属性 B.等级属性 C.类别属性 D.数值属性","reference":"C。性别取离散值且没有大小顺序，属于类别属性。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"收入等级取高、中、低，属于哪种属性？A.连续属性 B.等级属性 C.类别属性 D.二值属性","reference":"B。高、中、低是离散值且有大小顺序，属于等级属性。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"“one-hot编码会人为引入类别之间的大小顺序”这句话对吗？","reference":"不对。one-hot编码不会引入大小顺序，而直接用整数索引可能引入人为顺序。","metadata":{"scenario":"数据表示、预处理","difficulty":"medium"}}
+{"user_input":"等频划分的特点是？A.每个区间取值范围相同 B.每个区间样本数相同 C.每个区间均值相同 D.每个区间方差相同","reference":"B。等频划分使每个区间包含的样本数大致相同。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"“中位数通常比均值更不容易受极端值影响”这句话对吗？","reference":"对。中位数对极端值不敏感，均值则容易受极端值影响。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"以下哪个统计量不是描述集中趋势的？A.均值 B.中位数 C.方差 D.众数","reference":"C。方差描述离散程度；均值、中位数、众数描述集中趋势。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"“众数可能有多个”这句话对吗？","reference":"对。一个数据集合中可能出现多个出现次数最多的值，因此众数可能有多个。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"极差等于？A.最大值减最小值 B.Q3减Q1 C.均值减中位数 D.方差的平方根","reference":"A。极差又称全距，是最大值与最小值之差。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"四分位极差IQR等于？A.Q3-Q1 B.Q2-Q1 C.Q3-Q2 D.最大值-最小值","reference":"A。IQR=Q3-Q1，用于描述中间50%数据的离散程度。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"“箱型图可以用于发现异常值”这句话对吗？","reference":"对。小于Q1-1.5*IQR或大于Q3+1.5*IQR的值常被视为异常值。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"协方差主要用于衡量什么？A.两个变量之间的相关性 B.一个变量的离散程度 C.类别纯度 D.信息增益","reference":"A。协方差用于衡量两个变量共同变化的趋势。","metadata":{"scenario":"数据表示、预处理","difficulty":"medium"}}
+{"user_input":"“相关系数是归一化后的协方差”这句话对吗？","reference":"对。相关系数消除了量纲影响，更适合比较不同变量之间的线性相关程度。","metadata":{"scenario":"数据表示、预处理","difficulty":"medium"}}
+{"user_input":"余弦相似度的取值范围通常是？A.[0,1] B.[-1,1] C.[0,+∞) D.(-∞,+∞)","reference":"B。余弦相似度通常取值在[-1,1]之间。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"“余弦相似度可以直接作为严格距离”这句话对吗？","reference":"不对。余弦相似度可能为负，不满足距离的非负性要求，因此不能直接作为严格距离。","metadata":{"scenario":"数据表示、预处理","difficulty":"medium"}}
+{"user_input":"欧式距离对应明可夫斯基距离的哪个参数？A.p=1 B.p=2 C.p趋于无穷 D.p=0","reference":"B。欧式距离是明可夫斯基距离在p=2时的特殊形式。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"曼哈顿距离对应明可夫斯基距离的哪个参数？A.p=1 B.p=2 C.p趋于无穷 D.p=0","reference":"A。曼哈顿距离是明可夫斯基距离在p=1时的特殊形式。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"切比雪夫距离对应明可夫斯基距离的哪种情况？A.p=1 B.p=2 C.p趋于无穷 D.p=0","reference":"C。切比雪夫距离是明可夫斯基距离在p趋于无穷时的特殊形式。","metadata":{"scenario":"数据表示、预处理","difficulty":"medium"}}
+{"user_input":"“汉明距离适用于类别型数据”这句话对吗？","reference":"对。汉明距离常用于比较两个等长向量中对应位置不同的个数，尤其适合二值或类别型数据。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"Jaccard相似度通常适用于什么数据？A.集合数据 B.连续向量 C.有序等级 D.概率分布","reference":"A。Jaccard相似度定义为交集大小除以并集大小，适合集合表示的数据。","metadata":{"scenario":"数据表示、预处理","difficulty":"easy"}}
+{"user_input":"“欧式距离与向量长度无关”这句话对吗？","reference":"不对。欧式距离与向量长度和方向都有关；余弦相似度才主要关注方向。","metadata":{"scenario":"数据表示、预处理","difficulty":"medium"}}
+{"user_input":"L2范数的平方等于什么？A.向量与自身的点积 B.向量元素之和 C.向量均值 D.向量方差","reference":"A。L2范数的平方等于向量与自身的内积。","metadata":{"scenario":"数据表示、预处理","difficulty":"medium"}}
+{"user_input":"“缺失值最好一律直接删除”这句话对吗？","reference":"不对。直接删除可能损失大量其他有用信息，应根据缺失比例和机制选择删除或填充。","metadata":{"scenario":"数据清洗","difficulty":"easy"}}
+{"user_input":"最小-最大规范化通常把数据映射到什么区间？A.均值0方差1 B.[0,1] C.[-1,1] D.标准正态分布","reference":"B。最小-最大规范化通常将原始数据线性映射到[0,1]区间。","metadata":{"scenario":"数据规范化","difficulty":"easy"}}
+{"user_input":"Z分数规范化后，数据通常具有什么性质？A.均值0、标准差1 B.均值1、标准差0 C.取值[0,1] D.中位数为0","reference":"A。Z分数规范化使变换后数据均值为0、标准差为1。","metadata":{"scenario":"数据规范化","difficulty":"easy"}}
+{"user_input":"“中心化之后数据方差一定变为1”这句话对吗？","reference":"不对。中心化只把均值变为0，不改变方差；标准化才使标准差为1。","metadata":{"scenario":"数据规范化","difficulty":"medium"}}
+{"user_input":"以下哪项不是降维的常见目的？A.数据压缩 B.便于可视化 C.防止过拟合 D.增加噪声","reference":"D。降维通常用于压缩、可视化和缓解过拟合，而不是增加噪声。","metadata":{"scenario":"降维","difficulty":"easy"}}
+{"user_input":"“维度灾难是指维度增加导致样本空间稀疏”这句话对吗？","reference":"对。随着维度增加，样本空间体积指数增长，数据变得稀疏，模型更容易过拟合。","metadata":{"scenario":"降维","difficulty":"easy"}}
+{"user_input":"特征选择是指？A.构造全新特征 B.从原特征中选择部分特征 C.增加样本 D.删除样本","reference":"B。特征选择从给定特征集中选择最有用的特征子集。","metadata":{"scenario":"降维","difficulty":"easy"}}
+{"user_input":"特征提取是指？A.只选择原特征 B.基于原数据产生新特征 C.增加标签 D.做聚类","reference":"B。特征提取通过变换或组合产生新的低维特征。","metadata":{"scenario":"降维","difficulty":"easy"}}
+{"user_input":"“PCA是一种有监督降维方法”这句话对吗？","reference":"不对。PCA不使用标签，是无监督降维方法。","metadata":{"scenario":"降维：PCA","difficulty":"easy"}}
+{"user_input":"PCA的主要目标通常是什么？A.投影后方差最大 B.类别间隔最大 C.信息增益最大 D.基尼指数最小","reference":"A。PCA通过寻找新的投影方向，使投影后数据方差尽可能大。","metadata":{"scenario":"降维：PCA","difficulty":"easy"}}
+{"user_input":"“进行PCA前通常需要先中心化”这句话对吗？","reference":"对。PCA通常先对数据中心化，使均值为0，再计算协方差矩阵。","metadata":{"scenario":"降维：PCA","difficulty":"easy"}}
+{"user_input":"PCA中的投影方向通常是什么？A.协方差矩阵的特征向量 B.奇异值 C.均值 D.中位数","reference":"A。PCA投影方向是协方差矩阵较大特征值对应的特征向量。","metadata":{"scenario":"降维：PCA","difficulty":"medium"}}
+{"user_input":"“PCA可以完全避免信息损失”这句话对吗？","reference":"不对。降维通常会损失部分信息，只是尽量保留主要方差或结构。","metadata":{"scenario":"降维：PCA","difficulty":"easy"}}
+{"user_input":"用SVD实现PCA时，右奇异向量对应什么？A.X^TX的特征向量 B.XX^T的特征向量 C.标签 D.噪声","reference":"A。对中心化数据矩阵X做SVD，V的列是右奇异向量，也是X^TX的特征向量。","metadata":{"scenario":"降维：PCA","difficulty":"hard"}}
+{"user_input":"“PCA方差最大化目标在零均值下等价于重构误差最小化”这句话对吗？","reference":"对。零均值条件下，PCA最大化投影方差与最小化重构误差等价。","metadata":{"scenario":"降维：PCA","difficulty":"medium"}}
+{"user_input":"主成分之间通常具有什么关系？A.线性相关 B.正交 C.完全相同 D.无定义","reference":"B。不同主成分方向通常相互正交。","metadata":{"scenario":"降维：PCA","difficulty":"medium"}}
+{"user_input":"“PCA对特征量纲完全不敏感”这句话对吗？","reference":"不对。若特征量纲差异大，大尺度变量可能主导PCA结果，因此通常需要标准化。","metadata":{"scenario":"降维：PCA","difficulty":"medium"}}
+{"user_input":"选择PCA主成分个数常用什么指标？A.累计方差贡献率 B.准确率 C.召回率 D.F1值","reference":"A。常用累计方差贡献率达到一定比例来确定保留的主成分个数。","metadata":{"scenario":"降维：PCA","difficulty":"easy"}}
+{"user_input":"“特征选择会改变原始特征的含义”这句话对吗？","reference":"不对。特征选择只是选择原特征子集，不改变被选特征本身的含义。","metadata":{"scenario":"降维","difficulty":"easy"}}
+{"user_input":"维度灾难可能导致什么问题？A.过拟合 B.欠拟合 C.数据太少 D.标签泄露","reference":"A。高维稀疏容易导致模型过拟合，也可能增加计算和存储开销。","metadata":{"scenario":"降维","difficulty":"easy"}}
+{"user_input":"“降维一定提升模型性能”这句话对吗？","reference":"不对。降维可能去噪和压缩，也可能丢失有用信息，是否提升性能取决于任务和数据。","metadata":{"scenario":"降维","difficulty":"medium"}}
+{"user_input":"PCA投影矩阵通常由前k个什么组成？A.最大特征值对应的特征向量 B.最小特征值对应的特征向量 C.均值向量 D.中位数向量","reference":"A。PCA取前k个最大特征值对应的特征向量组成投影矩阵。","metadata":{"scenario":"降维：PCA","difficulty":"medium"}}
+{"user_input":"“PCA是无监督线性降维方法”这句话对吗？","reference":"对。PCA不使用标签，且通过线性投影实现降维。","metadata":{"scenario":"降维：PCA","difficulty":"easy"}}
+{"user_input":"t-SNE通常主要用于什么？A.高维数据可视化 B.分类 C.回归 D.关联规则挖掘","reference":"A。t-SNE常用于将高维数据降到二维或三维进行可视化。","metadata":{"scenario":"降维","difficulty":"easy"}}
+{"user_input":"泛化误差是指？A.训练集上的误差 B.模型在未来样本上的误差 C.验证集误差 D.测试集误差","reference":"B。泛化误差是模型在未来未知样本上的误差，常用测试误差近似。","metadata":{"scenario":"模型评估","difficulty":"easy"}}
+{"user_input":"“训练误差越小，模型泛化能力一定越强”这句话对吗？","reference":"不对。训练误差小可能只是过拟合，泛化能力还要看验证或测试误差。","metadata":{"scenario":"模型评估","difficulty":"medium"}}
+{"user_input":"过拟合通常表现为什么？A.训练误差小、测试误差大 B.训练误差大、测试误差大 C.训练误差大、测试误差小 D.训练和测试误差都小","reference":"A。过拟合时模型记住训练数据噪声，训练误差低但泛化差。","metadata":{"scenario":"模型评估","difficulty":"easy"}}
+{"user_input":"欠拟合通常表现为什么？A.训练误差大、验证误差也大 B.训练误差小、测试误差大 C.训练误差为0、测试误差为0 D.训练误差小、测试误差小","reference":"A。欠拟合表示模型太简单，训练和验证误差都较大且接近。","metadata":{"scenario":"模型评估","difficulty":"easy"}}
+{"user_input":"“验证集用于调参和模型选择”这句话对吗？","reference":"对。训练集学习参数，验证集选择超参数，测试集最终评估泛化性能。","metadata":{"scenario":"模型评估","difficulty":"easy"}}
+{"user_input":"留出法中测试集一般占多少？A.1% B.20%~33% C.50% D.80%","reference":"B。留出法通常将20%~33%的数据作为测试集。","metadata":{"scenario":"模型评估","difficulty":"easy"}}
+{"user_input":"“交叉验证中k越大计算开销越小”这句话对吗？","reference":"不对。k越大，训练和评估次数越多，计算开销通常越大。","metadata":{"scenario":"模型评估","difficulty":"medium"}}
+{"user_input":"留一法中k等于多少？A.1 B.n C.10 D.5","reference":"B。留一法每次留一个样本作测试集，若样本数为n，则k=n。","metadata":{"scenario":"模型评估","difficulty":"medium"}}
+{"user_input":"“自助法采用有放回抽样”这句话对吗？","reference":"对。自助法从原始数据集中有放回地随机抽样构建训练集。","metadata":{"scenario":"模型评估","difficulty":"medium"}}
+{"user_input":"自助法中未被抽中的样本比例约为？A.36.8% B.50% C.63.2% D.10%","reference":"A。从n个样本中有放回抽n次，约36.8%的样本未被抽中。","metadata":{"scenario":"模型评估","difficulty":"medium"}}
+{"user_input":"“测试集可以参与调参”这句话对吗？","reference":"不对。测试集应保持独立，仅用于最终评估，参与调参会造成信息泄露。","metadata":{"scenario":"模型评估","difficulty":"medium"}}
+{"user_input":"分类错误率等于？A.分类错误样本数/总样本数 B.分类正确样本数/总样本数 C.TP/(TP+FP) D.1+准确率","reference":"A。错误率是分类错误样本数占样本总数的比例。","metadata":{"scenario":"性能度量","difficulty":"easy"}}
+{"user_input":"准确率等于？A.1-错误率 B.错误率 C.TP/(TP+FP) D.TP/(TP+FN)","reference":"A。准确率是分类正确样本数占总样本数的比例，等于1-错误率。","metadata":{"scenario":"性能度量","difficulty":"easy"}}
+{"user_input":"“类别极不平衡时，准确率可能失效”这句话对吗？","reference":"对。若多数类占比极高，即使总预测为多数类，准确率也可能很高但实际效果差。","metadata":{"scenario":"性能度量","difficulty":"medium"}}
+{"user_input":"查准率P的计算公式是？A.TP/(TP+FP) B.TP/(TP+FN) C.TN/(TN+FP) D.FP/(FP+TN)","reference":"A。查准率表示预测为正例的样本中真正例的比例。","metadata":{"scenario":"性能度量","difficulty":"easy"}}
+{"user_input":"查全率R的计算公式是？A.TP/(TP+FP) B.TP/(TP+FN) C.TN/(TN+FP) D.FN/(FN+TP)","reference":"B。查全率又称召回率，表示真实正例中被预测出来的比例。","metadata":{"scenario":"性能度量","difficulty":"easy"}}
+{"user_input":"“F1值是查准率和查全率的算术平均”这句话对吗？","reference":"不对。F1是查准率和查全率的调和平均，更关注两者较低的一方。","metadata":{"scenario":"性能度量","difficulty":"easy"}}
+{"user_input":"F1值的计算公式是？A.2PR/(P+R) B.(P+R)/2 C.P*R D.P-R","reference":"A。F1=2*P*R/(P+R)，是查准率和查全率的调和平均。","metadata":{"scenario":"性能度量","difficulty":"easy"}}
+{"user_input":"“宏平均先汇总所有类的TP、FP、FN，再计算总体指标”这句话对吗？","reference":"不对。这是微平均的做法；宏平均先对每个类分别计算指标，再求平均。","metadata":{"scenario":"性能度量","difficulty":"medium"}}
+{"user_input":"偏差-方差分解中，方差主要反映？A.模型期望与真实输出的差异 B.训练集变动导致的性能变化 C.噪声下界 D.数据量大小","reference":"B。方差反映同样大小的不同训练集训练出的模型性能波动。","metadata":{"scenario":"模型评估","difficulty":"hard"}}
+{"user_input":"“偏差高通常对应欠拟合”这句话对吗？","reference":"对。偏差高说明模型期望输出与真实输出差距大，通常模型太简单，欠拟合。","metadata":{"scenario":"模型评估","difficulty":"medium"}}
+{"user_input":"偏差-方差窘境是指？A.偏差与方差存在冲突 B.数据与标签冲突 C.特征与样本冲突 D.训练与测试冲突","reference":"A。一般训练不足时偏差主导，训练过度时方差主导，二者存在权衡。","metadata":{"scenario":"模型评估","difficulty":"medium"}}
+{"user_input":"“噪声是任何学习算法所能达到的期望泛化误差下界”这句话对吗？","reference":"对。噪声表示当前任务中数据本身的不确定性，是期望泛化误差的下界。","metadata":{"scenario":"模型评估","difficulty":"hard"}}
+{"user_input":"模型选择通常主要依据什么？A.训练误差 B.验证误差 C.训练样本数 D.特征数","reference":"B。模型选择主要依据验证误差或交叉验证误差，而不是训练误差。","metadata":{"scenario":"模型评估","difficulty":"medium"}}
+{"user_input":"“交叉验证可以减少单次划分带来的偶然性”这句话对吗？","reference":"对。交叉验证多次划分并取平均，评估结果通常更稳定。","metadata":{"scenario":"模型评估","difficulty":"easy"}}
+{"user_input":"kNN算法属于哪类学习方法？A.惰性学习 B.急切学习 C.生成式模型 D.关联规则","reference":"A。kNN不预先训练模型，而是存储训练集，测试时再计算近邻。","metadata":{"scenario":"k最近邻分类","difficulty":"easy"}}
+{"user_input":"“kNN需要先进行显式训练得到参数模型”这句话对吗？","reference":"不对。kNN是惰性学习，没有显式训练阶段，测试时才建模预测。","metadata":{"scenario":"k最近邻分类","difficulty":"easy"}}
+{"user_input":"kNN中k太小容易导致？A.过拟合 B.欠拟合 C.无影响 D.模型过平滑","reference":"A。k太小对噪声敏感，容易过拟合。","metadata":{"scenario":"k最近邻分类","difficulty":"medium"}}
+{"user_input":"kNN中k太大容易导致？A.过拟合 B.欠拟合 C.无影响 D.方差增大","reference":"B。k太大模型过于平滑，可能欠拟合。","metadata":{"scenario":"k最近邻分类","difficulty":"medium"}}
+{"user_input":"“二分类kNN中k通常取奇数”这句话对吗？","reference":"对。取奇数有助于减少投票平局。","metadata":{"scenario":"k最近邻分类","difficulty":"easy"}}
+{"user_input":"kNN中常用哪种度量衡量相似度？A.欧式距离 B.信息增益 C.基尼指数 D.信息熵","reference":"A。kNN常用欧式距离、余弦相似度等衡量样本相似度。","metadata":{"scenario":"k最近邻分类","difficulty":"easy"}}
+{"user_input":"“kNN计算距离前通常需要特征规范化”这句话对吗？","reference":"对。若不规范化，量纲大的特征可能主导距离计算。","metadata":{"scenario":"k最近邻分类","difficulty":"easy"}}
+{"user_input":"kNN测试阶段可能很慢，主要原因是？A.需要与大量训练样本计算距离 B.需要反向传播 C.需要剪枝 D.需要求信息熵","reference":"A。kNN测试时需要计算测试样本与训练样本的相似度，训练集大时开销高。","metadata":{"scenario":"k最近邻分类","difficulty":"medium"}}
+{"user_input":"决策树内部结点通常表示什么？A.属性测试 B.最终类别 C.样本编号 D.距离","reference":"A。内部结点对应某个属性上的测试，分支对应测试结果。","metadata":{"scenario":"决策树","difficulty":"easy"}}
+{"user_input":"决策树叶结点通常表示什么？A.属性测试 B.预测结果 C.样本编号 D.距离","reference":"B。叶结点对应一个预测结果或类别。","metadata":{"scenario":"决策树","difficulty":"easy"}}
+{"user_input":"“决策树可以处理连续属性”这句话对吗？","reference":"对。决策树可通过连续属性离散化，如二分法，处理连续属性。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"ID3算法选择划分属性的准则是？A.基尼指数最小 B.信息增益最大 C.增益率最大 D.均方误差最小","reference":"B。ID3选择信息增益最大的属性进行划分。","metadata":{"scenario":"决策树","difficulty":"easy"}}
+{"user_input":"C4.5算法主要使用什么划分准则？A.信息增益 B.增益率 C.基尼指数 D.方差","reference":"B。C4.5使用增益率，并采用启发式策略选择划分属性。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"CART分类树通常使用什么划分准则？A.信息增益 B.增益率 C.基尼指数 D.信息熵","reference":"C。CART分类通常选择使划分后基尼指数最小的属性。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"“信息熵越小，样本集合纯度越高”这句话对吗？","reference":"对。信息熵越小，说明样本类别越集中，纯度越高。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"信息增益等于？A.划分前熵减去划分后加权熵 B.划分后熵 C.基尼指数 D.方差","reference":"A。信息增益表示用某属性划分后纯度提升的程度。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"“增益率可以缓解信息增益偏好可取值较多属性的问题”这句话对吗？","reference":"对。C4.5引入增益率，以缓解信息增益对取值数目较多属性的偏好。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"基尼指数越小通常表示？A.纯度越高 B.纯度越低 C.熵越大 D.无影响","reference":"A。基尼指数越小，数据集纯度越高。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"“决策树深度越大，测试误差一定越小”这句话对吗？","reference":"不对。深度越大训练误差通常减小，但测试误差不一定减小，可能过拟合。","metadata":{"scenario":"决策树","difficulty":"easy"}}
+{"user_input":"预剪枝的主要特点是什么？A.欠拟合风险增加 B.计算开销一定增加 C.过拟合风险增加 D.不改变模型","reference":"A。预剪枝在树生长过程中提前停止划分，训练开销降低，但可能欠拟合。","metadata":{"scenario":"决策树：剪枝","difficulty":"medium"}}
+{"user_input":"后剪枝的主要特点是什么？A.先生成完整树再剪枝 B.边建树边剪枝 C.不生成树 D.只剪根结点","reference":"A。后剪枝先生成完整决策树，再自底向上考察是否剪枝。","metadata":{"scenario":"决策树：剪枝","difficulty":"medium"}}
+{"user_input":"“后剪枝通常比预剪枝泛化性能更好”这句话对吗？","reference":"通常对。后剪枝保留更多分支后再剪，欠拟合风险较小，泛化性能常优于预剪枝。","metadata":{"scenario":"决策树：剪枝","difficulty":"medium"}}
+{"user_input":"决策树转换为规则集时，每条从根到叶的路径对应什么？A.一条IF-THEN规则 B.一个聚类 C.一个距离 D.一个协方差","reference":"A。每条根到叶的路径可转换为一条IF-THEN分类规则。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"决策树处理连续属性时，二分法候选划分点通常取？A.相邻属性值的中点 B.均值 C.中位数 D.众数","reference":"A。二分法将相邻属性值的中点作为候选划分点。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"“CART只能用于分类，不能用于回归”这句话对吗？","reference":"不对。CART既可用于分类，也可用于回归；分类常用基尼指数，回归常用平方误差。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"决策树剪枝主要用于对付什么问题？A.过拟合 B.欠拟合 C.数据缺失 D.维度灾难","reference":"A。剪枝是决策树对付过拟合的主要手段。","metadata":{"scenario":"决策树：剪枝","difficulty":"easy"}}
+{"user_input":"“信息增益越大，表示使用该属性划分获得的纯度提升越大”这句话对吗？","reference":"对。信息增益越大，说明划分后纯度提升越明显。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"信息熵公式中log常用什么底数？A.2 B.10 C.e D.100","reference":"A。决策树中信息熵常以2为底，单位为比特。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"“C4.5直接选择增益率最高的属性，可能偏好取值个数少的属性”这句话对吗？","reference":"对。因此C4.5采用启发式：先选信息增益高于平均的，再从中选增益率最高的。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"以下哪项不是决策树递归构建的停止条件？A.样本全属同一类别 B.属性集为空 C.样本集合为空 D.测试误差最小","reference":"D。测试误差最小不是递归停止条件；停止条件包括样本同类别、属性用完或样本为空。","metadata":{"scenario":"决策树","difficulty":"medium"}}
+{"user_input":"贝叶斯定理的公式是？A.P(c|x)=P(c)P(x|c)/P(x) B.P(x)=P(c)P(x|c) C.P(c|x)=P(c)+P(x) D.P(c|x)=P(c)-P(x)","reference":"A。贝叶斯定理中P(c)为先验，P(x|c)为似然，P(x)为证据。","metadata":{"scenario":"贝叶斯分类","difficulty":"easy"}}
+{"user_input":"“朴素贝叶斯假设属性之间相互独立”这句话对吗？","reference":"对。朴素贝叶斯假定在给定类别下，各属性条件独立。","metadata":{"scenario":"贝叶斯分类","difficulty":"easy"}}
+{"user_input":"朴素贝叶斯属于哪类模型？A.生成式模型 B.判别式模型 C.聚类模型 D.关联规则模型","reference":"A。朴素贝叶斯先对联合概率分布建模，再通过贝叶斯定理得到后验概率，属于生成式模型。","metadata":{"scenario":"贝叶斯分类","difficulty":"medium"}}
+{"user_input":"判别式模型通常直接建模什么？A.P(c|x) B.P(x,c) C.P(x) D.P(c)","reference":"A。判别式模型直接对后验概率P(c|x)建模，如决策树、神经网络、SVM。","metadata":{"scenario":"贝叶斯分类","difficulty":"medium"}}
+{"user_input":"“拉普拉斯修正可以避免零概率问题”这句话对吗？","reference":"对。拉普拉斯修正对概率估计的分子加1并调整分母，避免某条件概率为0导致连乘为0。","metadata":{"scenario":"贝叶斯分类","difficulty":"medium"}}
+{"user_input":"贝叶斯网通常是什么结构？A.有向无环图 B.无向图 C.完全图 D.线性模型","reference":"A。贝叶斯网是有向无环图，结点表示属性，边表示依赖关系。","metadata":{"scenario":"贝叶斯分类","difficulty":"hard"}}
+{"user_input":"“贝叶斯网中的边表示属性之间的依赖关系”这句话对吗？","reference":"对。贝叶斯网用边表示属性之间的依赖关系，并用条件概率表描述参数。","metadata":{"scenario":"贝叶斯分类","difficulty":"hard"}}
+{"user_input":"集成学习中个体学习器通常应满足什么？A.好而不同 B.完全相同 C.都表现很差 D.与任务无关","reference":"A。个体学习器应有一定准确性且彼此有差异，即好而不同。","metadata":{"scenario":"组合分类","difficulty":"easy"}}
+{"user_input":"Bagging在训练阶段采用什么采样方式？A.有放回采样 B.无放回采样 C.分层采样 D.系统采样","reference":"A。Bagging通过有放回随机采样得到多个训练子集。","metadata":{"scenario":"组合分类","difficulty":"medium"}}
+{"user_input":"“随机森林通常由多棵CART决策树组成”这句话对吗？","reference":"对。随机森林通常以CART决策树为基学习器，并引入样本和特征随机性。","metadata":{"scenario":"组合分类","difficulty":"medium"}}
+{"user_input":"随机森林用于分类时，常用什么方式得到最终预测？A.投票 B.求均值 C.加权和 D.最大熵","reference":"A。分类问题常用投票法，回归问题常用均值法。","metadata":{"scenario":"组合分类","difficulty":"medium"}}
+{"user_input":"随机森林用于回归时，常用什么方式得到最终预测？A.投票 B.均值 C.中位数 D.众数","reference":"B。随机森林回归通常对各棵树预测结果取均值。","metadata":{"scenario":"组合分类","difficulty":"medium"}}
+{"user_input":"“Boosting通常按顺序串行训练基分类器”这句话对吗？","reference":"对。Boosting按顺序训练，后续分类器更关注之前错分的样本。","metadata":{"scenario":"组合分类","difficulty":"medium"}}
+{"user_input":"Boosting中后续分类器通常更关注什么？A.之前被错分的样本 B.之前被正确分类的样本 C.随机样本 D.标签分布","reference":"A。Boosting通过调整样本权重，使后续分类器关注之前分类不准确的样本。","metadata":{"scenario":"组合分类","difficulty":"medium"}}
+{"user_input":"“Bagging中的基分类器通常可以独立并行训练”这句话对吗？","reference":"对。Bagging各基分类器基于不同采样数据集独立训练，便于并行。","metadata":{"scenario":"组合分类","difficulty":"medium"}}
+{"user_input":"随机森林中每棵树通常如何生长？A.充分生长且不剪枝 B.只生长一层 C.必须预剪枝 D.只留根结点","reference":"A。随机森林中每棵树通常尽可能充分生长且不剪枝，以增加多样性。","metadata":{"scenario":"组合分类","difficulty":"medium"}}
+{"user_input":"“集成学习一定比单个分类器好”这句话对吗？","reference":"不对。若基学习器太差或过于相似，集成未必提升，甚至可能变差。","metadata":{"scenario":"组合分类","difficulty":"medium"}}
+{"user_input":"AdaBoost属于哪类集成方法？A.Bagging B.Boosting C.聚类 D.降维","reference":"B。AdaBoost是Boosting的经典算法。","metadata":{"scenario":"组合分类","difficulty":"medium"}}
+{"user_input":"“个体学习器多样性有助于提升集成效果”这句话对吗？","reference":"对。个体学习器好而不同，集成后更容易互补，提升泛化能力。","metadata":{"scenario":"组合分类","difficulty":"easy"}}
+{"user_input":"组合分类在机器学习中又称为什么？A.集成学习 B.降维 C.聚类 D.关联规则","reference":"A。组合分类利用多个基分类器组合，又称集成学习。","metadata":{"scenario":"组合分类","difficulty":"easy"}}
+{"user_input":"“随机森林对异常值完全鲁棒”这句话对吗？","reference":"不对。随机森林有一定鲁棒性，但并非对异常值完全免疫。","metadata":{"scenario":"组合分类","difficulty":"medium"}}
+{"user_input":"Bagging用于分类时，预测阶段通常采用？A.投票 B.求均值 C.乘积 D.最小距离","reference":"A。Bagging分类通常通过投票决定最终类别。","metadata":{"scenario":"组合分类","difficulty":"medium"}}
+{"user_input":"“Boosting中每个基分类器通常有不同权重”这句话对吗？","reference":"对。表现好的基分类器通常权重更高，预测时按权重参与投票或求均值。","metadata":{"scenario":"组合分类","difficulty":"medium"}}
+{"user_input":"贝叶斯分类中P(c)通常称为什么？A.先验概率 B.后验概率 C.似然 D.证据因子","reference":"A。P(c)是类别先验概率，P(x|c)是类条件概率或似然。","metadata":{"scenario":"贝叶斯分类","difficulty":"easy"}}
+{"user_input":"“在比较不同类别的后验概率时，P(x)常可忽略”这句话对吗？","reference":"对。对同一样本x，P(x)与类别无关，因此分类决策时常可忽略。","metadata":{"scenario":"贝叶斯分类","difficulty":"medium"}}
+{"user_input":"聚类属于哪类学习？A.监督学习 B.无监督学习 C.半监督学习 D.强化学习","reference":"B。聚类不使用标签，属于无监督学习。","metadata":{"scenario":"聚类：基本概念","difficulty":"easy"}}
+{"user_input":"“K-means需要预先指定簇数k”这句话对吗？","reference":"对。K-means需要先给定k，然后迭代优化聚类中心。","metadata":{"scenario":"聚类：K-means","difficulty":"easy"}}
+{"user_input":"K-means的目标通常是什么？A.最小化簇内平方距离之和 B.最大化信息熵 C.最小化基尼指数 D.最大化信息增益","reference":"A。K-means最小化每个样本到其所属簇中心的欧式距离平方和。","metadata":{"scenario":"聚类：K-means","difficulty":"medium"}}
+{"user_input":"“K-means对初始聚类中心敏感”这句话对吗？","reference":"对。K-means只能保证局部最优，不同初始化可能得到不同结果。","metadata":{"scenario":"聚类：K-means","difficulty":"medium"}}
+{"user_input":"K-means更新聚类中心时通常取什么？A.簇内样本均值 B.簇内中位数 C.簇内众数 D.簇内最大点","reference":"A。K-means将聚类中心更新为分配给该簇样本的均值。","metadata":{"scenario":"聚类：K-means","difficulty":"easy"}}
+{"user_input":"选择K-means中k值常用什么方法？A.肘点法 B.信息增益 C.基尼指数 D.F1值","reference":"A。常用肘点法或轮廓系数法选择k。","metadata":{"scenario":"聚类：K-means","difficulty":"medium"}}
+{"user_input":"“K-means非常适合发现任意形状的非凸簇”这句话对吗？","reference":"不对。K-means倾向于发现球形或凸形簇，对非凸簇效果可能较差。","metadata":{"scenario":"聚类：K-means","difficulty":"medium"}}
+{"user_input":"AGNES是哪种层次聚类？A.自下而上凝聚 B.自上而下分裂 C.密度聚类 D.网格聚类","reference":"A。AGNES是自下而上的凝聚层次聚类。","metadata":{"scenario":"聚类：层次聚类","difficulty":"medium"}}
+{"user_input":"层次聚类中单连接取两个簇之间距离的？A.最小值 B.最大值 C.平均值 D.中位数","reference":"A。单连接取两个不同簇样本间距离的最小值。","metadata":{"scenario":"聚类：层次聚类","difficulty":"medium"}}
+{"user_input":"层次聚类中全连接取两个簇之间距离的？A.最小值 B.最大值 C.平均值 D.中位数","reference":"B。全连接取两个不同簇样本间距离的最大值。","metadata":{"scenario":"聚类：层次聚类","difficulty":"medium"}}
+{"user_input":"“平均连接取属于两个不同簇的样本之间距离的平均值”这句话对吗？","reference":"对。平均连接综合考虑两个簇之间所有跨簇样本对的距离。","metadata":{"scenario":"聚类：层次聚类","difficulty":"medium"}}
+{"user_input":"DBSCAN基于什么思想聚类？A.密度 B.方差 C.信息熵 D.基尼指数","reference":"A。DBSCAN是基于密度的聚类算法。","metadata":{"scenario":"聚类：密度聚类","difficulty":"medium"}}
+{"user_input":"DBSCAN中核心点要求邻域内样本数满足什么条件？A.不少于MinPts B.少于MinPts C.等于0 D.等于1","reference":"A。核心点邻域内样本点数量不少于MinPts。","metadata":{"scenario":"聚类：密度聚类","difficulty":"medium"}}
+{"user_input":"“DBSCAN可以识别噪声点”这句话对吗？","reference":"对。DBSCAN将不属于任何簇的稀疏点识别为噪声点。","metadata":{"scenario":"聚类：密度聚类","difficulty":"medium"}}
+{"user_input":"DBSCAN中的边界点是指？A.在核心点邻域内但自身不是核心点 B.一定是核心点 C.一定是噪声点 D.聚类中心","reference":"A。边界点位于核心点邻域内，但自身邻域内样本数少于MinPts。","metadata":{"scenario":"聚类：密度聚类","difficulty":"medium"}}
+{"user_input":"“DBSCAN中密度可达具有传递性”这句话对吗？","reference":"对。密度可达可以通过核心对象序列传递。","metadata":{"scenario":"聚类：密度聚类","difficulty":"hard"}}
+{"user_input":"轮廓系数越大通常表示？A.聚类效果越好 B.聚类效果越差 C.与聚类无关 D.一定等于1","reference":"A。轮廓系数综合考虑簇内紧凑度和簇间分离度，越大通常越好。","metadata":{"scenario":"聚类：评估","difficulty":"medium"}}
+{"user_input":"“轮廓系数是聚类的外部评价指标”这句话对吗？","reference":"不对。轮廓系数通常属于内部评价指标，不需要真实标签。","metadata":{"scenario":"聚类：评估","difficulty":"medium"}}
+{"user_input":"关联规则中支持度Support(X->Y)等于？A.P(X,Y) B.P(Y|X) C.P(X|Y) D.P(X)","reference":"A。支持度表示同时包含X和Y的交易占总交易数的比例。","metadata":{"scenario":"关联规则挖掘","difficulty":"easy"}}
+{"user_input":"关联规则中置信度Confidence(X->Y)等于？A.P(X,Y) B.P(Y|X) C.P(X|Y) D.P(Y)","reference":"B。置信度表示包含X的交易中有多少也包含Y。","metadata":{"scenario":"关联规则挖掘","difficulty":"easy"}}
+{"user_input":"“支持度具有反单调性”这句话对吗？","reference":"对。若X包含于Y，则support(X)≥support(Y)，即项集越大支持度通常越低。","metadata":{"scenario":"关联规则挖掘","difficulty":"medium"}}
+{"user_input":"Apriori原理的核心内容是？A.频繁项集的所有非空子集也频繁 B.非频繁项集的所有超集也频繁 C.所有项集都频繁 D.支持度与项集无关","reference":"A。Apriori利用支持度反单调性，频繁项集的子集也频繁。","metadata":{"scenario":"关联规则挖掘","difficulty":"medium"}}
+{"user_input":"“关联规则挖掘通常先挖掘频繁项集，再生成规则”这句话对吗？","reference":"对。两步法：先按支持度找频繁项集，再按置信度生成规则。","metadata":{"scenario":"关联规则挖掘","difficulty":"medium"}}
+{"user_input":"Apriori构建候选k+1项集时通常合并什么？A.频繁k项集 B.所有项 C.随机项 D.标签","reference":"A。Apriori从频繁k项集Lk合并生成候选k+1项集。","metadata":{"scenario":"关联规则挖掘","difficulty":"hard"}}
+{"user_input":"“关联规则{A}->{B}和{B}->{A}完全相同”这句话对吗？","reference":"不对。两者支持度相同，但置信度通常不同，方向有意义。","metadata":{"scenario":"关联规则挖掘","difficulty":"medium"}}
+{"user_input":"“购物车模型可以拓展到文本分析，用于发现经常共现的词”这句话对吗？","reference":"对。可将文本视为交易，词视为项，关联规则可用于话题检测等。","metadata":{"scenario":"关联规则挖掘","difficulty":"medium"}}
+{"user_input":"关联规则两步法中第一步通常是？A.频繁项集挖掘 B.规则生成 C.聚类 D.分类","reference":"A。先挖掘满足最小支持度的频繁项集，再生成满足最小置信度的规则。","metadata":{"scenario":"关联规则挖掘","difficulty":"medium"}}
+{"user_input":"“置信度高一定意味着支持度高”这句话对吗？","reference":"不对。置信度高只说明X出现时Y出现概率高，但X本身可能很少出现，支持度未必高。","metadata":{"scenario":"关联规则挖掘","difficulty":"medium"}}
+{"user_input":"Apriori剪枝的主要依据是？A.非频繁项集的超集也不频繁 B.频繁项集的超集一定频繁 C.支持度与项集无关 D.置信度越高支持度越高","reference":"A。若某项集不频繁，则包含它的超集也不可能频繁，可剪枝。","metadata":{"scenario":"关联规则挖掘","difficulty":"hard"}}
