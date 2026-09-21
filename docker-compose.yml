@@ -3,7 +3,7 @@
 # 服务：postgresql + neo4j + redis + nacos + lightrag + minio
 #      + gateway + user/file/kb/qa/admin 微服务 + frontend + caddy + prometheus + grafana
 #
-# 对外仅开放端口：80 / 443 / 6115（Caddy/前端 HTTPS）、6116（MinIO 头像直链）
+# 对外仅开放端口：80 / 443（Caddy/前端 HTTPS）、6116（MinIO 头像直链）
 # 其余微服务端口在容器内开放，供服务间通信；服务器防火墙需阻断非以上四端口的外网访问
 #
 # 使用：cp .env.example .env && docker compose up -d --build
@@ -591,7 +591,6 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "6115:443"
     depends_on:
       - frontend
       - minio
